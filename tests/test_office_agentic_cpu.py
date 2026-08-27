@@ -20,7 +20,7 @@ from office_env import (  # noqa: E402
 )
 from office_tools import TOOLS, OfficeWorkspace  # noqa: E402
 from reward import reward_fn  # noqa: E402
-from run_agent import _context_budget, _system_prompt  # noqa: E402
+from run_agent import _completion_was_truncated, _context_budget, _system_prompt  # noqa: E402
 
 
 @pytest.mark.parametrize(
@@ -61,6 +61,7 @@ def test_office_generator_records_use_dynamic_10k_budget():
     records = [build_record(task, seed=2026 + index, index=index + 1) for index, task in enumerate(TASK_TYPES)]
     assert {record["context_budget"] for record in records} == {10_000}
     assert {record["max_turns"] for record in records} == {12}
+    assert all("generation_reserve" not in record for record in records)
     assert all(record["output_file"] in record["prompt"] for record in records)
     assert set(TASK_TYPES) == {
         "excel_chart_dashboard",
@@ -129,9 +130,16 @@ def test_office_system_prompt_binds_the_actual_isolated_workspace():
     finally:
         workspace.close()
     assert workspace.root.as_posix() in prompt
-    assert "current working directory" in prompt
+    assert "Every tool resolves relative paths from this root" in prompt
     assert "Use relative paths" in prompt
     assert "Do not inspect the host's /workspace" in prompt
+    assert "Prefer" not in prompt
+
+
+def test_office_detects_length_truncated_completions():
+    assert _completion_was_truncated(SimpleNamespace(choices=[SimpleNamespace(finish_reason="length")]))
+    assert not _completion_was_truncated(SimpleNamespace(choices=[SimpleNamespace(finish_reason="tool_calls")]))
+    assert not _completion_was_truncated(SimpleNamespace(choices=[]))
 
 
 def test_office_runtime_token_budget_defaults_to_record(monkeypatch: pytest.MonkeyPatch):

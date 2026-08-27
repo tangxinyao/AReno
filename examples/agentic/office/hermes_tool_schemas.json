@@ -3,7 +3,7 @@
     "type": "function",
     "function": {
       "name": "execute_code",
-      "description": "Run Python in the isolated Office workspace. Use relative paths. openpyxl and python-docx are available; import read_file or write_file from hermes_tools if useful. Create and verify the requested artifact in one call when possible.",
+      "description": "Run Python in the isolated Office workspace. Use relative paths. openpyxl and python-docx are available; import read_file or write_file from hermes_tools if useful.",
       "parameters": {
         "type": "object",
         "properties": {

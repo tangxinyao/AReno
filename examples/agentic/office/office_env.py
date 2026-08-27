@@ -158,7 +158,6 @@ def build_record(
         "output_file": output_file,
         "max_turns": 12,
         "context_budget": 10_000,
-        "generation_reserve": 768,
         "prompt": make_prompt(spec, template=template, rng=rng),
     }
 

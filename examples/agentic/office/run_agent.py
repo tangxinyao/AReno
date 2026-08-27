@@ -21,13 +21,14 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 
 SYSTEM_PROMPT = """You are an Office artifact agent in an isolated workspace.
 The workspace root for this task is {workspace}. All input files named by the user are already directly inside that
-root, and execute_code starts with that root as its current working directory. Use relative paths such as
-'input.xlsx' or '.' for every tool and file operation. Do not inspect the host's /workspace directory or search
-outside this task root. Use the available tools to inspect inputs, create the exact requested output, and verify it.
-openpyxl, python-docx, and headless LibreOffice are installed. Do not install packages, use the network, or write
-outside the workspace. Create the file before answering."""
+root. Every tool resolves relative paths from this root. Use relative paths such as 'input.xlsx' or '.' for file
+operations. Do not inspect the host's /workspace directory or search outside this task root. Choose among the
+available tools based on the task, inspect the inputs, create the exact requested output, and verify it. openpyxl,
+python-docx, and headless LibreOffice are installed. Do not install packages, use the network, or write outside the
+workspace. Create the file before answering."""
 
 FINAL_PROMPT = "Stop using tools. State the output filename and whether the latest artifact_issues is empty."
+FINAL_RESPONSE_MAX_TOKENS = 256
 TOKEN_BUDGET_ENV = "ARENO_OFFICE_TOKEN_BUDGET"
 
 
@@ -69,7 +70,6 @@ async def run_agent(ctx, batch) -> AgentTrajectory:
 async def _run_episode(item, workspace: OfficeWorkspace, client, tokenizer) -> list[AgentTrajectoryTurn]:
     record = dict(item.record)
     context_budget = _context_budget(record)
-    generation_reserve = int(record.get("generation_reserve", 768))
     max_turns = int(record.get("max_turns", 12))
     messages = [{"role": "system", "content": _system_prompt(workspace)}, {"role": "user", "content": item.prompt}]
     turns = []
@@ -94,11 +94,19 @@ async def _run_episode(item, workspace: OfficeWorkspace, client, tokenizer) -> l
             "model": "policy",
             "messages": request_messages,
             "stream": False,
-            "max_tokens": min(256 if must_finish else generation_reserve, remaining_tokens),
+            "max_tokens": min(FINAL_RESPONSE_MAX_TOKENS, remaining_tokens) if must_finish else remaining_tokens,
         }
         if not must_finish:
             kwargs.update({"tools": TOOLS, "tool_choice": "auto"})
         response = await client.chat.completions.create(**kwargs)
+        if _completion_was_truncated(response):
+            logger.warning(
+                "Dropping length-truncated Office turn task=%s turn=%d max_tokens=%d",
+                record.get("id"),
+                turn_index + 1,
+                kwargs["max_tokens"],
+            )
+            break
         turn = AgentTrajectoryTurn(
             item=item,
             messages=request_messages,
@@ -130,7 +138,7 @@ async def _run_episode(item, workspace: OfficeWorkspace, client, tokenizer) -> l
         )
         solved = float(result.get("artifact_score", 0.0)) >= 1.0
         next_context_tokens = _context_token_count(tokenizer, messages, tools=TOOLS)
-        finish_next = solved or next_context_tokens >= context_budget - generation_reserve
+        finish_next = solved or next_context_tokens >= context_budget - FINAL_RESPONSE_MAX_TOKENS
         logger.debug(
             "Office turn task=%s turn=%d context_tokens=%d solved=%s",
             record.get("id"),
@@ -145,6 +153,13 @@ def _system_prompt(workspace: OfficeWorkspace) -> str:
     """Bind the model-visible prompt to this episode's actual workspace."""
 
     return SYSTEM_PROMPT.format(workspace=workspace.root.as_posix())
+
+
+def _completion_was_truncated(response) -> bool:
+    """Return whether the server stopped before completing this response."""
+
+    choices = getattr(response, "choices", None) or []
+    return bool(choices and getattr(choices[0], "finish_reason", None) == "length")
 
 
 def _context_budget(record: dict[str, Any]) -> int:

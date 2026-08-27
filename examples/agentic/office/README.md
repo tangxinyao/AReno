@@ -87,7 +87,7 @@ areno train \
   --optimizer-state-offload-dir /tmp/areno-office-optimizer \
   --max-context-len 10000 \
   --max-prompt-tokens 4096 \
-  --max-new-tokens 1024
+  --max-new-tokens 9000
 ```
 
 The reward uses the final tool call's parsed `.xlsx` or `.docx` artifact score,
