@@ -24,8 +24,8 @@ The workspace root for this task is {workspace}. All input files named by the us
 root, and execute_code starts with that root as its current working directory. Use relative paths such as
 'input.xlsx' or '.' for every tool and file operation. Do not inspect the host's /workspace directory or search
 outside this task root. Use the available tools to inspect inputs, create the exact requested output, and verify it.
-Prefer one execute_code call. openpyxl, python-docx, and headless LibreOffice are installed. Do not install packages,
-use the network, or write outside the workspace. Create the file before answering."""
+openpyxl, python-docx, and headless LibreOffice are installed. Do not install packages, use the network, or write
+outside the workspace. Create the file before answering."""
 
 FINAL_PROMPT = "Stop using tools. State the output filename and whether the latest artifact_issues is empty."
 TOKEN_BUDGET_ENV = "ARENO_OFFICE_TOKEN_BUDGET"
