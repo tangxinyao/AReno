@@ -19,10 +19,13 @@ from office_tools import TOOLS, OfficeWorkspace, decode_tool_arguments, run_tool
 logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-SYSTEM_PROMPT = """You are an Office artifact agent in an isolated workspace. Use relative paths and the available
-tools to inspect inputs, create the exact requested output, and verify it. Prefer one execute_code call. openpyxl,
-python-docx, and headless LibreOffice are installed. Do not install packages, use the network, or write outside the
-workspace. Create the file before answering."""
+SYSTEM_PROMPT = """You are an Office artifact agent in an isolated workspace.
+The workspace root for this task is {workspace}. All input files named by the user are already directly inside that
+root, and execute_code starts with that root as its current working directory. Use relative paths such as
+'input.xlsx' or '.' for every tool and file operation. Do not inspect the host's /workspace directory or search
+outside this task root. Use the available tools to inspect inputs, create the exact requested output, and verify it.
+Prefer one execute_code call. openpyxl, python-docx, and headless LibreOffice are installed. Do not install packages,
+use the network, or write outside the workspace. Create the file before answering."""
 
 FINAL_PROMPT = "Stop using tools. State the output filename and whether the latest artifact_issues is empty."
 TOKEN_BUDGET_ENV = "ARENO_OFFICE_TOKEN_BUDGET"
@@ -68,7 +71,7 @@ async def _run_episode(item, workspace: OfficeWorkspace, client, tokenizer) -> l
     context_budget = _context_budget(record)
     generation_reserve = int(record.get("generation_reserve", 768))
     max_turns = int(record.get("max_turns", 12))
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": item.prompt}]
+    messages = [{"role": "system", "content": _system_prompt(workspace)}, {"role": "user", "content": item.prompt}]
     turns = []
     finish_next = False
 
@@ -136,6 +139,12 @@ async def _run_episode(item, workspace: OfficeWorkspace, client, tokenizer) -> l
             solved,
         )
     return turns
+
+
+def _system_prompt(workspace: OfficeWorkspace) -> str:
+    """Bind the model-visible prompt to this episode's actual workspace."""
+
+    return SYSTEM_PROMPT.format(workspace=workspace.root.as_posix())
 
 
 def _context_budget(record: dict[str, Any]) -> int:
