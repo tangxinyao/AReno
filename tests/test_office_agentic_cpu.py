@@ -20,7 +20,12 @@ from office_env import (  # noqa: E402
 )
 from office_tools import TOOLS, OfficeWorkspace  # noqa: E402
 from reward import reward_fn  # noqa: E402
-from run_agent import _completion_was_truncated, _context_budget, _system_prompt  # noqa: E402
+from run_agent import (  # noqa: E402
+    _completion_was_truncated,
+    _context_budget,
+    _request_max_tokens,
+    _system_prompt,
+)
 
 
 @pytest.mark.parametrize(
@@ -140,6 +145,12 @@ def test_office_detects_length_truncated_completions():
     assert _completion_was_truncated(SimpleNamespace(choices=[SimpleNamespace(finish_reason="length")]))
     assert not _completion_was_truncated(SimpleNamespace(choices=[SimpleNamespace(finish_reason="tool_calls")]))
     assert not _completion_was_truncated(SimpleNamespace(choices=[]))
+
+
+def test_office_tool_turns_inherit_session_max_new_tokens():
+    assert _request_max_tokens(must_finish=False, remaining_tokens=8_731) is None
+    assert _request_max_tokens(must_finish=True, remaining_tokens=8_731) == 256
+    assert _request_max_tokens(must_finish=True, remaining_tokens=123) == 123
 
 
 def test_office_runtime_token_budget_defaults_to_record(monkeypatch: pytest.MonkeyPatch):

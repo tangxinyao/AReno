@@ -94,17 +94,19 @@ async def _run_episode(item, workspace: OfficeWorkspace, client, tokenizer) -> l
             "model": "policy",
             "messages": request_messages,
             "stream": False,
-            "max_tokens": min(FINAL_RESPONSE_MAX_TOKENS, remaining_tokens) if must_finish else remaining_tokens,
         }
+        request_max_tokens = _request_max_tokens(must_finish=must_finish, remaining_tokens=remaining_tokens)
+        if request_max_tokens is not None:
+            kwargs["max_tokens"] = request_max_tokens
         if not must_finish:
             kwargs.update({"tools": TOOLS, "tool_choice": "auto"})
         response = await client.chat.completions.create(**kwargs)
         if _completion_was_truncated(response):
             logger.warning(
-                "Dropping length-truncated Office turn task=%s turn=%d max_tokens=%d",
+                "Dropping length-truncated Office turn task=%s turn=%d max_tokens=%s",
                 record.get("id"),
                 turn_index + 1,
-                kwargs["max_tokens"],
+                request_max_tokens if request_max_tokens is not None else "session",
             )
             break
         turn = AgentTrajectoryTurn(
@@ -160,6 +162,14 @@ def _completion_was_truncated(response) -> bool:
 
     choices = getattr(response, "choices", None) or []
     return bool(choices and getattr(choices[0], "finish_reason", None) == "length")
+
+
+def _request_max_tokens(*, must_finish: bool, remaining_tokens: int) -> int | None:
+    """Use session max-new-tokens for tools; cap only the final text turn."""
+
+    if not must_finish:
+        return None
+    return min(FINAL_RESPONSE_MAX_TOKENS, remaining_tokens)
 
 
 def _context_budget(record: dict[str, Any]) -> int:
