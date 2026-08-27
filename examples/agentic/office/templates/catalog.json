@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "name": "office-deliverable-combinatorial-v1",
+  "source": {
+    "description": "Structured from 25 retry-correct and 21 wrong deliverable cases dated 2026-08-27. Source cases are used as coverage signals, not copied as fixed prompts.",
+    "correct_case_count": 25,
+    "wrong_case_count": 21,
+    "correct_case_ids": [
+      "UID0003", "UID0009", "UID0012", "UID0017", "UID0019", "UID0025", "UID0031", "UID0036",
+      "UID0042", "UID0049", "UID0050", "UID0053", "UID0055", "UID0056", "UID0065", "UID0071",
+      "UID0085", "UID0086", "UID0093", "UID0097", "UID0103", "UID0112", "UID0121", "UID0130",
+      "UID0133"
+    ],
+    "wrong_case_ids": [
+      "UID0001", "UID0010", "UID0015", "UID0032", "UID0037", "UID0039", "UID0044", "UID0058",
+      "UID0059", "UID0062", "UID0069", "UID0073", "UID0077", "UID0083", "UID0084", "UID0094",
+      "UID0109", "UID0120", "UID0122", "UID0123", "UID0124"
+    ],
+    "risk_tags": [
+      "period_definition",
+      "unit_conversion",
+      "wrong_row",
+      "wrong_window",
+      "range_vs_point",
+      "net_vs_gross",
+      "growth_baseline",
+      "statistical_object",
+      "fiscal_vs_calendar",
+      "source_selection",
+      "output_format",
+      "artifact_verification"
+    ]
+  },
+  "templates": [
+    {
+      "task": "excel_chart_dashboard",
+      "prompt_templates": [
+        "根据 {input_file}（月份/销售量/营收）生成 {output_file}：保留数据、新增一个柱状图图表对象引用销售量或营收。保存后确认图表对象存在。",
+        "读取 {input_file} 的月度数据，复制原数据到 {output_file}，并插入一个引用销售量或营收列的柱状图。重新打开文件确认图表对象存在。"
+      ],
+      "fields": {
+        "input_file": {"generator": "filename", "extension": ".xlsx"},
+        "output_file": {"generator": "filename", "extension": ".xlsx"},
+        "sheet_name": {"generator": "text", "min_length": 3, "max_length": 7}
+      },
+      "risk_tags": ["wrong_row", "source_selection", "artifact_verification"]
+    },
+    {
+      "task": "excel_formula_conditional",
+      "prompt_templates": [
+        "读取 {input_file}，新增“折扣价”列：用公式 原价×(1-折扣率)；合计行用求和公式而非硬编码数值；给折扣率高于均值的行加绿色填充。保存为 {output_file}。",
+        "在 {input_file} 中按原价和折扣率计算公式列“折扣价”，追加公式合计行，并用绿色条件格式标记折扣率高于平均值的记录；另存为 {output_file}。"
+      ],
+      "fields": {
+        "input_file": {"generator": "filename", "extension": ".xlsx"},
+        "output_file": {"generator": "filename", "extension": ".xlsx"},
+        "sheet_name": {"generator": "text", "min_length": 3, "max_length": 7}
+      },
+      "risk_tags": ["wrong_row", "statistical_object", "artifact_verification"]
+    },
+    {
+      "task": "excel_read_analyze",
+      "prompt_templates": [
+        "读取 {input_file}（含若干产品、若干区域与合计），汇总产品总数、区域总数、各产品营收总额和整体总营收。结果写入 {output_file}，并注明每项来源文件。",
+        "分析 {input_file} 的产品×区域营收表，在 {output_file} 中列出产品数、区域数、逐产品合计及总营收；不要把合计行重复计入，并注明来源。"
+      ],
+      "fields": {
+        "input_file": {"generator": "filename", "extension": ".xlsx"},
+        "output_file": {"generator": "filename", "extension": ".txt"},
+        "sheet_name": {"generator": "text", "min_length": 3, "max_length": 7}
+      },
+      "risk_tags": ["net_vs_gross", "wrong_row", "source_selection", "output_format"]
+    },
+    {
+      "task": "excel_write_data",
+      "prompt_templates": [
+        "生成报价台账 {output_file}：表头为 产品名称/单价/数量/金额；填写 8 行产品数据；产品名称非空、单价和数量为正数、金额=单价*数量；表头加粗并设置合适列宽。",
+        "新建 {output_file}，写入 8 条报价记录，列为产品名称、单价、数量、金额；金额必须使用乘法公式，表头加粗且列宽可读。"
+      ],
+      "fields": {
+        "output_file": {"generator": "filename", "extension": ".xlsx"},
+        "sheet_name": {"generator": "text", "min_length": 3, "max_length": 7}
+      },
+      "risk_tags": ["unit_conversion", "output_format", "artifact_verification"]
+    },
+    {
+      "task": "office_mixed_report",
+      "prompt_templates": [
+        "读取 {input_file} 汇总数据，生成 {output_file}：标题恰当，含各产品/区域营收合计的数据表格，正文写最关键的 2 个结论并带具体数值。",
+        "基于 {input_file} 创建 Word 报告 {output_file}，保留产品与区域汇总表，并明确写出营收最高的产品和区域及其数值。"
+      ],
+      "fields": {
+        "input_file": {"generator": "filename", "extension": ".xlsx"},
+        "output_file": {"generator": "filename", "extension": ".docx"},
+        "sheet_name": {"generator": "text", "min_length": 3, "max_length": 7}
+      },
+      "risk_tags": ["wrong_row", "net_vs_gross", "source_selection", "artifact_verification"]
+    },
+    {
+      "task": "word_convert_pdf",
+      "prompt_templates": [
+        "将 {input_file} 转换为 PDF，输出保存为 {output_file}。确认输出存在、非空且能正常解析。",
+        "把 Word 文档 {input_file} 完整转换成 {output_file}，保存后重新检查 PDF 至少包含一个可解析页面。"
+      ],
+      "fields": {
+        "input_file": {"generator": "filename", "extension": ".docx"},
+        "output_file": {"generator": "filename", "extension": ".pdf"}
+      },
+      "risk_tags": ["output_format", "artifact_verification"]
+    },
+    {
+      "task": "word_create_report",
+      "prompt_templates": [
+        "创建 Word 周报文档 {output_file}：包含标题“《工作周报》”，以及“一、本周进展”“二、遇到的问题”“三、下周计划”三个小节，各节写 2-3 句中文，最后以“填写人：____”结尾。生成后确认文件存在且可打开。",
+        "新建 {output_file}，标题为《工作周报》，正文依次包含本周进展、遇到的问题和下周计划三个编号小节，每节 2-3 句，末尾添加填写人栏并验证文件可打开。"
+      ],
+      "fields": {
+        "output_file": {"generator": "filename", "extension": ".docx"}
+      },
+      "risk_tags": ["output_format", "artifact_verification"]
+    },
+    {
+      "task": "word_extract_stat",
+      "prompt_templates": [
+        "读取 {input_file} 与词汇表 {vocabulary_file}，统计文档中每个词汇表词条的出现次数，输出为 {output_file}（JSON 对象，键只能来自词汇表）。",
+        "按 {vocabulary_file} 提供的词条统计 {input_file} 中的词频，将完整映射写入 {output_file}；不要计入词汇表外的词。"
+      ],
+      "fields": {
+        "input_file": {"generator": "filename", "extension": ".docx"},
+        "vocabulary_file": {"generator": "filename", "extension": ".txt"},
+        "output_file": {"generator": "filename", "extension": ".json"}
+      },
+      "risk_tags": ["statistical_object", "source_selection", "output_format"]
+    },
+    {
+      "task": "word_format_edit",
+      "prompt_templates": [
+        "读取 {input_file}（周报模板），将“标题1”样式段落居中且加粗，正文设为宋体 12pt，将包含“三、待协调事项”的段落改为无序列表项，末尾追加“填写人：____________”。保存为 {output_file}，不要修改输入文件。",
+        "格式化 {input_file} 并另存为 {output_file}：一级标题居中加粗，正文使用宋体小四，待协调事项改成项目符号，文末加入填写人栏；保留原文件。"
+      ],
+      "fields": {
+        "input_file": {"generator": "filename", "extension": ".docx"},
+        "output_file": {"generator": "filename", "extension": ".docx"}
+      },
+      "risk_tags": ["source_selection", "output_format", "artifact_verification"]
+    },
+    {
+      "task": "word_table_doc",
+      "prompt_templates": [
+        "读取 {input_file}（含月份和销售量），在 Word 中插入与数据行列数一致的表格，表头加粗，并在表格下方写一句包含全部销售量合计值的话。保存为 {output_file}。",
+        "把 {input_file} 的月度销售数据转成 Word 表格并保存到 {output_file}；表头需加粗，数据不得漏行，表格后写出销售量总和。"
+      ],
+      "fields": {
+        "input_file": {"generator": "filename", "extension": ".xlsx"},
+        "output_file": {"generator": "filename", "extension": ".docx"},
+        "sheet_name": {"generator": "text", "min_length": 3, "max_length": 7}
+      },
+      "risk_tags": ["wrong_window", "range_vs_point", "artifact_verification"]
+    }
+  ]
+}
