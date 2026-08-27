@@ -1,0 +1,99 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "execute_code",
+      "description": "Run Python in the isolated Office workspace. Use relative paths. openpyxl and python-docx are available; import read_file or write_file from hermes_tools if useful. Create and verify the requested artifact in one call when possible.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Python code to execute in the workspace."
+          }
+        },
+        "required": [
+          "code"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "read_file",
+      "description": "Read a relative workspace file. Text, XLSX, DOCX, and PDF inputs are rendered as numbered text lines.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Relative workspace path."
+          },
+          "offset": {
+            "type": "integer",
+            "description": "First line, starting at 1.",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum lines to return.",
+            "default": 2000,
+            "maximum": 2000
+          }
+        },
+        "required": [
+          "path"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "skill_view",
+      "description": "Load concise built-in guidance for XLSX or DOCX work.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Office format guidance.",
+            "enum": [
+              "xlsx",
+              "docx"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "write_file",
+      "description": "Create or overwrite a relative text file in the workspace.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Relative workspace path."
+          },
+          "content": {
+            "type": "string",
+            "description": "Complete UTF-8 text content."
+          }
+        },
+        "required": [
+          "path",
+          "content"
+        ]
+      }
+    }
+  }
+]
