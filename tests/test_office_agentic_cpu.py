@@ -20,7 +20,7 @@ from office_env import (  # noqa: E402
 )
 from office_tools import TOOLS, OfficeWorkspace  # noqa: E402
 from reward import reward_fn  # noqa: E402
-from run_agent import _context_budget  # noqa: E402
+from run_agent import _context_budget, _system_prompt  # noqa: E402
 
 
 @pytest.mark.parametrize(
@@ -118,6 +118,20 @@ def test_office_prompt_grammar_preserves_required_files_and_varies_layout():
 def test_office_runtime_token_budget_env_overrides_record(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("ARENO_OFFICE_TOKEN_BUDGET", "8000")
     assert _context_budget({"context_budget": 10_000}) == 8000
+
+
+def test_office_system_prompt_binds_the_actual_isolated_workspace():
+    pytest.importorskip("openpyxl")
+    record = build_record("excel_chart_dashboard", seed=2026, index=1)
+    workspace = OfficeWorkspace.from_record(record)
+    try:
+        prompt = _system_prompt(workspace)
+    finally:
+        workspace.close()
+    assert workspace.root.as_posix() in prompt
+    assert "current working directory" in prompt
+    assert "Use relative paths" in prompt
+    assert "Do not inspect the host's /workspace" in prompt
 
 
 def test_office_runtime_token_budget_defaults_to_record(monkeypatch: pytest.MonkeyPatch):
