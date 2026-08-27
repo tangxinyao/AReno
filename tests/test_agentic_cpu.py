@@ -564,6 +564,25 @@ def test_proxy_rollout_batches_queued_requests():
     assert all(response["areno"]["response_logprobs"] == [-0.1] for response in responses)
 
 
+def test_proxy_rollout_does_not_time_out_long_completion():
+    trainer = _FakeTrainer(world_size=1, tp_size=1)
+    trainer.rollout_delay_s = 0.05
+    session = RolloutSession(
+        trainer,
+        sampling_params=_FakeSamplingParams(),
+        loss_mask_policy=LossMaskPolicy(),
+        timeout_s=0.001,
+    )
+
+    async def run():
+        session._loop = asyncio.get_running_loop()
+        return await session._complete_chat({"model": "policy", "messages": [{"role": "user", "content": "wait"}]})
+
+    response = asyncio.run(run())
+
+    assert response["usage"]["completion_tokens"] == 1
+
+
 def test_explicit_trajectory_helper_builds_train_rows_without_prompt_claiming():
     trainer = _FakeTrainer(world_size=1, tp_size=1)
     session = RolloutSession(

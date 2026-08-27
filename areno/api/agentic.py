@@ -282,7 +282,12 @@ class RolloutSession:
         self._max_running_prompts = (
             max(1, int(max_running_prompts)) if max_running_prompts is not None else self._dp_size
         )
-        self._timeout_s = float(timeout_s)
+        # Kept in the public signature for compatibility with existing agent
+        # functions and CLI configurations.  A rollout completion has no
+        # wall-clock deadline: long generations must be allowed to finish
+        # naturally instead of being abandoned while the backend still owns
+        # the request.
+        del timeout_s
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -492,7 +497,7 @@ class RolloutSession:
             return
         try:
             future = asyncio.run_coroutine_threadsafe(self._complete_chat(body), self._loop)
-            response = future.result(timeout=self._timeout_s)
+            response = future.result()
             _write_json(handler, 200, response)
         except ValueError as exc:
             _write_json(handler, 400, {"error": {"message": str(exc)}})
@@ -528,11 +533,7 @@ class RolloutSession:
         )
         if self._loop is None:
             raise RuntimeError("agent rollout proxy is not running")
-        try:
-            await asyncio.wait_for(asyncio.shield(self._run_chat_request(pending)), timeout=self._timeout_s)
-        except asyncio.TimeoutError:
-            pending.cancelled = True
-            raise TimeoutError("agent rollout proxy timed out waiting for completion")
+        await asyncio.shield(self._run_chat_request(pending))
         if pending.error is not None:
             raise pending.error
         if pending.response is None:

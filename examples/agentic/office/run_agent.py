@@ -45,7 +45,7 @@ async def run_agent(ctx, batch) -> AgentTrajectory:
     max_connections = max(len(items), ctx.max_running_prompts)
     http_client = httpx.AsyncClient(
         limits=httpx.Limits(max_connections=max_connections, max_keepalive_connections=max_connections),
-        timeout=httpx.Timeout(900.0, connect=30.0),
+        timeout=None,
     )
     client = AsyncOpenAI(base_url=ctx.get_base_url(), api_key=ctx.api_key, http_client=http_client, max_retries=0)
     workspaces: list[OfficeWorkspace] = []
