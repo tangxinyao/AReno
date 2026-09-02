@@ -1,0 +1,114 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "terminal",
+      "description": "Run a shell command inside this task's isolated workspace. The process starts at the workspace root and inherits the task environment (including HERMES_HOME for profile/skill state and GOOGLE_OAUTH_BASE_URL for the OAuth endpoints of this workspace). Compound commands and pipes are allowed. Output is capped; stale or long-lived servers will be killed when the task ends.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "The shell command to run, e.g. 'python \"$HOME/.hermes/skills/productivity/google-workspace/scripts/setup.py\" --check'."
+          }
+        },
+        "required": ["command"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "read_file",
+      "description": "Read a text file from the workspace. Relative paths resolve from the workspace root; absolute paths and paths escaping the workspace are rejected. Use this for credentials files, tokens, or skill reference text you need to inspect exactly.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Workspace-relative file path, e.g. 'oauth/client_secret.json'."
+          },
+          "offset": {
+            "type": "integer",
+            "description": "1-based first line to read (default 1)."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of lines to return (default 2000)."
+          }
+        },
+        "required": ["path"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "write_file",
+      "description": "Create or overwrite a text file inside the workspace. Parent directories are created automatically. Relative paths resolve from the workspace root; writing outside the workspace is rejected.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Workspace-relative file path, e.g. 'oauth/client_secret.json'."
+          },
+          "content": {
+            "type": "string",
+            "description": "Full file content to write."
+          }
+        },
+        "required": ["path", "content"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "skill_view",
+      "description": "Read a skill's SKILL.md document by name. Available skills in this environment: himalaya (terminal IMAP/SMTP email) and google-workspace (Gmail/Calendar/Drive via OAuth). Load a skill before following its setup procedures.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Skill name, e.g. 'google-workspace' or 'himalaya'."
+          }
+        },
+        "required": ["name"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "clarify",
+      "description": "Ask the user one or more questions when you need a decision, clarification, or feedback before proceeding. Pass every question in `questions` (1-5 entries) — a single question is a one-entry array, and several INDEPENDENT questions belong in ONE call (one form beats a chain of clarify calls; if one answer would change another question, ask separately). Per question: single-select (up to 4 choices — put your recommended option FIRST, the UI marks it '(Recommended)' and auto-appends an 'Other' free-text row), multi-select (multi_select=true), or open-ended (omit choices). Options go ONLY in `choices`, never enumerated inside the question text. Result: {responses: [...]} in question order (plus timed_out=true if the user stopped part-way). Prefer deciding low-stakes questions yourself.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "questions": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 5,
+            "description": "The question(s). Each: question text (options excluded), optional choices (recommended first; omit for free-text), optional multi_select. Responses come back in question order with the question text echoed.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "question": {"type": "string"},
+                "choices": {
+                  "type": "array",
+                  "items": {"type": "string"},
+                  "maxItems": 4
+                },
+                "multi_select": {"type": "boolean"}
+              },
+              "required": ["question"]
+            }
+          }
+        },
+        "required": ["questions"]
+      }
+    }
+  }
+]

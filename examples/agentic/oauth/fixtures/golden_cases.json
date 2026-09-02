@@ -1,0 +1,11 @@
+{
+  "$note": "Golden regression cases. Self-check re-runs these through the adjudicator; any drift means the mock or the verifier broke.",
+  "cases": [
+    {"id": "happy_workspace",      "expect": {"verdict": "success",  "step_scores": {"S1": 1, "S2": 1, "S3": 1, "S4min": 3, "S5a": 1, "S5b": 1, "S5c": 1, "S5d": 1}}},
+    {"id": "route_error",          "expect": {"verdict": "failure",  "failure_class": "ROUTE_ERROR"}},
+    {"id": "install_error",        "expect": {"verdict": "failure",  "failure_class": "INSTALL_ERROR"}},
+    {"id": "retry_loop",           "expect": {"verdict": "failure",  "failure_class": "RETRY_LOOP", "step_scores": {"S2": 0}}},
+    {"id": "abandon",              "expect": {"verdict": "failure",  "failure_class": "ABANDONED"}},
+    {"id": "token_expired",        "expect": {"verdict": "failure",  "failure_class": "AUTH_ERROR", "step_scores": {"S5d": 0}}}
+  ]
+}
