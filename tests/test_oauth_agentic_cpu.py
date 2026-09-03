@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import sys
 import urllib.request
@@ -17,8 +18,6 @@ import oauth_matrix  # noqa: E402
 import oauth_seeds  # noqa: E402
 import oauth_tools  # noqa: E402
 import oauth_world  # noqa: E402
-import reward as oauth_reward  # noqa: E402
-from dataset_loader import load_training_dataset  # noqa: E402
 from grading.matrix import enumerate_combos  # noqa: E402
 from grading.messages import Trajectory  # noqa: E402
 from grading.step_table import AnalyzerCfg, StepAnalyzer  # noqa: E402
@@ -26,6 +25,23 @@ from oauth_steps import DEFAULT_STEP_ORDER, OAUTH_TABLE, _count_clarify  # noqa:
 from oauth_vocab import GOOGLE_EMAIL_VOCAB  # noqa: E402
 
 FIXTURES = OAUTH_EXAMPLE / "fixtures"
+
+
+def _example_module(name: str):
+    """Load an example module whose basename is not unique across the examples
+    tree (`reward` / `run_agent` / `dataset_loader` exist under every
+    `examples/agentic/*`).  A bare import would return whichever sibling
+    example a previously collected test module already put in `sys.modules`."""
+    spec = importlib.util.spec_from_file_location(
+        f"agentic_oauth_{name}_for_tests", OAUTH_EXAMPLE / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+oauth_reward = _example_module("reward")
+load_training_dataset = _example_module("dataset_loader").load_training_dataset
 
 
 # ---------------------------------------------------------------------------
@@ -198,7 +214,7 @@ def test_build_record_is_deterministic_and_valid():
     assert record == oauth_env.build_record(combo, index=7)
     assert oauth_env.validate_record(record) == []
 
-    blocked = oauth_env.build_record(_combo(client_secret_ready="no"), index=8)
+    blocked = oauth_env.build_record(_oauth_combo(client_secret_ready="no"), index=8)
     spec = oauth_env.parse_task_spec(blocked)
     assert spec["expected"] == {"outcome": "blocked", "reason": "nosecret"}
     assert oauth_env.validate_record(blocked) == []
@@ -829,7 +845,7 @@ def test_real_hermes_bad_capture_never_claims_success():
 # ---------------------------------------------------------------------------
 
 def test_agent_budget_env_overrides_record(monkeypatch):
-    import run_agent
+    run_agent = _example_module("run_agent")
 
     monkeypatch.setenv("ARENO_OAUTH_TOKEN_BUDGET", "8000")
     assert run_agent._context_budget({"context_budget": 10_000}) == 8000
@@ -838,7 +854,7 @@ def test_agent_budget_env_overrides_record(monkeypatch):
 
 
 def test_agent_budget_env_rejects_non_positive(monkeypatch):
-    import run_agent
+    run_agent = _example_module("run_agent")
 
     for raw in ("0", "-1"):
         monkeypatch.setenv("ARENO_OAUTH_TOKEN_BUDGET", raw)
@@ -847,7 +863,7 @@ def test_agent_budget_env_rejects_non_positive(monkeypatch):
 
 
 def test_agent_detects_length_truncated_completions():
-    import run_agent
+    run_agent = _example_module("run_agent")
 
     truncated = SimpleNamespace(choices=[SimpleNamespace(finish_reason="length")])
     tool_call = SimpleNamespace(choices=[SimpleNamespace(finish_reason="tool_calls")])
@@ -857,7 +873,7 @@ def test_agent_detects_length_truncated_completions():
 
 
 def test_agent_max_tokens_applies_only_to_the_final_turn():
-    import run_agent
+    run_agent = _example_module("run_agent")
 
     assert run_agent._request_max_tokens(must_finish=False, remaining_tokens=500) is None
     assert run_agent._request_max_tokens(must_finish=True, remaining_tokens=9000) == 256

@@ -91,7 +91,7 @@ _PROTECTION_INTENT = (r"高级保护|advanced\s*protection|硬件安全密钥|�
                       r"|管理员|允许列表|第三方应用")
 _SCOPE_INTENT = (r"做什么|干啥|干嘛|用途|场景|哪种|范围|怎么连|怎么用|连接方式"
                  r"|什么功能|收发|imap|smtp|app\s*password"
-                 r"|只需要|需要连接|需要哪|哪些服务|什么服务|还要什么|连接什么|还差什么")
+                 r"|只需要|需要连接|需要哪|哪些|什么服务|还要什么|连接什么|还差什么")
 
 # the ROUTED clarify keys, lifted to module constants so the process gate
 # (`oauth_gate.py`) judges the disambiguate obligations against the EXACT same
