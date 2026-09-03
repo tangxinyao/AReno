@@ -589,7 +589,9 @@ def test_gate_flags_missing_clarify_and_forged_anchor():
     ], "meta": {"driver": "areno"}})
     assert oauth_gate.process_checks(dict(base, traj=asked, verdict="failure")) == []
 
-    forged = dict(base, traj=empty, witness={"authorize": 0, "token": 0},
+    # the witness half is read on the trajectory that already asked, so the
+    # clarify obligations cannot leak into it
+    forged = dict(base, traj=asked, witness={"authorize": 0, "token": 0},
                   verdict="success", expected={"outcome": "reach", "reason": "reach"})
     reasons = oauth_gate.process_checks(forged)
     assert "process:forged_oauth_anchor" in reasons
@@ -704,7 +706,7 @@ def _workspace(**overrides) -> "oauth_tools.OAuthWorkspace":
 
 
 def test_clarify_tool_routes_and_reports_timeouts():
-    workspace = _workspace(advanced_protection="yes")
+    workspace = _workspace(service_scope="full_workspace", advanced_protection="yes")
     try:
         result = oauth_tools.run_tool(workspace, "clarify", {"questions": [
             {"question": "你希望连接哪些 Google 服务？"},
