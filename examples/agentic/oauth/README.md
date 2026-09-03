@@ -9,9 +9,12 @@ scores every rollout online.
 
 Each of the 216 scenarios (6-axis matrix) is a full "connect my Google email"
 story with its own mock OAuth world: some reach `AUTHENTICATED`, others hit a
-business block (no test user, user abandons the browser, expired code, no
-client secret, stale token) where the best play is to handle the branch
-cleanly — never claim success.
+business block (wrong route for the need, no test user, user abandons the
+browser, expired code, no client secret, stale token) where the best play is
+to walk into the branch, surface it and handle it cleanly — never claim
+success.  Only 4 of the 216 combos can reach `AUTHENTICATED`, so generate a
+balanced mix (`--outcome reach` / `--outcome blocked`) rather than training on
+the raw enumeration.
 
 ## Layout
 
@@ -32,7 +35,8 @@ grading/               trimmed trajlab engine slice (registry-free): message
                        contracts, StepAnalyzer, RuleJudge, matrix primitives
 skills/                vendored hermes-agent SKILL.md docs (MIT): himalaya,
                        google-workspace (scripts/setup.py substituted by the shim)
-fixtures/              golden_cases.json + two real Hermes captures (grading regression)
+fixtures/              golden_cases.json (the lab's golden expectations; the
+                       Hermes captures they refer to are not vendored here)
 ```
 
 ## Tool surface
@@ -41,22 +45,30 @@ The five tools mirror the Hermes surface the original captures were collected
 with: `terminal`, `read_file`, `write_file`, `skill_view`, `clarify`. The
 `clarify` tool follows hermes' batch `questions` contract; in this environment
 it is answered by a deterministic scripted user (the task_spec's
-`clarify_answers`, routed by the same intent regexes the process gate judges),
-and off-script questions surface the hermes timeout sentinel.
+`clarify_answers`, routed by the same intent regexes the process gate judges).
+An off-script question comes back with a blank `user_response` (it must not
+credit the S3 clarify census) plus `timed_out: true` and the hermes timeout
+sentinel in `note`.
 
 ## Scenario matrix (216 = 3×2×2×2×3×3)
 
 | Axis | Values |
 |---|---|
-| service_scope | email_only / email_calendar / full_workspace |
+| service_scope | email_only (→ App Password + himalaya, no OAuth) / email_calendar / full_workspace |
 | advanced_protection | no / yes |
 | test_user_added | yes / no (→ `access_denied`) |
 | client_secret_ready | yes / no (→ the agent must face "not created yet") |
-| token_state | absent / expired / revoked (→ `REFRESH_FAILED`) |
+| token_state | absent / expired / revoked (leftover token seeded → `REFRESH_FAILED` from the first probe) |
 | code_validity | valid / expired / user_aborted |
 
 `expected_outcome(combo)` derives reach/blocked from the same mapping the
-mock world implements — one source of truth, no second ruler.
+mock world implements — one source of truth, no second ruler.  Blocks are
+ranked in the order they can actually fire (`nosecret` before the authorize
+branches: without a client secret `--auth-url` refuses locally and the browser
+leg never happens).  The scope axis is read first: on `email_only` the scripted user (and the vendored skill doc)
+send the agent to himalaya + a Gmail App Password, so there is no Google OAuth
+anchor to reach and a Google success claim is the failure mode
+(`blocked/himalaya_route`).
 
 ## Reward composition
 
@@ -66,9 +78,16 @@ reward = 0.70 * outcome_term + 0.30 * process_term − 0.25 * len(process_penalt
 
 - **outcome_term** — the outcome ruler: 1.0 iff the verified final state
   matches `expected_outcome(combo)`. Reach combos must actually confirm
-  `AUTHENTICATED` via `setup.py --check`; blocked combos must NOT claim it.
-  Forging the token file (writing `google_token.json` directly) claims
-  success and therefore fails the ruler.
+  `AUTHENTICATED` via `setup.py --check`. Blocked combos must NOT claim it
+  **and** must have surfaced their own block
+  (`oauth_gate.blocked_evidence`: `access_denied` / `abandoned` /
+  `invalid_grant` / `REFRESH_FAILED` / "no client credentials" in a tool
+  result, corroborated by the world witness where the block lives behind an
+  OAuth endpoint; on `email_only`, routing to the himalaya skill) — "called no
+  tool at all" is not a clean block, and 212 of the 216 combos are blocked.
+  Forging the token file is worthless twice over: the world only honours a
+  token it issued (`--check` answers `NOT_AUTHENTICATED`), and an uncorroborated
+  success claim forfeits the outcome term outright.
 - **process_term** — mean of the S1..S5d step scores (S4 normalized from its
   1..5 rubric). S1 skill routing, S2 auth probe without loops, S3 clarify
   asks, S4 the single manual step announcement, S5a client_secret, S5b
@@ -80,7 +99,27 @@ reward = 0.70 * outcome_term + 0.30 * process_term − 0.25 * len(process_penalt
 
 During the episode each tool result also carries `progress_score` (the same
 process term over the transcript so far) and `solved` — the same signal the
-final reward uses — so the agent loop can stop early on confirmed success.
+final reward uses, corroborated by the world witness so an echoed status line
+cannot end the episode — so the agent loop can stop early on confirmed
+success.
+
+## Episode sandbox
+
+The workspace is seeded with the two skill docs, the `setup.py` shim, the
+canonical `client_secret.json` (only when the combo says the user already
+downloaded it) and — for `token_state=expired|revoked` — the leftover
+`google_token.json` of the mailbox that was connected once. That token is
+never a usable credential: the world answers `REFRESH_FAILED` for those
+accounts whatever the file says, and re-consent does not resurrect the grant
+(the `/token` exchange fails too), so the workspace is still never
+pre-authenticated.
+
+`terminal` children run with `HOME` and `HERMES_HOME` pointing at the episode
+workspace (the skill docs address state as `~/.hermes/...`), with a `python`
+shim for this interpreter on `PATH` (the docs invoke `python setup.py`), and
+with outbound traffic black-holed — only the episode's loopback mock world
+answers, so the himalaya `curl | sh` install branch fails fast and
+deterministically instead of reaching the internet.
 
 ## Usage
 
@@ -88,7 +127,9 @@ final reward uses — so the agent loop can stop early on confirmed success.
 python examples/agentic/oauth/dataset_generator.py \
   --output examples/agentic/oauth/dataset.jsonl           # all 216, deterministic
 python examples/agentic/oauth/dataset_generator.py \
-  --output examples/agentic/oauth/dataset.jsonl --count 64
+  --output examples/agentic/oauth/dataset.jsonl --count 64   # seeded sample
+python examples/agentic/oauth/dataset_generator.py \
+  --output /tmp/reach.jsonl --outcome reach                  # the 4 reach combos
 
 areno train \
   --ckpt inclusionai/ling-3.0-tiny \
@@ -131,9 +172,14 @@ pytest tests/ -k oauth    # world/matrix/grading/reward/loader/capture regressio
   state machine per episode on an ephemeral port.
 - `skills/*/SKILL.md` are vendored from
   [hermes-agent](https://github.com/NousResearch/hermes-agent) (MIT,
-  author Nous Research); see frontmatter in each file. The
+  author Nous Research) and **trimmed** for the training context window
+  (~21KB → ~9KB): the setup procedures the adjudication reads are kept, the
+  per-service API reference is not — each file's `metadata.areno.trimmed`
+  frontmatter says what was cut. The
   `google-workspace` `scripts/setup.py` referenced by the skill doc is
   replaced at workspace materialization by a stdlib shim (`oauth_seeds.py`)
   whose endpoints point at the episode's mock OAuth world.
-- `fixtures/samples-*.json` are real Hermes captures from the source lab;
-  they contain no credentials (mock `mock-client-1` fixtures only).
+- `fixtures/golden_cases.json` is the source lab's golden expectation table.
+  The Hermes captures it refers to (`fixtures/samples-*.json`) are **not**
+  vendored here, so the two capture-regression tests skip until they are
+  dropped in; the adjudicator is covered by the scripted transcripts instead.

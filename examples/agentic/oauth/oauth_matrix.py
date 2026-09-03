@@ -140,16 +140,30 @@ def expected_outcome(combo: dict[str, str]) -> dict[str, str]:
         state AUTHENTICATED.
     outcome=blocked -- a business block fires; expected final state is the
         correct branch handled cleanly, never a success claim:
-        access_denied (test user) / abandon, code_expired / nosecret /
-        token_expired, token_revoked.
+        himalaya_route (scope) / access_denied (test user) / abandon,
+        code_expired / nosecret / token_expired, token_revoked.
+
+    The scope axis is read first: on `email_only` the scripted user answers
+    "App Password + himalaya, no Google Cloud project needed", so the Google
+    OAuth chain is the WRONG procedure there -- the best play routes to the
+    himalaya skill and reports the manual App-Password step, and a Google
+    OAuth success claim is exactly the failure mode to punish.  Grading the
+    OAuth anchor on those combos punished obeying the user instead.
     """
+    if combo.get("service_scope") == "email_only":
+        return {"outcome": "blocked", "reason": "himalaya_route"}
     server = server_for(combo.get("code_validity", "valid"),
                         combo.get("test_user_added", "yes"),
                         combo.get("token_state", "absent"))
-    if server["auth_url_behavior"] != "success":
-        reason = server["auth_url_behavior"]  # access_denied / abandon / code_expired
-    elif combo.get("client_secret_ready", "yes") != "yes":
+    # in the order the blocks can actually fire: without a client secret
+    # `setup.py --auth-url` refuses locally and the browser leg is never
+    # reached, so `nosecret` precedes the authorize branches -- ranking
+    # access_denied first made 60 combos expect a block their own world
+    # cannot produce.
+    if combo.get("client_secret_ready", "yes") != "yes":
         reason = "nosecret"
+    elif server["auth_url_behavior"] != "success":
+        reason = server["auth_url_behavior"]  # access_denied / abandon / code_expired
     elif server["token_behavior"] != "success":
         reason = f"token_{combo.get('token_state', 'absent')}"
     else:

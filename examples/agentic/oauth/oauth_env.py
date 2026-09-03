@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import json
 import shutil
+import sys
 from pathlib import Path
 
 import oauth_matrix
 import oauth_seeds
-from oauth_world import google_paths
+from oauth_world import OAuthStateMachine, google_paths
 
 TASK = "connect_google_email"
 DEFAULT_CONTEXT_BUDGET = 10_000
@@ -73,8 +74,13 @@ def build_record(combo: dict[str, str], *, index: int) -> dict:
 
 def materialize_workspace(record: dict, root: Path) -> dict[str, str]:
     """Seed an episode workspace with the skill docs, the setup shim and (when
-    the combo promises it) the canonical client secret.  No token file ever
-    pre-exists: authentication is the task."""
+    the combo promises it) the canonical client secret and the leftover token.
+
+    A token file pre-exists only for ``token_state=expired|revoked``, whose
+    story is a mailbox that WAS connected and whose grant died -- the world
+    refuses it (`REFRESH_FAILED`), so the workspace is still never
+    pre-authenticated.  On ``token_state=absent`` there is no token file at
+    all: authentication is the task."""
     root = Path(root)
     spec = parse_task_spec(record)
 
@@ -89,6 +95,16 @@ def materialize_workspace(record: dict, root: Path) -> dict[str, str]:
     shim_path = root / oauth_seeds.SETUP_SHIM_PATH
     shim_path.parent.mkdir(parents=True, exist_ok=True)
     shim_path.write_text(oauth_seeds.setup_shim_text(), encoding="utf-8")
+    shim_path.chmod(0o755)
+
+    # The skill doc drives setup.py as `python <path>`; many hosts only ship
+    # `python3`, which would fail every documented command.  Put a `python`
+    # for this interpreter on the episode's own PATH (see
+    # ``OAuthWorkspace.child_env``).
+    python_shim = hermes_home / "bin" / "python"
+    python_shim.parent.mkdir(parents=True, exist_ok=True)
+    python_shim.write_text(f'#!/bin/sh\nexec "{sys.executable}" "$@"\n', encoding="utf-8")
+    python_shim.chmod(0o755)
 
     secret = oauth_seeds.client_secret_seed(bool(spec["env"].get("client_secret_ready")))
     if secret is not None:
@@ -96,7 +112,12 @@ def materialize_workspace(record: dict, root: Path) -> dict[str, str]:
         secret_path.parent.mkdir(parents=True, exist_ok=True)
         secret_path.write_text(secret, encoding="utf-8")
 
-    return google_paths(root)
+    paths = google_paths(root)
+    stale = oauth_seeds.stale_token_seed(spec["combo"].get("token_state"))
+    if stale is not None:
+        Path(paths["google_token"]).write_text(stale, encoding="utf-8")
+
+    return paths
 
 
 def validate_record(record: dict) -> list[str]:
@@ -134,6 +155,8 @@ def validate_record(record: dict) -> list[str]:
         shim = tmp_root / oauth_seeds.SETUP_SHIM_PATH
         if not shim.is_file() or "python3" not in shim.read_text(encoding="utf-8")[:40]:
             issues.append("setup shim missing or malformed")
+        if not (tmp_root / ".hermes" / "bin" / "python").is_file():
+            issues.append("python interpreter shim missing")
         for group, name in _VENDORED_SKILLS:
             if not (tmp_root / ".hermes" / "skills" / group / name / "SKILL.md").is_file():
                 issues.append(f"skill doc missing: {group}/{name}")
@@ -141,6 +164,17 @@ def validate_record(record: dict) -> list[str]:
         ready = bool(spec["env"].get("client_secret_ready"))
         if ready != secret_path.is_file():
             issues.append("client_secret presence does not match client_secret_ready")
-        if (tmp_root / ".hermes" / "google_token.json").exists():
-            issues.append("workspace must never be pre-authenticated")
+        token_path = tmp_root / ".hermes" / "google_token.json"
+        stale_combo = combo["token_state"] in ("expired", "revoked")
+        if stale_combo != token_path.is_file():
+            issues.append("token file presence does not match token_state")
+        if stale_combo:
+            # seeded, but never a usable credential: the world answers
+            # REFRESH_FAILED for these combos whatever the file says
+            seeded = json.loads(token_path.read_text(encoding="utf-8"))
+            if seeded.get("token_state") != combo["token_state"]:
+                issues.append("seeded token does not carry its stale token_state")
+            machine = OAuthStateMachine(spec["server"], {"google_token": str(token_path)})
+            if machine.check()["status"] != "REFRESH_FAILED":
+                issues.append("workspace must never be pre-authenticated")
     return issues

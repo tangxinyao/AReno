@@ -33,7 +33,10 @@ and tokens. The user's goal is to connect their Google email: figure out what th
 follow the matching skill's setup procedure with the terminal tool, and verify the result with
 the skill's own check command before answering. If a decision genuinely changes the procedure
 (scope, protection enrollment, existing credentials), ask via the clarify tool instead of
-guessing; do not re-ask what the user already answered. Create no files unrelated to the task."""
+guessing; do not re-ask what the user already answered. Create no files unrelated to the task.
+Before every tool call write one short sentence saying what you are about to do and what you
+expect from it, including any failure you already expect. There is no outbound network: only
+this workspace and its local endpoints exist."""
 
 FINAL_PROMPT = "Stop using tools. Briefly state the connection status confirmed by the check command and anything the user must still do themselves."
 FINAL_RESPONSE_MAX_TOKENS = 256
@@ -131,11 +134,15 @@ async def _run_episode(item, workspace: OAuthWorkspace, client, tokenizer) -> li
         call = _first_tool_call(assistant)
         if call is None:
             break
-        result = run_tool(
+        # The tools block (subprocess, loopback HTTP, trajectory grading), so
+        # run them off the event loop: the other episodes of this rollout batch
+        # share it and would otherwise wait out every command.
+        result = await asyncio.to_thread(
+            run_tool,
             workspace,
             call["function"]["name"],
             decode_tool_arguments(call["function"].get("arguments")),
-            messages=messages,
+            messages=list(messages),
         )
         content = json.dumps(result, ensure_ascii=False, sort_keys=True)
         messages.append(

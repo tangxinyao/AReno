@@ -5,9 +5,13 @@ Composition (all terms deterministic; see README "Reward composition"):
     reward = 0.70 * outcome_term + 0.30 * process_term - 0.25 * len(process_penalties)
 
   * ``outcome_term`` -- the outcome ruler: 1.0 when the episode's final state
-    matches ``expected_outcome(combo)`` (reach combos must actually verify
-    AUTHENTICATED via ``setup.py --check``; blocked combos must NOT claim a
-    success), else 0.0.
+    matches ``expected_outcome(combo)``, else 0.0.  Reach combos must actually
+    verify AUTHENTICATED via ``setup.py --check``.  Blocked combos must not
+    claim a success AND must have surfaced their business block
+    (``oauth_gate.blocked_evidence``): "did nothing" is not a clean block, and
+    212 of the 216 combos are blocked.  An uncorroborated success claim
+    (``forged_oauth_anchor``) forfeits the term outright -- otherwise forging
+    the anchor still nets 0.70 - 0.25 > 0.
   * ``process_term`` -- mean of the S1..S5d step scores (S4 normalized /5),
     i.e. the graded process quality of the whole trajectory.
   * ``process_penalties`` -- `oauth_gate.process_checks` drift reasons:
@@ -28,7 +32,7 @@ if _HERE not in sys.path:
 
 from grading.messages import Trajectory  # noqa: E402
 from grading.step_table import AnalyzerCfg, StepAnalyzer  # noqa: E402
-from oauth_gate import process_checks  # noqa: E402
+from oauth_gate import blocked_evidence, process_checks  # noqa: E402
 from oauth_steps import OAUTH_TABLE  # noqa: E402
 from oauth_tools import _normalized_progress  # noqa: E402
 
@@ -54,23 +58,30 @@ def reward_fn(record) -> float:
     source = dict(getattr(record, "source_record", None) or {})
     spec = json.loads(str(source.get("task_spec") or "{}"))
 
-    traj = Trajectory.from_dict({"messages": messages, "meta": {"driver": "areno"}})
+    traj = Trajectory.from_dict({"messages": messages, "driver": "areno"})
     report = _analyzer().analyze(traj)
 
     reached = report.score_of("S5d") >= 1.0
     expected = spec.get("expected") or {}
-    outcome_term = float(reached == (expected.get("outcome") == "reach"))
+    witness = _last_witness(messages)
+    if expected.get("outcome") == "reach":
+        outcome_term = float(reached)
+    else:
+        outcome_term = float(not reached
+                             and blocked_evidence(traj, str(expected.get("reason") or ""), witness))
     process_term = _normalized_progress(report)
 
     ctx = {
         "scenario": SimpleNamespace(env=spec.get("env") or {}, user=spec.get("user") or {}),
         "traj": traj,
         "combo": spec.get("combo") or {},
-        "witness": _last_witness(messages),
+        "witness": witness,
         "verdict": "success" if reached else "failure",
         "expected": expected,
     }
     penalties = process_checks(ctx)
+    if "process:forged_oauth_anchor" in penalties:
+        outcome_term = 0.0  # an uncorroborated success claim earns no outcome
     reward = OUTCOME_WEIGHT * outcome_term + PROCESS_WEIGHT * process_term \
         - PENALTY_WEIGHT * len(penalties)
     return round(max(0.0, reward), 4)

@@ -13,6 +13,13 @@
     the user story promises (已创建并下载) -- but ONLY when the combo says the
     secret is ready.  A not-ready combo seeds nothing and the model has to
     face the real block.
+  * ``stale_token_seed`` returns the leftover ``google_token.json`` of the
+    ``token_state=expired|revoked`` combos.  Their story is "this mailbox was
+    connected once and the grant died", so the token file has to be there from
+    the first probe: that is what makes ``--check`` answer ``REFRESH_FAILED``
+    at turn one instead of only after a pointless re-auth round trip.  The
+    fixture is never a valid credential -- the world refuses to authenticate a
+    stale account no matter what the file says.
 
 Path-contract delta vs trajlab: the canonical secret resolves relative to
 ``HERMES_HOME`` (the workspace's ``.hermes``) instead of a hard-coded
@@ -64,11 +71,10 @@ def _read(p):
 
 
 def _check():
-    if os.path.exists(TOKEN):
-        tok = _read(TOKEN)
-        if tok.get("access_token"):
-            print("AUTHENTICATED: token verified via mock refresh")
-            return
+    # the world owns the verdict: it knows whether the token was really
+    # issued (a hand-written token file is not an authentication) and whether
+    # the account's token is expired/revoked.  Never short-circuit on the
+    # local file -- that hides both REFRESH_FAILED and forged anchors.
     try:
         _st, body = _req("GET", "/check")
     except Exception as e:  # mock unreachable -> honest report
@@ -208,6 +214,22 @@ def setup_shim_text(base_url: str | None = None) -> str:
     the fallback value inside the file.
     """
     return SETUP_SHIM_TMPL.replace("{base_url}", base_url or "http://127.0.0.1:9898")
+
+
+def stale_token_seed(token_state: str | None) -> str | None:
+    """Leftover token fixture for the `expired` / `revoked` combos (None for
+    `absent`).  Mock values only -- the world decides the verdict."""
+    if token_state not in ("expired", "revoked"):
+        return None
+    return json.dumps({
+        "access_token": f"at_stale_{token_state}",
+        "refresh_token": f"rt_stale_{token_state}",
+        "token_type": "Bearer",
+        "expires_in": 0,
+        "expiry": "2026-01-01T00:00:00Z",
+        "scope": "gmail.readonly calendar.events.readonly",
+        "token_state": token_state,
+    }, indent=2)
 
 
 def client_secret_seed(secret_ready: bool) -> str | None:

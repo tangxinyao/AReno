@@ -3,7 +3,7 @@
     "type": "function",
     "function": {
       "name": "terminal",
-      "description": "Run a shell command inside this task's isolated workspace. The process starts at the workspace root and inherits the task environment (including HERMES_HOME for profile/skill state and GOOGLE_OAUTH_BASE_URL for the OAuth endpoints of this workspace). Compound commands and pipes are allowed. Output is capped; stale or long-lived servers will be killed when the task ends.",
+      "description": "Run a shell command inside this task's isolated workspace. The process starts at the workspace root, with HOME and HERMES_HOME pointing at this workspace (so ~/.hermes is the profile of this task) and GOOGLE_OAUTH_BASE_URL holding the OAuth endpoints of this workspace. There is no outbound network: package installs and downloads fail by design, only local endpoints answer. Compound commands and pipes are allowed. Output is capped; stale or long-lived servers will be killed when the task ends.",
       "parameters": {
         "type": "object",
         "properties": {

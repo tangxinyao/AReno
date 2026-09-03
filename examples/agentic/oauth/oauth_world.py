@@ -62,6 +62,10 @@ class OAuthStateMachine:
         # per-scenario exchange counter (invalid_grant_once: fail the first
         # exchange only, succeed on retry)
         self._exchanges = 0
+        # a token file alone proves nothing: a rollout can write one with the
+        # write_file tool.  Only a token this world actually minted anchors a
+        # success claim.
+        self._issued = False
         # endpoint hit counts (witness): the world testifies which OAuth
         # endpoints the roll actually walked.  A reach-success with zero
         # authorize/token hits forged its anchor file (reward hacking) instead
@@ -97,9 +101,16 @@ class OAuthStateMachine:
             return False, OAUTH_ERRORS["invalid_grant"][1]
         if self.token_behavior == "invalid_client":
             return False, OAUTH_ERRORS["invalid_client"][1]
+        if self.token_behavior == "refresh_failed":
+            # the stale-grant combos: re-consent does not resurrect a grant the
+            # account owner revoked, so the exchange itself fails (this branch
+            # of the behaviour table used to fall through to success and hand
+            # the roll an AUTHENTICATED token it should never get)
+            return False, OAUTH_ERRORS["refresh_failed"][1]
         if not code or "expired" in (code or ""):
             return False, OAUTH_ERRORS["invalid_grant"][1]
 
+        self._issued = True
         refresh_token = f"rt_{code}"
         self._write_token_file(resp := {
             "access_token": f"at_{code}",
@@ -117,14 +128,25 @@ class OAuthStateMachine:
     def check(self) -> dict[str, str]:
         """`setup.py --check` semantics: AUTHENTICATED / NOT_AUTHENTICATED / REFRESH_FAILED.
 
-        Result-level anchor: success only when the token file exists AND the
-        token is not expired/revoked (result-level rule).
+        Result-level anchor: success only when this world issued the token
+        (a forged token file is not an anchor), the file is there AND the
+        account's grant is not expired/revoked (result-level rule).
+
+        The stale verdict is checked BEFORE the issuer test: those combos are
+        seeded with a leftover token file (`oauth_seeds.stale_token_seed`), so
+        the first probe of the episode must already report REFRESH_FAILED.
         """
         if not self.token_path.exists():
             return {"status": "NOT_AUTHENTICATED",
                     "detail": "No token at %s" % self.token_path}
         if self.token_state in ("expired", "revoked"):
-            return {"status": "REFRESH_FAILED", "detail": f"token_state={self.token_state}"}
+            return {"status": "REFRESH_FAILED",
+                    "detail": "refresh rejected: the stored grant is %s "
+                              "(token_state=%s)" % (self.token_state, self.token_state)}
+        if not self._issued:
+            return {"status": "NOT_AUTHENTICATED",
+                    "detail": "token at %s was never issued by this OAuth server"
+                              % self.token_path}
         return {"status": "AUTHENTICATED", "detail": "token verified via mock refresh"}
 
     def _write_token_file(self, resp: dict[str, Any]) -> None:
@@ -143,6 +165,8 @@ class _Handler(BaseHTTPRequestHandler):
             else:
                 status, body = OAUTH_ERRORS.get(result, (400, {"error": result}))
                 self._json(status, body)
+        elif url.path.rstrip("/") == "/check":
+            self._json(200, machine.check())
         elif url.path.rstrip("/") == "/health":
             self._json(200, {"ok": True, "version": "v0.1.0"})
         else:
@@ -233,6 +257,7 @@ class MockOAuthServer:
     def snapshot(self) -> dict[str, Any]:
         """State snapshot used by golden-case regression."""
         return {"token_path": str(self.machine.token_path),
+                "issued": self.machine._issued,
                 "token_state": self.machine.token_state,
                 "auth_url_behavior": self.machine.auth_url_behavior,
                 "token_behavior": self.machine.token_behavior,

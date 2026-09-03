@@ -107,8 +107,14 @@ class Trajectory:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Trajectory":
-        meta_keys = {"messages"}
-        meta = {k: v for k, v in d.items() if k not in meta_keys}
+        """Accepts both meta shapes: flat extras beside ``messages`` (the
+        capture format) and an explicit nested ``meta`` block (what the areno
+        callers pass) -- a nested block must be merged, not kept as a
+        ``meta`` *key*, or every ``meta`` reader (``traj_driver``) sees ""."""
+        meta = {k: v for k, v in d.items() if k != "messages"}
+        nested = meta.pop("meta", None)
+        if isinstance(nested, dict):
+            meta.update(nested)
         return cls(messages=[Message.from_dict(m) for m in d.get("messages", [])], meta=meta)
 
     def to_dict(self, include_reasoning: bool = True) -> dict[str, Any]:

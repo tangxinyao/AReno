@@ -38,6 +38,16 @@ def _combo(**overrides: str) -> dict[str, str]:
     return combo
 
 
+def _oauth_combo(**overrides: str) -> dict[str, str]:
+    """Baseline combo on the Google OAuth route.
+
+    The first value of the scope axis is `email_only`, which the scripted user
+    answers with the App-Password/himalaya branch -- there is no OAuth anchor
+    to reach there, so every OAuth-route expectation starts from a scope that
+    actually needs OAuth."""
+    return _combo(service_scope="full_workspace", **overrides)
+
+
 def test_matrix_enumerates_216_unique_google_email_ids():
     dims = oauth_matrix.google_email_dimensions()
     combos = enumerate_combos(dims)
@@ -53,23 +63,42 @@ def test_matrix_enumerates_216_unique_google_email_ids():
 
 
 def test_expected_outcome_matches_server_behaviour_table():
-    assert oauth_matrix.expected_outcome(_combo()) == {"outcome": "reach", "reason": "reach"}
-    assert oauth_matrix.expected_outcome(_combo(test_user_added="no")) == \
+    assert oauth_matrix.expected_outcome(_oauth_combo()) == {"outcome": "reach", "reason": "reach"}
+    assert oauth_matrix.expected_outcome(_oauth_combo(test_user_added="no")) == \
         {"outcome": "blocked", "reason": "access_denied"}
-    assert oauth_matrix.expected_outcome(_combo(code_validity="user_aborted")) == \
+    assert oauth_matrix.expected_outcome(_oauth_combo(code_validity="user_aborted")) == \
         {"outcome": "blocked", "reason": "abandon"}
-    assert oauth_matrix.expected_outcome(_combo(code_validity="expired")) == \
+    assert oauth_matrix.expected_outcome(_oauth_combo(code_validity="expired")) == \
         {"outcome": "blocked", "reason": "code_expired"}
-    assert oauth_matrix.expected_outcome(_combo(client_secret_ready="no")) == \
+    assert oauth_matrix.expected_outcome(_oauth_combo(client_secret_ready="no")) == \
         {"outcome": "blocked", "reason": "nosecret"}
     for token_state, reason in (("expired", "token_expired"), ("revoked", "token_revoked")):
-        assert oauth_matrix.expected_outcome(_combo(token_state=token_state)) == \
+        assert oauth_matrix.expected_outcome(_oauth_combo(token_state=token_state)) == \
             {"outcome": "blocked", "reason": reason}
-    # several blocks together degrade to the first failure on the chain
-    assert oauth_matrix.expected_outcome(_combo(client_secret_ready="no",
-                                                token_state="expired",
-                                                code_validity="expired")) == \
+    # several blocks together degrade to the first failure ON THE CHAIN: with
+    # no client secret `--auth-url` refuses before the browser leg exists, so
+    # nosecret outranks the authorize-stage blocks
+    assert oauth_matrix.expected_outcome(_oauth_combo(client_secret_ready="no",
+                                                     token_state="expired",
+                                                     code_validity="expired")) == \
+        {"outcome": "blocked", "reason": "nosecret"}
+    assert oauth_matrix.expected_outcome(_oauth_combo(code_validity="expired",
+                                                     token_state="revoked")) == \
         {"outcome": "blocked", "reason": "code_expired"}
+
+
+def test_email_only_scope_takes_the_app_password_route():
+    """The scripted user answers `email_only` with "App Password + himalaya,
+    no Google Cloud project" (and the vendored skill doc says the same), so a
+    Google OAuth success claim is the failure mode there -- never the goal."""
+    for combo in enumerate_combos(oauth_matrix.google_email_dimensions()):
+        if combo["service_scope"] != "email_only":
+            continue
+        assert oauth_matrix.expected_outcome(combo) == {"outcome": "blocked",
+                                                        "reason": "himalaya_route"}
+    scope_answer = oauth_matrix.user_for("email_only", "no", "未建项目")["clarify_answers"][
+        oauth_matrix.SCOPE_CLARIFY_KEY]
+    assert "App Password" in scope_answer
 
 
 def test_server_for_maps_browser_and_token_behaviour():
@@ -113,11 +142,18 @@ def test_state_machine_behaviour_table(tmp_path):
     assert once.exchange("mock_code_1_ok")[0] is False
     assert once.exchange("mock_code_2_ok")[0] is True  # a retry wins
 
+    # a revoked grant is not resurrected by re-consent: the exchange itself
+    # fails, and the leftover token file keeps reporting REFRESH_FAILED
     stale = oauth_world.OAuthStateMachine(oauth_matrix.server_for("valid", "yes", "revoked"), paths)
-    stale.exchange("mock_code_1_ok")
+    done, err = stale.exchange("mock_code_1_ok")
+    assert not done and err["error"] == "invalid_grant"
     assert stale.check()["status"] == "REFRESH_FAILED"
 
+    # a token file this world never issued is not an authentication: `fresh`
+    # sees the file the first machine wrote and must still refuse it (that is
+    # exactly the shape a write_file-forged anchor has).
     fresh = oauth_world.OAuthStateMachine({}, paths)
+    assert fresh.token_path.exists()
     assert fresh.check()["status"] == "NOT_AUTHENTICATED"
 
 
@@ -141,6 +177,9 @@ def test_mock_oauth_server_end_to_end(tmp_path):
         with urllib.request.urlopen(req) as resp:
             check = json.loads(resp.read())
         assert check["status"] == "AUTHENTICATED"
+        # the setup shim asks over GET -- both verbs must answer the same
+        with urllib.request.urlopen(server.base_url + "/check") as resp:
+            assert json.loads(resp.read())["status"] == "AUTHENTICATED"
         assert server.snapshot()["hits"] == {"authorize": 1, "token": 1}
     finally:
         server.stop()
@@ -172,13 +211,25 @@ def test_workspace_materialization_matches_the_combo(tmp_path):
     assert (tmp_path / "ws" / ".hermes" / "skills" / "productivity"
             / "google-workspace" / "SKILL.md").is_file()
     assert (tmp_path / "ws" / oauth_seeds.SETUP_SHIM_PATH).is_file()
+    # the skill doc runs `python <setup.py>`; the episode PATH must carry one
+    assert (tmp_path / "ws" / ".hermes" / "bin" / "python").is_file()
     assert (tmp_path / "ws" / "oauth" / "client_secret.json").is_file()
-    assert not (tmp_path / "ws" / ".hermes" / "google_token.json").exists()  # never pre-authenticated
+    assert not (tmp_path / "ws" / ".hermes" / "google_token.json").exists()  # token_state=absent
     assert paths["google_token"].endswith("google_token.json")
 
     starved = oauth_env.build_record(_combo(client_secret_ready="no"), index=2)
     oauth_env.materialize_workspace(starved, tmp_path / "ws2")
     assert not (tmp_path / "ws2" / "oauth" / "client_secret.json").exists()
+
+    # token_state=expired|revoked: the mailbox WAS connected once, so the dead
+    # token is on disk from turn one -- seeded, never usable
+    stale = oauth_env.build_record(_oauth_combo(token_state="revoked"), index=3)
+    stale_paths = oauth_env.materialize_workspace(stale, tmp_path / "ws3")
+    seeded = json.loads(Path(stale_paths["google_token"]).read_text(encoding="utf-8"))
+    assert seeded["token_state"] == "revoked"
+    machine = oauth_world.OAuthStateMachine(
+        json.loads(stale["task_spec"])["server"], stale_paths)
+    assert machine.check()["status"] == "REFRESH_FAILED"
 
 
 def _transcript(workspace):
@@ -198,19 +249,30 @@ def _transcript(workspace):
     return messages, call
 
 
+def _last_json_line(output: str) -> dict:
+    """The shim prints human lines before its JSON payload (the canonical
+    client-secret auto-load reports itself first)."""
+    return json.loads([ln for ln in output.splitlines() if ln.strip()][-1])
+
+
 def test_workspace_terminal_walks_the_full_oauth_chain():
     """One real subprocess episode through the fake world, graded by the
-    ported S1..S5d table (CPU-safe: local processes + loopback HTTP only)."""
+    ported S1..S5d table (CPU-safe: local processes + loopback HTTP only).
+
+    Drives the commands the vendored skill doc actually documents (`python
+    setup.py --check / --auth-url / --auth-code`), through the workspace's own
+    `python` shim -- the raw-curl variant exercised neither the shim nor the
+    S5a/S5b command vocabulary."""
     from oauth_tools import OAuthWorkspace
 
-    record = oauth_env.build_record(_combo(), index=0)
+    record = oauth_env.build_record(_oauth_combo(), index=0)
     workspace = OAuthWorkspace.from_record(record)
     setup = oauth_seeds.SETUP_SHIM_PATH
     try:
         messages, call = _transcript(workspace)
 
-        check0 = call("terminal", {"command": f"python3 {setup} --check"}, "先探测状态。")
-        assert check0["output"].startswith("NOT_AUTHENTICATED")
+        check0 = call("terminal", {"command": f"python {setup} --check"}, "先探测状态。")
+        assert check0["output"].startswith("NOT_AUTHENTICATED"), check0
         assert check0["witness"] == {"authorize": 0, "token": 0}
         assert "progress_score" in check0
 
@@ -225,29 +287,83 @@ def test_workspace_terminal_walks_the_full_oauth_chain():
             {"question": "账号是否启用了高级保护（Advanced Protection）？"}]}, "再确认保护。")
         assert protection["responses"][0]["user_response"]
 
-        # authorize: /authorize must be IN the command (S5b) and hit the world (witness)
-        launched = call("terminal", {"command":
-                         'curl -s "$GOOGLE_OAUTH_BASE_URL/authorize?client_id=mock-client-1" 2>&1 | head -5'},
-                        "启动授权。若 access_denied 会向用户交代预期失败。")
-        auth = json.loads(launched["output"])
-        assert auth["redirect_uri"].startswith("http://localhost:1/?code=")
+        # authorize through the documented flag (S5b) -- it hits the world (witness)
+        # and auto-loads the canonical client secret on the way (S5a).
+        launched = call("terminal", {"command": f"python {setup} --auth-url --services all"},
+                        "启动授权。浏览器回跳会失败，这是预期的。")
+        assert "client_secret saved" in launched["output"]
+        auth = _last_json_line(launched["output"])
+        assert auth["redirect_url"].startswith("http://localhost:1/?code=")
 
-        call("terminal", {"command": f'python3 {setup} --auth-code "{auth["redirect_uri"]}"'},
+        call("terminal", {"command": f'python {setup} --auth-code "{auth["redirect_url"]}"'},
              "用授权码兑换 token。")
-        final = call("terminal", {"command": f"python3 {setup} --check"}, "验证闭环。")
+        # the same command as the opening probe: a legitimate verification,
+        # not a retry loop (S2 must not read it as one)
+        final = call("terminal", {"command": f"python {setup} --check"}, "验证闭环。")
         assert final["output"].startswith("AUTHENTICATED"), final["output"]
         assert final.get("solved") is True
         assert final["witness"] == {"authorize": 1, "token": 1}
 
         report = workspace.step_report(messages)
         assert [row["name"] for row in report.step_scores] == list(DEFAULT_STEP_ORDER)
-        assert report.score_of("S1") == 1.0
-        assert report.score_of("S2") == 1.0
-        assert report.score_of("S3") == 1.0
-        assert report.score_of("S5b") == 1.0
-        assert report.score_of("S5c") == 1.0
-        assert report.score_of("S5d") == 1.0
-        assert report.score_of("S5a") == 0.0  # the secret came pre-seeded; nothing was written
+        for code in ("S1", "S2", "S3", "S5a", "S5b", "S5c", "S5d"):
+            assert report.score_of(code) == 1.0, (code, report.to_dict())
+    finally:
+        workspace.close()
+
+
+def test_workspace_blocks_a_stale_token_combo_from_the_first_probe():
+    """token_state=expired/revoked: the leftover token is seeded, so the very
+    first `--check` reports REFRESH_FAILED, re-consent does not resurrect the
+    grant (the exchange fails), and the episode can never claim success.  A
+    `--check` that trusted the local token file would call this branch a
+    success and invert its reward."""
+    from oauth_tools import OAuthWorkspace
+
+    record = oauth_env.build_record(_oauth_combo(token_state="expired"), index=0)
+    workspace = OAuthWorkspace.from_record(record)
+    setup = oauth_seeds.SETUP_SHIM_PATH
+    try:
+        messages, call = _transcript(workspace)
+        probe = call("terminal", {"command": f"python {setup} --check"}, "先探测状态。")
+        assert probe["output"].startswith("REFRESH_FAILED"), probe["output"]
+        assert probe["witness"] == {"authorize": 0, "token": 0}  # no round trip needed
+
+        launched = call("terminal", {"command": f"python {setup} --auth-url"}, "尝试重新授权。")
+        auth = _last_json_line(launched["output"])
+        retry = call("terminal", {"command": f'python {setup} --auth-code "{auth["redirect_url"]}"'},
+                     "兑换授权码；这个账号的授权已被撤销，预期仍会失败。")
+        assert "invalid_grant" in retry["output"], retry["output"]
+
+        final = call("terminal", {"command": f"python {setup} --check"}, "再验证一次。")
+        assert final["output"].startswith("REFRESH_FAILED"), final["output"]
+        assert not final.get("solved")
+        report = workspace.step_report(messages)
+        assert report.score_of("S2") == 1.0  # the probe read the stale state
+        assert report.score_of("S5d") == 0.0
+
+        traj = Trajectory.from_dict({"messages": messages, "driver": "areno"})
+        assert oauth_gate.blocked_evidence(traj, "token_expired", final["witness"])
+    finally:
+        workspace.close()
+
+
+def test_workspace_refuses_a_forged_token_file():
+    """Writing the token file is the cheapest fake success available; the
+    world must not honour a token it never issued."""
+    from oauth_tools import OAuthWorkspace
+
+    workspace = _workspace(service_scope="full_workspace")
+    setup = oauth_seeds.SETUP_SHIM_PATH
+    try:
+        _messages, call = _transcript(workspace)
+        forged = call("write_file", {"path": ".hermes/google_token.json",
+                                     "content": json.dumps({"access_token": "forged"})}, "伪造。")
+        assert forged["success"]
+        checked = call("terminal", {"command": f"python {setup} --check"}, "验证。")
+        assert checked["output"].startswith("NOT_AUTHENTICATED"), checked["output"]
+        assert not checked.get("solved")
+        assert checked["witness"] == {"authorize": 0, "token": 0}
     finally:
         workspace.close()
 
@@ -328,9 +444,57 @@ def test_full_happy_transcript_scores_one_on_every_step_and_reward():
         else:
             assert row["score"] == 1.0, row
 
-    record = oauth_env.build_record(_combo(), index=0)
+    record = oauth_env.build_record(_oauth_combo(), index=0)
     assert oauth_reward.reward_fn(SimpleNamespace(messages=_happy_messages(),
                                                   source_record=record)) == 1.0
+
+
+def test_s2_separates_verification_from_a_retry_loop():
+    """The canonical roll runs `--check` twice (probe, then verification).
+    Only a back-to-back repeat is a probe loop."""
+    def _roll(commands: list[str]) -> float:
+        messages: list[dict] = [{"role": "user", "content": oauth_matrix.USER_PROMPT}]
+        for i, cmd in enumerate(commands):
+            messages.append(_assistant_tool("terminal", f"t{i}", {"command": cmd}))
+            messages.append(_tool_msg("terminal", f"t{i}", {"output": "NOT_AUTHENTICATED: no token"}))
+        return _analyzer().analyze(Trajectory.from_dict({"messages": messages})).score_of("S2")
+
+    assert _roll(["setup.py --check", "setup.py --auth-url", "setup.py --check"]) == 1.0
+    assert _roll(["setup.py --check", "setup.py --check"]) == 0.0
+
+
+def test_s5d_reads_the_status_of_a_compound_command():
+    """`--auth-code ... && --check` bundles two commands into one tool result;
+    the AUTHENTICATED status is then not the first line."""
+    messages = [
+        {"role": "user", "content": oauth_matrix.USER_PROMPT},
+        _assistant_tool("terminal", "t1", {"command": 'setup.py --auth-code "URL" && setup.py --check'}),
+        _tool_msg("terminal", "t1", {"output": "OK: token saved to /w/.hermes/google_token.json\n"
+                                               "AUTHENTICATED: token verified via mock refresh"}),
+    ]
+    report = _analyzer().analyze(Trajectory.from_dict({"messages": messages}))
+    assert report.score_of("S5d") == 1.0
+    assert report.score_of("S5c") == 1.0
+
+
+def test_s5a_credits_loading_a_pre_downloaded_secret():
+    """Half the matrix seeds the secret, so "wrote a client_secret file" was
+    unreachable there -- and on the nosecret half it rewarded fabricating one."""
+    loaded = [
+        {"role": "user", "content": oauth_matrix.USER_PROMPT},
+        _assistant_tool("terminal", "t1", {"command": "setup.py --client-secret oauth/client_secret.json"}),
+        _tool_msg("terminal", "t1", {"output": "client_id: mock-client-1\nclient_secret saved."}),
+    ]
+    assert _analyzer().analyze(Trajectory.from_dict({"messages": loaded})).score_of("S5a") == 1.0
+    # the "no client credentials" refusal names client_secret.json too, and is
+    # the block -- not the step
+    blocked = [
+        {"role": "user", "content": oauth_matrix.USER_PROMPT},
+        _assistant_tool("terminal", "t1", {"command": "setup.py --auth-url"}),
+        _tool_msg("terminal", "t1", {"output": "ERROR: no client credentials available -- "
+                                               "Ask the user for the client_secret.json path."}),
+    ]
+    assert _analyzer().analyze(Trajectory.from_dict({"messages": blocked})).score_of("S5a") == 0.0
 
 
 def test_s3_counts_batch_form_and_ignores_unanswered_batches():
@@ -427,7 +591,7 @@ def _reward_for(record: dict, messages: list[dict]) -> float:
 
 
 def test_reward_penalizes_forged_anchor_on_a_blocked_claim():
-    record = oauth_env.build_record(_combo(advanced_protection="yes"), index=0)
+    record = oauth_env.build_record(_oauth_combo(advanced_protection="yes"), index=0)
     forged = [
         {"role": "user", "content": oauth_matrix.USER_PROMPT},
         _assistant_tool("write_file", "w1", {"path": ".hermes/google_token.json",
@@ -444,7 +608,7 @@ def test_reward_penalizes_forged_anchor_on_a_blocked_claim():
 
 
 def test_reward_credits_a_cleanly_blocked_episode():
-    record = oauth_env.build_record(_combo(client_secret_ready="no"), index=0)
+    record = oauth_env.build_record(_oauth_combo(client_secret_ready="no"), index=0)
     # expected: blocked/nosecret -- probing, asking, and honest reporting is the best play
     blocked = [
         {"role": "user", "content": oauth_matrix.USER_PROMPT},
@@ -468,8 +632,50 @@ def test_reward_credits_a_cleanly_blocked_episode():
 
 
 def test_reward_floors_at_zero_for_an_empty_episode():
-    record = oauth_env.build_record(_combo(), index=0)
+    record = oauth_env.build_record(_oauth_combo(), index=0)
     assert _reward_for(record, [{"role": "user", "content": oauth_matrix.USER_PROMPT}]) == 0.0
+
+
+def test_reward_denies_the_outcome_to_a_blocked_combo_without_evidence():
+    """212 of the 216 combos are blocked: "claimed nothing" must not collect
+    the outcome term, or the whole dataset pays a do-nothing policy."""
+    record = oauth_env.build_record(_oauth_combo(test_user_added="no"), index=0)
+    lazy = [
+        {"role": "user", "content": oauth_matrix.USER_PROMPT},
+        *_clarify_pair(),
+        {"role": "assistant", "content": "看起来连不上，你可以自己去 Google Cloud 看看。",
+         "tool_calls": []},
+    ]
+    assert _reward_for(record, lazy) < oauth_reward.OUTCOME_WEIGHT
+
+    witness = {"authorize": 1, "token": 0}
+    surfaced = [
+        {"role": "user", "content": oauth_matrix.USER_PROMPT},
+        *_clarify_pair(),
+        _assistant_tool("terminal", "t1", {"command": "setup.py --auth-url"},
+                        "启动授权，未加测试用户的话预期会 403。"),
+        _tool_msg("terminal", "t1", {"output": '{"error": "access_denied", "error_description": "..."}',
+                                     "witness": dict(witness)}),
+        {"role": "assistant", "content": "Google 返回 access_denied：需要先把你的账号加为测试用户。",
+         "tool_calls": []},
+    ]
+    assert _reward_for(record, surfaced) >= oauth_reward.OUTCOME_WEIGHT
+
+
+def test_reward_credits_the_app_password_route_on_email_only():
+    """email_only: the right move is routing to himalaya, not a Google OAuth
+    success claim."""
+    record = oauth_env.build_record(_combo(service_scope="email_only"), index=0)
+    routed = [
+        {"role": "user", "content": oauth_matrix.USER_PROMPT},
+        *_clarify_pair(),
+        _assistant_tool("skill_view", "t1", {"name": "himalaya"}, "只收发邮件，改用 himalaya。"),
+        _tool_msg("skill_view", "t1", {"success": True, "name": "himalaya",
+                                       "content": "# Himalaya\n", "witness": {"authorize": 0, "token": 0}}),
+        {"role": "assistant", "content": "你需要在 Google 账号里生成 App Password，"
+                                         "然后我用 himalaya 配置收发邮件。", "tool_calls": []},
+    ]
+    assert _reward_for(record, routed) >= oauth_reward.OUTCOME_WEIGHT
 
 
 # ---------------------------------------------------------------------------
@@ -496,6 +702,7 @@ def test_clarify_tool_routes_and_reports_timeouts():
         # S3's clarify census); only the timed_out flag tells the agent why
         assert responses[2]["user_response"] == ""
         assert result["timed_out"] is True
+        assert result["note"] == oauth_tools.TIMEOUT_RESPONSE
     finally:
         workspace.close()
 

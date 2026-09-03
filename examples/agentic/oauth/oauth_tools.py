@@ -187,15 +187,32 @@ class OAuthWorkspace:
 
     # -- process environment for terminal children --------------------------
     def child_env(self) -> dict[str, str]:
+        """Bind the child process to this episode alone.
+
+        ``HOME`` is the workspace root: the vendored skill docs address state
+        as ``~/.hermes/...``, and with the host's HOME those paths would leak
+        into the real user profile and across concurrent episodes.  Outbound
+        traffic is black-holed (the himalaya doc tells the agent to
+        ``curl | sh`` an installer) while loopback -- the episode's mock world
+        -- stays reachable, so the install branch fails fast and
+        deterministically instead of hitting the internet.
+        """
+        hermes_home = self.root / ".hermes"
         env = dict(os.environ)
-        env["HERMES_HOME"] = (self.root / ".hermes").as_posix()
+        env["HOME"] = self.root.as_posix()
+        env["HERMES_HOME"] = hermes_home.as_posix()
         env["GOOGLE_OAUTH_BASE_URL"] = self.server.base_url
+        env["PATH"] = f"{(hermes_home / 'bin').as_posix()}{os.pathsep}{env.get('PATH', '')}"
+        for name in ("http_proxy", "https_proxy", "all_proxy"):
+            env[name] = "http://127.0.0.1:9"
+            env[name.upper()] = env[name]
+        env["no_proxy"] = env["NO_PROXY"] = "127.0.0.1,localhost"
         return env
 
     # -- grading -------------------------------------------------------------
     def step_report(self, messages: list[dict[str, Any]]) -> StepReport:
         """Adjudicate the episode trajectory so far."""
-        traj = Trajectory.from_dict({"messages": list(messages), "meta": {"driver": "areno"}})
+        traj = Trajectory.from_dict({"messages": list(messages), "driver": "areno"})
         return self.analyzer.analyze(traj)
 
     def _with_grade(self, result: dict[str, Any], messages: list[dict[str, Any]]) -> dict[str, Any]:
@@ -203,13 +220,17 @@ class OAuthWorkspace:
 
         ``progress_score`` is the mean of the S-step scores (S4 normalized to
         0..1) over the trajectory so far; ``solved`` marks a confirmed
-        AUTHENTICATED anchor (the S5d row).
+        AUTHENTICATED anchor (the S5d row) that the world witness corroborates.
         """
         report = self.step_report(messages)
+        hits = dict(self.server.machine.hits)
         result["progress_score"] = round(_normalized_progress(report), 4)
-        if report.score_of("S5d") >= 1.0:
+        # only a world-corroborated anchor stops the episode: `echo
+        # AUTHENTICATED` reads like S5d on the transcript, and ending the
+        # rollout there would hand the model a cheap exit.
+        if report.score_of("S5d") >= 1.0 and int(hits.get("token", 0)) > 0:
             result["solved"] = True
-        result["witness"] = dict(self.server.machine.hits)
+        result["witness"] = hits
         return result
 
 
@@ -348,7 +369,11 @@ def clarify(workspace: OAuthWorkspace, arguments: dict[str, Any]) -> dict[str, A
 
     result: dict[str, Any] = {"responses": responses}
     if timed_out:
+        # hermes contract: an unanswered question comes back blank plus the
+        # timeout sentinel telling the agent to decide for itself (a blank
+        # answer must not credit the S3 clarify census).
         result["timed_out"] = True
+        result["note"] = TIMEOUT_RESPONSE
     return result
 
 

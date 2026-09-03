@@ -22,8 +22,11 @@ GOOGLE_EMAIL_VOCAB = StepVocab(
     token_file="google_token.json",
     # S5a -- injected secret
     secret_file="client_secret",
-    # S5b -- auth-url launch + expected-failure caveat
-    authorize_cmd=("authorize",),
+    # S5b -- auth-url launch + expected-failure caveat.  Both spellings count:
+    # the raw endpoint (`curl .../authorize`) and the flag the skill doc
+    # actually documents (`$GSETUP --auth-url --services ...`), which carries
+    # no "authorize" substring at all.
+    authorize_cmd=("authorize", "--auth-url"),
     caveat_keywords=("预期", "会失败", "access_denied", "403", "回传", "授权"),
     # S5c -- code exchange + grant errors
     auth_code_cmd=("--auth-code", "/token"),

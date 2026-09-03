@@ -12,7 +12,7 @@ from typing import Any
 
 from grading.messages import Trajectory
 from grading.step_table import (StepAnalyzer, StepEntry, _first_tool_output_after,
-                                prose_ask_texts, traj_driver)
+                                has_status_line, prose_ask_texts, traj_driver)
 
 DEFAULT_STEP_ORDER = ("S1", "S2", "S3", "S4", "S5a", "S5b", "S5c", "S5d")
 
@@ -33,10 +33,23 @@ def _s2(analyzer: StepAnalyzer, obs: list[dict[str, Any]], calls: list[tuple[int
     auth_probed = any(vocab.not_authenticated in o or vocab.token_file in o
                       or vocab.refresh_failed in o for o in outputs)
     cmds = [c for _, c in calls]
-    looped = any(cmds.count(c) >= analyzer.cfg.s2_loop_threshold for c in cmds)
+    looped = _repeats_in_a_row(cmds, analyzer.cfg.s2_loop_threshold)
     score = 1.0 if (auth_probed and not looped) else 0.0
     return {"score": score, "partial": bool(auth_probed) and bool(looped),
             "auth_probed": bool(auth_probed), "looped": bool(looped)}
+
+
+def _repeats_in_a_row(cmds: list[str], threshold: int) -> bool:
+    """A probe loop is the same command run back-to-back with nothing in
+    between.  A plain census over the whole roll would flag the *canonical*
+    trajectory, which legitimately runs ``--check`` twice: once to probe the
+    initial state (S2) and once to verify the closed loop (S5d)."""
+    run = 1
+    for previous, current in zip(cmds, cmds[1:]):
+        run = run + 1 if current == previous else 1
+        if run >= threshold:
+            return True
+    return False
 
 
 def _count_clarify(obs: list[dict[str, Any]]) -> int:
@@ -65,12 +78,28 @@ def _s4_evidence(analyzer: StepAnalyzer, obs: list[dict[str, Any]]) -> str:
     return texts[-1] if texts else ""
 
 
-def _s5a(analyzer: StepAnalyzer, obs: list[dict[str, Any]]) -> dict[str, Any]:
+def _s5a(analyzer: StepAnalyzer, obs: list[dict[str, Any]],
+         calls: list[tuple[int, str]], outputs: list[str]) -> dict[str, Any]:
+    """The step is "the OAuth client credentials reached setup.py".
+
+    Writing the file is one way; loading an already-downloaded secret
+    (``--client-secret``, or the shim's canonical auto-load, which reports
+    ``client_secret saved``) is the other -- and the only one available on the
+    combos that seed the secret.  Crediting the write alone made S5a dead on
+    every ``client_secret_ready=yes`` combo and rewarded fabricating a
+    credentials file on the ones that block precisely because none exists."""
+    marker = analyzer.vocab.secret_file
     writers = [o for o in obs if o.get("name") == "write_file"]
-    hit = any(analyzer.vocab.secret_file in (o.get("payload", {}).get("path", "") or "")
-              or analyzer.vocab.secret_file in str(o.get("payload", {}).get("filename", ""))
-              for o in writers)
-    return {"score": 1.0 if hit else 0.0, "write_events": len(writers)}
+    written = any(marker in (o.get("payload", {}).get("path", "") or "")
+                  or marker in str(o.get("payload", {}).get("filename", ""))
+                  for o in writers)
+    # precise tells only: the "no client credentials ... ask for the
+    # client_secret.json path" refusal also carries the marker word, and that
+    # message is the *block*, not the step.
+    loaded = (any(f"--{marker.replace('_', '-')}" in cmd for _, cmd in calls)
+              or any(f"{marker} saved" in out for out in outputs))
+    return {"score": 1.0 if (written or loaded) else 0.0,
+            "write_events": len(writers), "written": written, "loaded": loaded}
 
 
 def _s5b(analyzer: StepAnalyzer, obs: list[dict[str, Any]], calls: list[tuple[int, str]]) -> dict[str, Any]:
@@ -110,8 +139,10 @@ def _s5d(analyzer: StepAnalyzer, obs: list[dict[str, Any]], calls: list[tuple[in
     checks = [(idx, cmd) for idx, cmd in calls if voc.check_cmd in cmd]
     if not checks:
         return {"score": 0.0, "reason": "无 --check"}
-    # the negative marker contains the positive one; match the status prefix
-    auth_ok = any(_first_tool_output_after(obs, idx).strip().startswith(voc.authenticated)
+    # the negative marker contains the positive one, so match the status
+    # prefix -- per LINE, because `--auth-code ... && --check` bundles two
+    # commands into one tool result and the status is then not line 1.
+    auth_ok = any(has_status_line(_first_tool_output_after(obs, idx), voc.authenticated)
                   for idx, _ in checks)
     refreshed = any(voc.refresh_failed in _first_tool_output_after(obs, idx) for idx, _ in checks)
     return {"score": 1.0 if auth_ok else 0.0, "auth_ok": bool(auth_ok),
@@ -159,7 +190,7 @@ def OAUTH_TABLE(analyzer: StepAnalyzer, traj: Trajectory, obs: list[dict[str, An
         return {"score": label, "evidence": text[:200]}
 
     def s5a() -> dict[str, Any]:
-        return _s5a(analyzer, obs)
+        return _s5a(analyzer, obs, calls, outputs)
 
     def s5b() -> dict[str, Any]:
         row = _s5b(analyzer, obs, calls)
@@ -192,7 +223,8 @@ def OAUTH_TABLE(analyzer: StepAnalyzer, traj: Trajectory, obs: list[dict[str, An
                                    else "未清晰宣达唯一手动步骤"]),
         "S5a": StepEntry("S5a", "rule",
                          s5a,
-                         lambda r: ["client_secret.json 已写入" if r["score"] else "未注入 client_secret"]),
+                         lambda r: ["client_secret 已提供给 setup.py" if r["score"]
+                                    else "未注入 client_secret"]),
         "S5b": StepEntry("S5b", "rule",
                          s5b,
                          lambda r: ["已启动 /authorize 并回传授权链接" if r["auth_launched"] else "未启动授权",
