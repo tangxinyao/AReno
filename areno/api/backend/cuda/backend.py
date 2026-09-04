@@ -22,6 +22,7 @@ from collections.abc import Callable
 from pathlib import Path
 from threading import Lock
 
+from areno import _configure_torch_runtime
 from areno.api.backend.base import Backend, BackendCapabilities, register_backend
 from areno.api.backend.common import (
     expand_prompt_features,
@@ -43,6 +44,8 @@ from areno.api.config import CudaConfig
 from areno.api.context import Context
 from areno.api.models import BackendType, RolloutResult, RolloutSequence, SamplingParams, TrainSequence
 from areno.api.roles import ModelRole
+
+_configure_torch_runtime()
 
 logger = logging.getLogger(__name__)
 _SYS_PATH_LOCK = Lock()
@@ -138,7 +141,6 @@ class CudaBackend(Backend):
             cfg = CudaConfig()
         if not isinstance(cfg, CudaConfig):
             raise TypeError(f"CudaBackend requires CudaConfig, got {type(cfg)!r}")
-
         # Derive the DP/TP layout: world = dp * tp must hold exactly. When the
         # caller omits `dp_size` we infer it from `world_size / tp_size`.
         world_size = int(ctx.world_size)
@@ -178,7 +180,6 @@ class CudaBackend(Backend):
         from areno.engine.protocol import (
             ClusterPartition,
             DistributedWorldSpec,
-            find_free_port,
             start_partitioned_clusters,
         )
 
@@ -204,7 +205,9 @@ class CudaBackend(Backend):
         )
         world_spec = DistributedWorldSpec(
             master_addr="127.0.0.1",
-            master_port=find_free_port(),
+            # Placeholder: start_partitioned_clusters creates a coordinator-held
+            # TCPStore with port=0 and fills in the resolved port before spawn.
+            master_port=0,
             global_world_size=world_size + len(rollout_devices),
             train=train_partition,
             rollout=rollout_partition,

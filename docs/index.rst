@@ -36,6 +36,7 @@ AReno documentation
    :maxdepth: 1
    :caption: Cookbook
 
+   cookbook/writing-loaders-and-rewards
    cookbook/math-rlvr
    cookbook/tictactoe-agentic-rl
    cookbook/duelgrid-visual-agent
@@ -46,6 +47,7 @@ AReno documentation
    :caption: Reference
 
    CLI Reference <reference/cli>
+   4-bit AdamW <reference/adamw-4bit>
    SDK Reference <sdk/trainer>
    Supported Models <models/supported>
 

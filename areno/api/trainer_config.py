@@ -57,6 +57,7 @@ class TrainerConfig:
     weight_decay: float = 1.0e-2
     grad_clip_norm: float = 1.0
     adam_8bit: bool = False
+    adam_4bit: bool = False
     unfreeze_multimodal_tower: bool = False
     unfreeze_multimodal_projector: bool = False
     multimodal_tower_lr: float | None = None
@@ -76,7 +77,6 @@ class TrainerConfig:
     attn_backend: str = "flash"
     metrics_log_dir: str | None = DEFAULT_METRICS_LOG_DIR
     agent_fn: str | None = None
-    agent_timeout_s: float = 300.0
     train_tool_results: bool = False
     chat_template_enable_thinking: bool | None = None
     lora: LoraConfig | None = None
@@ -91,6 +91,10 @@ class TrainerConfig:
             self.backend = self.backend.lower()
         if self.backend not in {"cuda", "mlx"}:
             raise ValueError("backend must be one of: cuda, mlx")
+        if self.adam_4bit and self.adam_8bit:
+            raise ValueError("adam_4bit and adam_8bit are mutually exclusive")
+        if self.adam_4bit and self.backend != "cuda":
+            raise ValueError("adam_4bit is only supported by the CUDA backend")
         if self.attn_backend not in {"flash", "native"}:
             raise ValueError("attn_backend must be one of: flash, native")
         if self.model_hub not in {"hf", "modelscope"}:
@@ -121,8 +125,8 @@ class TrainerConfig:
             self.multimodal_projector_lr_decay_steps,
             self.multimodal_projector_lr_decay_style,
         )
-        if self.lora is not None and self.backend != "cuda":
-            raise ValueError("native LoRA is only supported by the CUDA backend")
+        if self.backend == "mlx" and self.reference_mode != "independent":
+            raise ValueError("MLX currently supports only reference_mode='independent'")
 
     @staticmethod
     def _validate_multimodal_optimizer_group(
@@ -156,6 +160,7 @@ class TrainerConfig:
             "weight_decay": self.weight_decay,
             "grad_clip_norm": self.grad_clip_norm,
             "adam_8bit": self.adam_8bit,
+            "adam_4bit": self.adam_4bit,
             "unfreeze_multimodal_tower": self.unfreeze_multimodal_tower,
             "unfreeze_multimodal_projector": self.unfreeze_multimodal_projector,
             "multimodal_tower_lr": self.multimodal_tower_lr,
@@ -188,10 +193,13 @@ class TrainerConfig:
         from areno.api.config import MlxConfig
 
         return MlxConfig(
+            base_model_name_or_path=self.base_model_name_or_path,
             optimizer=self.optimizer_config(),
             keep_rollout_state=self.keep_rollout_state,
             compile_train_step=True,
             gradient_checkpointing=self.activation_checkpointing,
+            lora=self.lora,
+            reference_mode=self.reference_mode,
         )
 
     def cuda_config(self):
@@ -282,6 +290,7 @@ class RolloutTrainerConfig(TrainerConfig):
 
         max_running = self.resolved_max_running_prompts()
         return MlxConfig(
+            base_model_name_or_path=self.base_model_name_or_path,
             optimizer=self.optimizer_config(),
             max_running_prompts=max_running,
             completion_batch_size=max_running,
@@ -289,6 +298,8 @@ class RolloutTrainerConfig(TrainerConfig):
             keep_rollout_state=self.keep_rollout_state,
             compile_train_step=True,
             gradient_checkpointing=self.activation_checkpointing,
+            lora=self.lora,
+            reference_mode=self.reference_mode,
         )
 
 

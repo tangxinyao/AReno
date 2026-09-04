@@ -271,7 +271,6 @@ class RolloutSession:
         sampling_params: SamplingParams,
         loss_mask_policy: LossMaskPolicy | None = None,
         max_running_prompts: int | None = None,
-        timeout_s: float = 300.0,
         proxy: bool = True,
     ) -> None:
         self._trainer = trainer
@@ -282,12 +281,6 @@ class RolloutSession:
         self._max_running_prompts = (
             max(1, int(max_running_prompts)) if max_running_prompts is not None else self._dp_size
         )
-        # Kept in the public signature for compatibility with existing agent
-        # functions and CLI configurations.  A rollout completion has no
-        # wall-clock deadline: long generations must be allowed to finish
-        # naturally instead of being abandoned while the backend still owns
-        # the request.
-        del timeout_s
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
