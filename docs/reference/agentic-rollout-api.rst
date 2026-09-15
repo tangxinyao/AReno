@@ -18,5 +18,6 @@ The training CLI accepts the agent entry point through ``--agent-fn``:
 The agent function can use the local OpenAI-compatible proxy to call the model
 and can execute tools or environment logic between model turns.
 
-See :doc:`/cli/training` for current flags and
-:doc:`/cookbook/tictactoe-agentic-rl` for the smallest runnable recipe.
+See :doc:`/cli/training` for current flags and the
+:doc:`/cookbook/agentic-rl` chapter for the
+smallest runnable recipe.

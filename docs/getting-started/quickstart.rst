@@ -41,8 +41,9 @@ math example is the fastest way to see that path end to end.
      --tp-size 1 \
      --world-size 1
 
-Read :doc:`/concepts/training-loop` for the mental model and
-:doc:`/cookbook/math-rlvr` for the runnable recipe shape.
+Read :doc:`/concepts/training-loop` for the mental model and the
+:doc:`/cookbook/gspo` chapter as the runnable
+recipe shape.
 
 On Apple Silicon, use a checkpoint supported by ``mlx-lm`` and add
 ``--world-size 1 --tp-size 1 --mini-bs 1`` for the first run. See
@@ -62,4 +63,4 @@ services, or an environment before AReno scores the trajectory.
      --algo gspo
 
 Read :doc:`/reference/agentic-rollout-api` for the agentic rollout boundary and
-:doc:`/cookbook/tictactoe-agentic-rl` for the first recipe.
+the :doc:`/cookbook/agentic-rl` chapter for the first recipe.

@@ -8,7 +8,7 @@ commands, options, SDK types, supported models, APIs, and environment
 variables.
 
 For guided setup, start with :doc:`/getting-started/welcome`. For runnable
-tasks, use :doc:`/cookbook/math-rlvr`.
+tasks, use the :doc:`/cookbook/gspo` chapter.
 
 Reference pages:
 

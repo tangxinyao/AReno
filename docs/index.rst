@@ -38,10 +38,26 @@ AReno documentation
    :maxdepth: 1
    :caption: Cookbook
 
-   cookbook/writing-loaders-and-rewards
-   cookbook/math-rlvr
-   cookbook/tictactoe-agentic-rl
-   cookbook/duelgrid-visual-agent
+   cookbook/setup
+   cookbook/ling-3-0-tiny
+   cookbook/dgx-spark
+   cookbook/aliyun-cloud
+   cookbook/first-train
+   cookbook/algorithms
+   cookbook/sft
+   cookbook/online-rl-loop
+   cookbook/gspo
+   cookbook/grpo
+   cookbook/ppo
+   cookbook/dpo
+   cookbook/agentic-rl
+   cookbook/inference-subsystem
+   cookbook/training-subsystem
+   cookbook/tensor-parallelism
+   cookbook/model-adapters
+   cookbook/cuda-acceleration
+   cookbook/extending-areno
+   cookbook/dashboard
 
 .. toctree::
    :hidden:

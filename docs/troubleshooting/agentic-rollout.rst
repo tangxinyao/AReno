@@ -21,4 +21,5 @@ Common symptoms:
 * Runs hang: check external tool or environment calls before model calls.
 * Tool calls fail to parse: inspect raw assistant turns and schema format.
 
-Use :doc:`/cookbook/tictactoe-agentic-rl` as the smallest reference recipe.
+Use the :doc:`/cookbook/agentic-rl` chapter as the
+smallest reference recipe.
