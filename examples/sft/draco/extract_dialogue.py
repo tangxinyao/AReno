@@ -1,18 +1,20 @@
-"""Extract Draco Malfoy's lines from your own Harry Potter ebooks into SFT rows.
+"""Extract (someone speaks to Draco -> Draco replies) pairs from your own Harry Potter books.
 
 The books are copyrighted: run this on copies you own, keep the output local
 (``data/`` is git-ignored), and do not redistribute it.
 
 Usage::
 
-    python examples/sft/draco/extract_dialogue.py books/*.epub \
+    python examples/sft/draco/extract_dialogue.py /path/to/harry.txt \
         --output examples/sft/draco/data/draco.jsonl
 
-Accepts ``.txt`` (one paragraph per line or blank-line separated) and ``.epub``.
-English and Chinese (simplified or traditional) editions are both supported;
-the language is detected per book. Attribution is heuristic and favors
-precision: a paragraph is kept only when its narration names Malfoy/Draco next
-to a speech verb and names no other speaker.
+Accepts English ``.txt`` (one paragraph per line, UTF-8 or GB18030) and
+``.epub``. Each paragraph is split into speech units (an adjacent ``"..." "..."``
+pair means two speakers glued into one paragraph), and each unit is attributed
+from its narration (``said Malfoy``, ``Harry snapped``). An unattributed unit
+inherits the speaker of the unit two back when the unit in between is someone
+else, which recovers the usual back-and-forth. A row is emitted when a unit by
+someone other than Draco is directly followed by a Draco unit.
 """
 
 from __future__ import annotations
@@ -22,53 +24,122 @@ import json
 import posixpath
 import re
 import zipfile
+from dataclasses import dataclass
 from html.parser import HTMLParser
 from pathlib import Path
 from xml.etree import ElementTree
 
-# English -----------------------------------------------------------------
-_EN_VERBS = (
-    r"said|drawled|sneered|snarled|spat|jeered|called|shouted|yelled|asked|muttered|whispered|hissed|"
-    r"snapped|replied|added|laughed|sniggered|scoffed|demanded|cried|growled|mocked|taunted|smirked|"
-    r"continued|went on|began|breathed|murmured|retorted|jibed"
+_VERBS = (
+    r"said|says|drawled|sneered|snarled|spat|jeered|called|shouted|yelled|asked|muttered|whispered|hissed|"
+    r"snapped|replied|added|laughed|sniggered|scoffed|demanded|cried|growled|mocked|taunted|smirked|roared|"
+    r"continued|went on|began|breathed|murmured|retorted|told|answered|repeated|insisted|exclaimed|bellowed|"
+    r"panted|gasped|groaned|moaned|sighed|screamed|squeaked|barked|interrupted|urged|pleaded|agreed|protested"
 )
-_EN_DRACO = r"(?:Draco(?:\s+Malfoy)?|Malfoy)"
-_EN_DRACO_SPEAKS = re.compile(rf"\b(?:{_EN_VERBS})\s+{_EN_DRACO}\b|\b{_EN_DRACO}\s+(?:{_EN_VERBS})\b")
-_EN_OTHER_SPEAKS = re.compile(rf"\b(?:{_EN_VERBS})\s+([A-Z][a-z]+)|\b([A-Z][a-z]+)\s+(?:{_EN_VERBS})\b")
-# Other Malfoys are masked before attribution so they never count as Draco.
-_EN_OTHER_MALFOYS = re.compile(r"\b(?:Lucius|Narcissa|Mr\.?|Mrs\.?)\s+Malfoy\b")
-_EN_NOT_NAMES = {"He", "She", "They", "It", "I", "We", "You", "Draco", "Malfoy", "Then", "And", "But", "Someone"}
-_EN_DOUBLE_QUOTE = re.compile(r"[“\"]([^”\"]+)[”\"]")
-# Closing ’ followed by a letter is an apostrophe (don’t), not a closing quote.
-_EN_SINGLE_QUOTE = re.compile(r"‘(.+?)’(?![A-Za-z])")
+_NAME = r"(?:(?:Professor|Mr\.|Mrs\.|Madam|Uncle|Aunt|Lord|Mad-Eye|Sir)\s+)?[A-Z][a-zA-Z']+(?:[- ][A-Z][a-zA-Z']+)?"
+_SPEAKER_AFTER = re.compile(rf"\b(?:{_VERBS})\s+({_NAME})")
+_SPEAKER_BEFORE = re.compile(rf"({_NAME})(?:,[^,\n]{{1,80}},)?\s+(?:{_VERBS})\b")  # also `Malfoy, who ..., said`
+# Action beat with no speech verb: `Malfoy smirked. "..."` -- a name opening a narration sentence.
+_BEAT_SUBJECT = re.compile(rf"(?:^|[.!?]\s+)({_NAME})\s+[a-z]", re.M)
+_NOT_NAMES = {
+    "He", "She", "They", "It", "I", "We", "You", "Then", "And", "But", "So", "Now", "When", "As", "The",
+    "Someone", "Everyone", "Nobody", "Somebody",
+}
+_QUOTE_CHARS = str.maketrans({"“": '"', "”": '"'})
+# A closing quote followed only by whitespace and a new opening quote starts another speaker.
+_GLUED_SPEAKERS = re.compile(r'(?<=[.!?,—–-]")\s+(?=")')
 
-# Chinese: 人民文学版 马尔福/德拉科, 皇冠版 馬份/跩哥 ---------------------------
-_ZH_VERBS = r"说|說|道|问|問|叫|喊|嚷|笑|吼|讥|譏"
-_ZH_DRACO = r"(?:德拉科|跩哥|马尔福|馬份)"
-_ZH_DRACO_SPEAKS = re.compile(rf"{_ZH_DRACO}[^“”「」。！？]{{0,10}}?(?:{_ZH_VERBS})")
-_ZH_OTHER_MALFOYS = re.compile(r"卢修斯·?马尔福|盧修斯·?馬份|纳西莎·?马尔福|水仙·?馬份|马尔福(?:先生|夫人)|馬份(?:先生|夫人)")
-_ZH_OTHERS = (
-    r"哈利|罗恩|榮恩|赫敏|妙麗|海格|邓布利多|鄧不利多|斯内普|石內卜|麦格|麥教授|纳威|奈威|金妮|弗雷德|乔治|"
-    r"克拉布|高尔|潘西|卢娜|小天狼星|卢平|路平|穆迪|伏地魔|贝拉特里克斯|韦斯莱|衛斯理"
-)
-_ZH_OTHER_SPEAKS = re.compile(rf"(?:{_ZH_OTHERS})[^“”「」。！？]{{0,10}}?(?:{_ZH_VERBS})")
-_ZH_QUOTE = re.compile(r"[“「]([^”」]+)[”」]")
+DRACO = "Draco"
 
-_BLOCK_TAGS = {"p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "br", "blockquote"}
+
+@dataclass
+class Unit:
+    words: str
+    speaker: str | None
+    index: int  # paragraph index, used to require adjacency
+
+
+def canonical_speaker(name: str) -> str | None:
+    words = name.split()
+    while words and words[0] in _NOT_NAMES:  # "Then Harry said" -> "Harry"
+        words.pop(0)
+    name = " ".join(words)
+    if not name or name.endswith("'s"):
+        return None
+    return DRACO if name in ("Draco", "Malfoy", "Draco Malfoy") else name
+
+
+def attribute(narration: str) -> str | None:
+    """Return the single speaker named in a unit's narration, else None."""
+
+    names = {canonical_speaker(match.group(1)) for match in _SPEAKER_AFTER.finditer(narration)}
+    names |= {canonical_speaker(match.group(1)) for match in _SPEAKER_BEFORE.finditer(narration)}
+    names.discard(None)
+    if not names:
+        names = {canonical_speaker(match.group(1)) for match in _BEAT_SUBJECT.finditer(narration)}
+        names.discard(None)
+    return names.pop() if len(names) == 1 else None
+
+
+def split_units(paragraph: str) -> list[tuple[str, str]]:
+    """Split a paragraph into (spoken words, narration) speech units."""
+
+    units = []
+    for chunk in _GLUED_SPEAKERS.split(paragraph.translate(_QUOTE_CHARS)):
+        if chunk.count('"') < 2 or chunk.count('"') % 2:
+            continue  # no speech, or a speech that runs on into the next paragraph
+        parts = chunk.split('"')
+        words = " ".join(part.strip() for part in parts[1::2] if part.strip())
+        words = words[:-1] + "." if words.endswith(",") else words  # `"Go away," said X` -> "Go away."
+        narration = "\n".join(part.strip() for part in parts[0::2])
+        if words:
+            units.append((words, narration))
+    return units
+
+
+def speech_units(paragraphs: list[str]) -> list[Unit]:
+    units = [
+        Unit(words, attribute(narration), index)
+        for index, paragraph in enumerate(paragraphs)
+        for words, narration in split_units(paragraph)
+    ]
+    for k in range(2, len(units)):
+        prev, before = units[k - 1], units[k - 2]
+        alternating = units[k].index - before.index <= 2
+        if units[k].speaker is None and alternating and prev.speaker and before.speaker not in (None, prev.speaker):
+            units[k].speaker = before.speaker
+    return units
+
+
+def extract_rows(paragraphs: list[str], *, book: str, max_gap: int = 2) -> list[dict]:
+    """Pair each Draco unit with the non-Draco unit right before it.
+
+    ``max_gap`` is the largest paragraph distance between the two; 2 allows one
+    pure-narration paragraph in between.
+    """
+
+    units = speech_units(paragraphs)
+    rows = []
+    for prev, unit in zip(units, units[1:]):
+        adjacent = unit.index - prev.index <= max_gap
+        if adjacent and unit.speaker == DRACO and prev.speaker not in (None, DRACO):
+            rows.append({"book": book, "speaker": prev.speaker, "prompt_line": prev.words, "line": unit.words})
+    return rows
 
 
 class _ParagraphParser(HTMLParser):
+    _BLOCK_TAGS = {"p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "br", "blockquote"}
+
     def __init__(self) -> None:
         super().__init__()
         self.paragraphs: list[str] = []
         self._buffer: list[str] = []
 
     def handle_starttag(self, tag: str, attrs) -> None:
-        if tag in _BLOCK_TAGS:
+        if tag in self._BLOCK_TAGS:
             self._flush()
 
     def handle_endtag(self, tag: str) -> None:
-        if tag in _BLOCK_TAGS:
+        if tag in self._BLOCK_TAGS:
             self._flush()
 
     def handle_data(self, data: str) -> None:
@@ -88,8 +159,12 @@ class _ParagraphParser(HTMLParser):
 def read_paragraphs(path: Path) -> list[str]:
     if path.suffix.lower() == ".epub":
         return _read_epub(path)
-    text = path.read_text(encoding="utf-8-sig", errors="replace")
-    return [line.strip() for line in text.splitlines() if line.strip()]
+    raw = path.read_bytes()
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = raw.decode("gb18030")
+    return [" ".join(line.split()) for line in text.splitlines() if line.strip()]
 
 
 def _read_epub(path: Path) -> list[str]:
@@ -109,64 +184,22 @@ def _read_epub(path: Path) -> list[str]:
         return paragraphs
 
 
-def detect_language(paragraphs: list[str]) -> str:
-    sample = "".join(paragraphs[:500])
-    cjk = sum(1 for char in sample if "一" <= char <= "鿿")
-    return "zh" if cjk > len(sample) * 0.3 else "en"
-
-
-def draco_line(paragraph: str, lang: str) -> str | None:
-    """Return Draco's spoken words in a paragraph, or None if he is not the sole speaker."""
-
-    if lang == "zh":
-        quotes = _ZH_QUOTE.findall(paragraph)
-        narration = _ZH_OTHER_MALFOYS.sub("其他人", _ZH_QUOTE.sub("", paragraph))
-        if not quotes or not _ZH_DRACO_SPEAKS.search(narration) or _ZH_OTHER_SPEAKS.search(narration):
-            return None
-        return "".join(quote.strip() for quote in quotes)
-
-    quote_re = _EN_SINGLE_QUOTE if paragraph.count("‘") > paragraph.count("“") else _EN_DOUBLE_QUOTE
-    quotes = quote_re.findall(paragraph)
-    narration = _EN_OTHER_MALFOYS.sub("Other", quote_re.sub(" ", paragraph))
-    if not quotes or not _EN_DRACO_SPEAKS.search(narration):
-        return None
-    for match in _EN_OTHER_SPEAKS.finditer(narration):
-        name = match.group(1) or match.group(2)
-        if name not in _EN_NOT_NAMES:
-            return None
-    return " ".join(quote.strip() for quote in quotes)
-
-
-def extract_rows(paragraphs: list[str], *, lang: str, book: str, context_paras: int, context_chars: int) -> list[dict]:
-    rows = []
-    for index, paragraph in enumerate(paragraphs):
-        line = draco_line(paragraph, lang)
-        if not line or len(line) < 2:
-            continue
-        context = "\n".join(paragraphs[max(0, index - context_paras) : index])[-context_chars:]
-        if context:
-            rows.append({"book": book, "lang": lang, "context": context, "line": line})
-    return rows
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("books", nargs="+", type=Path, help="Your own .txt or .epub files.")
     parser.add_argument("--output", type=Path, default=Path(__file__).parent / "data" / "draco.jsonl")
-    parser.add_argument("--context-paras", type=int, default=4, help="Preceding paragraphs used as the scene.")
-    parser.add_argument("--context-chars", type=int, default=1500, help="Keep at most this many trailing chars.")
     args = parser.parse_args()
 
     rows: list[dict] = []
-    seen: set[str] = set()
+    seen: set[tuple[str, str]] = set()
     for path in args.books:
-        paragraphs = read_paragraphs(path)
-        lang = detect_language(paragraphs)
-        book_rows = extract_rows(
-            paragraphs, lang=lang, book=path.stem, context_paras=args.context_paras, context_chars=args.context_chars
-        )
-        book_rows = [row for row in book_rows if not (row["line"] in seen or seen.add(row["line"]))]
-        print(f"{path.name}: {lang}, {len(paragraphs)} paragraphs, {len(book_rows)} Draco lines")
+        book_rows = []
+        for row in extract_rows(read_paragraphs(path), book=path.stem):
+            key = (row["prompt_line"], row["line"])
+            if key not in seen:
+                seen.add(key)
+                book_rows.append(row)
+        print(f"{path.name}: {len(book_rows)} exchanges")
         rows.extend(book_rows)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
