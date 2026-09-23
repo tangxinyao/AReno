@@ -2,7 +2,6 @@
     "id": "1c6acf6b-3716-4dd6-ba54-a4f5453510af",
     "task_name": "five-step-pipeline",
     "trial_name": "five-step-pipeline__NKUNuFC",
-    "trial_uri": "file:///Users/xinyaotang/Documents/github.com/opc-benchmark/jobs/opc-deepseek-all/five-step-pipeline__NKUNuFC",
     "task_id": {
         "path": "tasks/finance/revenue-recognition/five-step-pipeline"
     },

@@ -4,48 +4,41 @@ Turns passing Hermes agent sessions (multi-turn tool-calling rollouts captured
 by ``hermes-session.jsonl``) into supervised rows. Two output modes:
 
 - **B (default)**: sequential SFT text rows, one ``(prompt, response)`` row per
-  assistant turn. The prompt is the Ling chat-format history up to that turn
-  (task + all prior actions/observations), the response is that turn's own
-  output (reasoning + `` response`` + text + tool calls). Tool results are
-  context — never a training target.
+  assistant turn. The prompt is the chat-template rendering of the history up
+  to that turn plus the generation prompt; the response is the rest of that
+  turn's rendering (reasoning, content, tool calls) without the trailing EOS,
+  which AReno appends itself. Tool results are context — never a target.
 - **C (``ARENO_OPC_C_MODE=1``)**: whole-rollout packed rows, ``tokens`` +
   ``prompt_mask`` + ``loss_mask``, with loss enabled only on assistant-produced
-  spans (including the closing ``<|role_end|>``). Avoids re-encoding the
-  history prefix once per turn.
+  spans (including the closing EOS). Avoids re-encoding the history prefix once
+  per turn.
 
-Both render the [Ling-3.0-tiny]
-(https://modelscope.cn/models/inclusionAI/Ling-3.0-tiny) ``chat_template.jinja``
-semantics as plain text: ``<role>HUMAN</role>`` turns, a
-``<role>ASSISTANT</role>`` + `` n thinking`` generation prompt, a
-`` thinking ... response`` split, ``<tool_call>`` with ``<arg_key>/<arg_value>``
-argument pairs, and ``<role>OBSERVATION</role>`` + ``<tool_response>`` blocks
-for tool results. Reasoning is a training target by default.
+All markup comes from the tokenizer's own ``chat_template.jinja`` through
+``apply_chat_template``; the loader never hand-writes role, thinking or
+tool-call tags, so rows match what the template produces at inference. Target
+spans are located by rendering growing message prefixes, so a template that
+rewrites earlier turns (not prefix-stable) is rejected with an error.
 
 Input ``--dataset-path`` may be a job run dir (``*/agent/hermes-session.jsonl``
-with a sibling ``*/result.json``), a flat dir of session files, or a single
-session file. Only trials with verifier ``reward == 1.0`` are kept; standalone
-sessions without a result file are kept as-is.
+with a sibling ``*/result.json``), a single trial dir, a flat dir of session
+files, a single session file, or a ``split_phases.py`` output file (passed
+through as-is). Only trials with verifier ``reward == 1.0`` are kept; sessions
+with no ``result.json`` are kept as-is, but a ``result.json`` without a reward
+counts as a failure.
 """
 
 from __future__ import annotations
 
 import bisect
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any
 
-# --- Ling-3.0-tiny / Bailing V3 native markup (from chat_template.jinja) ---
-_LING_ROLE_SYSTEM = "<role>SYSTEM</role>"
-_LING_ROLE_HUMAN = "<role>HUMAN</role>"
-_LING_ROLE_ASSISTANT = "<role>ASSISTANT</role>"
-_LING_ROLE_OBSERVATION = "<role>OBSERVATION</role>"
-_LING_ROLE_END = "<|role_end|>"  # Ling's EOS
-_LING_GEN_PROMPT = f"{_LING_ROLE_ASSISTANT}\n thinking"  # generation prompt (thinking on)
-_LING_THINKING_HEADER = "detailed thinking on"
-_LING_TOOL_RESPONSE_OPEN = "<tool_response>\n"
-_LING_TOOL_RESPONSE_CLOSE = "\n</tool_response>"
+logger = logging.getLogger(__name__)
 
+_LING_REPO = "inclusionAI/Ling-3.0-tiny"
 _TRUNCATED = "\n…<truncated {n} chars>"
 _PASS_REWARD = 1.0
 
@@ -63,10 +56,14 @@ _LING_TOKENIZER_FILES = [
 
 
 def load_training_dataset(dataset_path: str, *, default_loader, **_: object) -> list[dict]:
-    """Normalize passing OPC Hermes sessions into SFT rows (Ling format)."""
+    """Normalize passing OPC Hermes sessions into SFT rows (Ling chat template)."""
 
     # OPC data is local JSONL, not a HF dataset; the default_loader is unused.
     del default_loader
+
+    path = Path(dataset_path)
+    if _is_row_file(path):
+        return _load_row_file(path)
 
     drop_reasoning = bool(os.environ.get("ARENO_OPC_DROP_REASONING"))
     include_system_prompt = bool(os.environ.get("ARENO_OPC_INCLUDE_SYSTEM_PROMPT"))
@@ -74,30 +71,33 @@ def load_training_dataset(dataset_path: str, *, default_loader, **_: object) -> 
     max_tool_chars = _int_env("ARENO_OPC_MAX_TOOL_CHARS")
     phase_split = bool(os.environ.get("ARENO_OPC_PHASES"))
     c_mode = bool(os.environ.get("ARENO_OPC_C_MODE"))
-
+    max_seq_tokens = _int_env("ARENO_OPC_MAX_SEQ_TOKENS") or 32768
     if c_mode:
-        tokenizer = _load_tokenizer()
-        return _load_c_records(
-            dataset_path,
-            tokenizer,
-            max_seq_tokens=_int_env("ARENO_OPC_MAX_SEQ_TOKENS") or 32768,
-            max_tool_chars=max_tool_chars,
-            drop_reasoning=drop_reasoning,
-        )
+        ignored = [name for name in ("ARENO_OPC_MAX_HISTORY_MESSAGES", "ARENO_OPC_PHASES") if os.environ.get(name)]
+        if ignored:
+            logger.warning("opc: C mode packs whole rollouts; ignoring %s", ", ".join(ignored))
 
+    tokenizer = _load_tokenizer()
     records: list[dict] = []
     for session_path, result_path in _iter_session_files(dataset_path):
-        reward = _trial_reward(result_path)
-        if reward is not None and reward != _PASS_REWARD:
+        if not _trial_passed(result_path):
             continue  # failed trial -> not taught
         try:
             session = _load_session(session_path)
         except (OSError, ValueError) as exc:
             raise ValueError(f"opc: cannot load {session_path}: {exc}") from exc
+        messages = _chat_messages(session, include_system_prompt=include_system_prompt, drop_reasoning=drop_reasoning)
+        trial_name = _trial_name(session_path)
+        if c_mode:
+            c_rows = _session_to_c_rows(messages, tokenizer, max_seq_tokens=max_seq_tokens, max_tool_chars=max_tool_chars)
+            for chunk_index, row in enumerate(c_rows):
+                row["source_trial"] = trial_name
+                row["chunk_index"] = chunk_index
+                records.append(row)
+            continue
         rows = _session_to_rows(
-            session,
-            include_system_prompt=include_system_prompt,
-            drop_reasoning=drop_reasoning,
+            messages,
+            tokenizer,
             max_history_messages=max_history_messages,
             max_tool_chars=max_tool_chars,
             phase_split=phase_split,
@@ -106,7 +106,7 @@ def load_training_dataset(dataset_path: str, *, default_loader, **_: object) -> 
             record = {
                 "prompt": row["prompt"],
                 "response": row["response"],
-                "source_trial": session_path.parent.parent.name,
+                "source_trial": trial_name,
                 "turn_index": index,
             }
             if phase_split:
@@ -116,40 +116,75 @@ def load_training_dataset(dataset_path: str, *, default_loader, **_: object) -> 
     return records
 
 
-def _iter_session_files(dataset_path: str):
-    """Yield ``(session_file, result_file_or_None)`` pairs for ``dataset_path``."""
+# --- Input discovery ----------------------------------------------------------
+
+
+def _iter_session_files(dataset_path: str) -> list[tuple[Path, Path | None]]:
+    """Return ``(session_file, result_file_or_None)`` pairs for ``dataset_path``."""
 
     path = Path(dataset_path)
     if path.is_file():
-        return [(path, None)]
-
-    found = []
-    if path.is_dir():
-        # Job-run layout: <job>/<trial>/agent/hermes-session.jsonl + result.json
-        for trial_dir in sorted(path.glob("*/")):
-            session_file = trial_dir / "agent" / "hermes-session.jsonl"
-            if session_file.is_file():
-                result_file = trial_dir / "result.json"
-                found.append((session_file, result_file if result_file.is_file() else None))
-        if not found:
-            # Looser layouts: hermes-session.jsonl one level down, or bare
-            # *.jsonl sitting directly in the directory.
-            for subdir in sorted(path.glob("*/")):
-                for session_file in sorted(subdir.glob("hermes-session.jsonl")):
-                    found.append((session_file, None))
-            if not found:
-                for session_file in sorted(path.glob("*.jsonl")):
-                    found.append((session_file, None))
-    return found
+        sessions = [path]
+    elif path.is_dir():
+        # Job-run layout first (<job>/<trial>/agent/hermes-session.jsonl), then
+        # one level shallower (a single trial dir, or <dir>/<x>/hermes-session.jsonl),
+        # then bare *.jsonl files sitting directly in the directory.
+        sessions = (
+            sorted(path.glob("*/agent/hermes-session.jsonl"))
+            or sorted(path.glob("*/hermes-session.jsonl"))
+            or sorted(path.glob("*.jsonl"))
+        )
+    else:
+        sessions = []
+    if not sessions:
+        raise ValueError(f"opc: no hermes-session.jsonl found under {dataset_path}")
+    return [(session, _result_file(session)) for session in sessions]
 
 
-def _trial_reward(result_path: Path | None) -> float | None:
-    """Read the verifier reward from a trial result.json, or None if absent."""
+def _result_file(session_file: Path) -> Path | None:
+    """Find the verifier verdict for a session, whatever layout it was found in."""
 
-    if result_path is None or not result_path.is_file():
-        return None
+    # Hermes trials store <trial>/agent/hermes-session.jsonl next to <trial>/result.json.
+    if session_file.parent.name == "agent":
+        candidate = session_file.parent.parent / "result.json"
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _trial_name(session_file: Path) -> str:
+    if session_file.parent.name == "agent":
+        return session_file.parent.parent.name
+    return session_file.stem
+
+
+def _trial_passed(result_path: Path | None) -> bool:
+    """Standalone sessions pass; a result.json passes only with reward == 1.0."""
+
+    if result_path is None:
+        return True
     data = json.loads(result_path.read_text(encoding="utf-8"))
-    return data.get("verifier_result", {}).get("rewards", {}).get("reward")
+    reward = ((data.get("verifier_result") or {}).get("rewards") or {}).get("reward")
+    return reward == _PASS_REWARD
+
+
+def _is_row_file(path: Path) -> bool:
+    """Whether ``path`` is already a JSONL of ``prompt``/``response`` rows (split_phases output)."""
+
+    if not path.is_file():
+        return False
+    with path.open(encoding="utf-8") as handle:
+        first = handle.readline()
+    try:
+        row = json.loads(first)
+    except json.JSONDecodeError:
+        return False
+    return isinstance(row, dict) and "prompt" in row and "response" in row
+
+
+def _load_row_file(path: Path) -> list[dict]:
+    lines = path.read_text(encoding="utf-8").splitlines()
+    return [json.loads(line) for line in lines if line.strip()]
 
 
 def _load_session(session_path: Path) -> dict[str, Any]:
@@ -174,6 +209,57 @@ def _load_session(session_path: Path) -> dict[str, Any]:
     return obj
 
 
+def _int_env(name: str) -> int:
+    """Read a non-negative int env var; unset/empty means 0 ("off")."""
+
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return 0
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a non-negative integer, got {raw!r}") from exc
+    if value < 0:
+        raise ValueError(f"{name} must be a non-negative integer, got {raw!r}")
+    return value
+
+
+# --- Hermes -> chat-template messages -------------------------------------------
+
+
+def _chat_messages(session: dict[str, Any], *, include_system_prompt: bool, drop_reasoning: bool) -> list[dict[str, Any]]:
+    """Convert Hermes messages into the OpenAI-style dicts ``apply_chat_template`` expects."""
+
+    messages: list[dict[str, Any]] = []
+    if include_system_prompt and session.get("system_prompt"):
+        messages.append({"role": "system", "content": session["system_prompt"]})
+    for message in session.get("messages", []):
+        # TODO(agent): assumes Hermes marks rewound / compacted-away messages with
+        # active == 0 or compacted truthy; confirm against Hermes session docs.
+        if message.get("active", 1) == 0 or message.get("compacted"):
+            continue
+        role = message.get("role")
+        if role in ("system", "user"):
+            messages.append({"role": role, "content": _message_text(message)})
+        elif role == "assistant":
+            chat: dict[str, Any] = {"role": "assistant", "content": _message_text(message)}
+            reasoning = message.get("reasoning_content")
+            if reasoning and not drop_reasoning:
+                chat["reasoning_content"] = reasoning
+            tool_calls = _tool_calls(message)
+            if tool_calls:
+                chat["tool_calls"] = tool_calls
+            messages.append(chat)
+        elif role == "tool":
+            chat = {"role": "tool", "content": _message_text(message)}
+            if message.get("tool_call_id"):
+                chat["tool_call_id"] = message["tool_call_id"]
+            if message.get("tool_name"):
+                chat["name"] = message["tool_name"]
+            messages.append(chat)
+    return messages
+
+
 def _message_text(message: dict[str, Any]) -> str:
     """Extract plain text from ``content`` (str, list of blocks, or None)."""
 
@@ -193,56 +279,158 @@ def _message_text(message: dict[str, Any]) -> str:
     return str(content)
 
 
-def _int_env(name: str) -> int:
-    """Read a non-negative int env var; 0 (or unset/empty) means "off"."""
+def _tool_calls(message: dict[str, Any]) -> list[dict[str, Any]]:
+    """Normalize tool calls to ``{"type", "function": {"name", "arguments": dict}}``."""
 
-    raw = os.environ.get(name, "")
-    if not raw.strip():
-        return 0
+    calls: list[dict[str, Any]] = []
+    for tool_call in message.get("tool_calls") or []:
+        if not isinstance(tool_call, dict):
+            continue
+        function = tool_call.get("function")
+        source = function if isinstance(function, dict) else tool_call
+        arguments = source.get("arguments") or {}
+        if isinstance(arguments, str):
+            try:
+                arguments = json.loads(arguments)
+            except json.JSONDecodeError:
+                arguments = {"raw": arguments}
+        if not isinstance(arguments, dict):
+            arguments = {"raw": arguments}
+        call: dict[str, Any] = {"type": "function", "function": {"name": source.get("name", ""), "arguments": arguments}}
+        if tool_call.get("id"):
+            call["id"] = tool_call["id"]
+        calls.append(call)
+    return calls
+
+
+def _has_output(message: dict[str, Any]) -> bool:
+    return bool(message.get("content") or message.get("reasoning_content") or message.get("tool_calls"))
+
+
+def _truncate_context(message: dict[str, Any], max_chars: int) -> dict[str, Any]:
+    """Cap tool results and tool-call argument values; only ever applied to context."""
+
+    if not max_chars:
+        return message
+    if message["role"] == "tool":
+        return {**message, "content": _cap(message["content"], max_chars)}
+    if message.get("tool_calls"):
+        calls = []
+        for call in message["tool_calls"]:
+            arguments = {
+                key: _cap(value, max_chars) if isinstance(value, str) else value
+                for key, value in call["function"]["arguments"].items()
+            }
+            calls.append({**call, "function": {**call["function"], "arguments": arguments}})
+        return {**message, "tool_calls": calls}
+    return message
+
+
+def _cap(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars] + _TRUNCATED.format(n=len(text) - max_chars)
+
+
+def _preamble_len(messages: list[dict[str, Any]]) -> int:
+    """Number of leading messages (system + task) before the first assistant turn."""
+
+    for index, message in enumerate(messages):
+        if message["role"] == "assistant":
+            return index
+    return len(messages)
+
+
+# --- Template rendering -----------------------------------------------------------
+
+
+def _load_tokenizer():
+    """Load the Ling tokenizer (with its chat template).
+
+    ``ARENO_OPC_TOKENIZER`` points at a local tokenizer dir (offline). Without
+    it the loader auto-downloads the Ling-3.0-tiny tokenizer files (not the
+    weights) from ModelScope.
+    """
+
     try:
-        return max(int(raw), 0)
-    except ValueError:
-        return 0
+        from transformers import AutoTokenizer
+    except ImportError as exc:
+        raise ValueError("the OPC loader requires `transformers` (only the tokenizer is used)") from exc
+
+    local = os.environ.get("ARENO_OPC_TOKENIZER", "").strip()
+    if not local:
+        try:
+            from modelscope import snapshot_download
+
+            local = snapshot_download(_LING_REPO, allow_file_pattern=_LING_TOKENIZER_FILES)
+        except Exception as exc:  # noqa: BLE001 - surface a friendly error
+            raise ValueError(
+                "could not auto-download the Ling tokenizer; set ARENO_OPC_TOKENIZER=<dir> to a local copy"
+            ) from exc
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(local, trust_remote_code=True)
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError(f"could not load tokenizer from {local!r}: {exc}") from exc
+    if not getattr(tokenizer, "chat_template", None):
+        raise ValueError(f"tokenizer at {local!r} has no chat_template; the OPC loader renders rows with it")
+    return tokenizer
 
 
-# --- B mode renderers -----------------------------------------------------
+def _render(tokenizer, messages: list[dict[str, Any]], *, add_generation_prompt: bool) -> str:
+    return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=add_generation_prompt)
+
+
+def _prefix_len(full: str, prefix: str) -> int:
+    """Length of ``prefix`` after checking the template rendered it as a prefix of ``full``."""
+
+    if not full.startswith(prefix):
+        raise ValueError(
+            "opc: the chat template is not prefix-stable (rendering more messages rewrote earlier "
+            "text, e.g. it drops reasoning from past turns), so assistant turns cannot be isolated. "
+            "C mode needs a prefix-stable template; use the default B mode instead."
+        )
+    return len(prefix)
+
+
+def _strip_eos(text: str, tokenizer) -> str:
+    """Drop the template's closing EOS; AReno appends ``eos_token_id`` to B-mode targets itself."""
+
+    eos = getattr(tokenizer, "eos_token", None)
+    stripped = text.rstrip()
+    if eos and stripped.endswith(eos):
+        return stripped[: -len(eos)]
+    return text
+
+
+# --- B mode -------------------------------------------------------------------------
 
 
 def _session_to_rows(
-    session: dict[str, Any],
+    messages: list[dict[str, Any]],
+    tokenizer,
     *,
-    include_system_prompt: bool,
-    drop_reasoning: bool,
     max_history_messages: int,
     max_tool_chars: int,
     phase_split: bool,
 ) -> list[dict[str, Any]]:
     """Expand a session into one (prompt, response) row per assistant turn."""
 
-    prefix: list[dict[str, Any]] = []
-    if include_system_prompt and session.get("system_prompt"):
-        prefix.append({"role": "system", "content": session["system_prompt"]})
-
+    preamble = _preamble_len(messages)
     rows: list[dict[str, Any]] = []
     current_phase = {"index": 0, "genre": None}
-    for message in session.get("messages", []):
-        role = message.get("role")
-        if role != "assistant":
-            prefix.append(message)
+    for k, message in enumerate(messages):
+        if message["role"] != "assistant" or not _has_output(message):
             continue
-        # The target turn stays verbatim; only the *context* is compressed
-        # so long trajectories fit inside the model's context window.
-        response = _render_ling_assistant_target(message, drop_reasoning=drop_reasoning)
-        if not response:
-            prefix.append(message)  # empty turn still advances the history
-            continue
-        # Sliding window: always keep the task-defining first message, then
-        # the most recent messages, so later rows retain the task prompt.
-        if max_history_messages and len(prefix) > max_history_messages + 1:
-            context = prefix[:1] + prefix[-max_history_messages:]
-        else:
-            context = prefix
-        prompt = _render_ling_history(context, drop_reasoning=drop_reasoning, max_tool_chars=max_tool_chars)
+        context = messages[:k]
+        # Sliding window: always keep the system + task preamble, then the most
+        # recent messages, so later rows retain the task prompt.
+        if max_history_messages and k > preamble + max_history_messages:
+            context = context[:preamble] + context[-max_history_messages:]
+        # The target turn stays verbatim; only the *context* is compressed.
+        context = [_truncate_context(item, max_tool_chars) for item in context]
+        prompt = _render(tokenizer, context, add_generation_prompt=True)
+        full = _render(tokenizer, context + [message], add_generation_prompt=False)
+        response = _strip_eos(full[_prefix_len(full, prompt) :], tokenizer)
         row = {"prompt": prompt, "response": response}
         if phase_split:
             genre = _phase_genre(message)
@@ -252,141 +440,13 @@ def _session_to_rows(
             row["phase_index"] = current_phase["index"]
             row["phase_genre"] = genre
         rows.append(row)
-        prefix.append(message)
     return rows
 
 
-def _render_ling_history(messages: list[dict[str, Any]], *, drop_reasoning: bool, max_tool_chars: int = 0) -> str:
-    """Render history + generation prompt the way Ling's chat template does."""
-
-    blocks: list[str] = []
-    i, n = 0, len(messages)
-    if i < n and messages[i].get("role") == "system":
-        blocks.append(
-            f"{_LING_ROLE_SYSTEM}{_message_text(messages[i]).rstrip(chr(10))}\n{_LING_THINKING_HEADER}{_LING_ROLE_END}"
-        )
-        i += 1
-    else:
-        blocks.append(f"{_LING_THINKING_HEADER}{_LING_ROLE_END}")
-    while i < n:
-        message = messages[i]
-        role = message.get("role")
-        if role == "system":
-            blocks.append(f"{_LING_ROLE_SYSTEM}{_message_text(message)}{_LING_ROLE_END}")
-            i += 1
-        elif role == "user":
-            blocks.append(f"{_LING_ROLE_HUMAN}{_message_text(message)}{_LING_ROLE_END}")
-            i += 1
-        elif role == "assistant":
-            blocks.append(_render_ling_assistant_block(message, drop_reasoning=drop_reasoning, max_tool_chars=max_tool_chars))
-            i += 1
-        elif role == "tool":
-            # Consecutive tool results share one OBSERVATION role block.
-            responses: list[str] = []
-            while i < n and messages[i].get("role") == "tool":
-                responses.append(_render_ling_tool_response(messages[i], max_tool_chars=max_tool_chars))
-                i += 1
-            blocks.append(f"{_LING_ROLE_OBSERVATION}\n" + "\n".join(responses) + _LING_ROLE_END)
-        else:
-            i += 1
-    return "\n".join(blocks) + "\n" + _LING_GEN_PROMPT
-
-
-def _render_ling_assistant_block(message: dict[str, Any], *, drop_reasoning: bool, max_tool_chars: int = 0) -> str:
-    """Render a full assistant turn (for history), including tool calls."""
-
-    body = _render_ling_assistant_target(message, drop_reasoning=drop_reasoning, max_tool_chars=max_tool_chars)
-    return f"{_LING_ROLE_ASSISTANT}\n thinking{body}{_LING_ROLE_END}"
-
-
-def _render_ling_assistant_target(message: dict[str, Any], *, drop_reasoning: bool, max_tool_chars: int = 0) -> str:
-    """Render the *supervised target* for one assistant turn.
-
-    Matches the template's ``\n thinking{reasoning} response{content}`` split:
-    the generation prompt ends at ``<role>ASSISTANT</role>\n thinking``, so the
-    target starts with the reasoning, then the `` response`` separator, then
-    content, then raw tool-call blocks. No trailing role_end in B mode — AReno
-    appends the EOS (``<|role_end|>``) itself.
-    """
-
-    reasoning = "" if drop_reasoning else (message.get("reasoning_content") or "")
-    parts: list[str] = []
-    if reasoning:
-        parts.append(reasoning.strip("\n"))
-        parts.append(" response")
-    else:
-        parts.append(" response")
-    content = _message_text(message).lstrip("\n")
-    if content:
-        parts.append(content)
-    body = "".join(parts)
-    tool_text = _render_ling_tools(message, max_tool_chars=max_tool_chars)
-    if tool_text:
-        body += "\n" + tool_text
-    return body
-
-
-def _render_ling_tools(message: dict[str, Any], *, max_tool_chars: int = 0) -> str:
-    """Render all tool calls of a turn as Ling ``<tool_call>`` blocks."""
-
-    blocks: list[str] = []
-    for tool_call in message.get("tool_calls") or []:
-        function = tool_call.get("function") if isinstance(tool_call, dict) else None
-        if isinstance(function, dict):
-            name = function.get("name", "")
-            arguments = function.get("arguments") or {}
-        else:
-            name = tool_call.get("name", "")
-            arguments = tool_call.get("arguments") or {}
-        if isinstance(arguments, str):
-            try:
-                arguments = json.loads(arguments)
-            except json.JSONDecodeError:
-                arguments = {"raw": arguments}
-        if not isinstance(arguments, dict):
-            arguments = {"raw": arguments}
-        blocks.append(_render_ling_tool_call(name, arguments, max_tool_chars=max_tool_chars))
-    return "\n".join(blocks)
-
-
-def _render_ling_tool_call(name: str, arguments: dict[str, Any], *, max_tool_chars: int = 0) -> str:
-    """Render one Ling tool call as ``<tool_call>{name}\n<arg_key>/<arg_value>...``."""
-
-    def value_text(value: Any) -> str:
-        return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
-
-    arg_lines = [
-        f"<arg_key>{key}</arg_key>\n<arg_value>{value_text(value)}</arg_value>" for key, value in arguments.items()
-    ]
-    if max_tool_chars:
-        room = max_tool_chars - len(name) - len("<tool_call>\n") - len("\n</tool_call>")
-        kept: list[str] = []
-        dropped = 0
-        for line in arg_lines:
-            if room < len(line):
-                dropped += len(line)
-                continue
-            kept.append(line)
-            room -= len(line)
-        if dropped:
-            kept.append(f"<arg_value>…<truncated {dropped} chars…</arg_value>")
-        arg_lines = kept
-    return "<tool_call>" + name + "\n" + "\n".join(arg_lines) + "\n</tool_call>"
-
-
-def _render_ling_tool_response(message: dict[str, Any], *, max_tool_chars: int = 0) -> str:
-    """Render one tool result as a ``<tool_response>`` block inside OBSERVATION."""
-
-    content = _message_text(message)
-    if max_tool_chars and len(content) > max_tool_chars:
-        content = content[:max_tool_chars] + _TRUNCATED.format(n=len(content) - max_tool_chars)
-    return f"{_LING_TOOL_RESPONSE_OPEN}{content}{_LING_TOOL_RESPONSE_CLOSE}"
-
-
 def _phase_genre(message: dict[str, Any]) -> str:
-    """Classify one assistant turn into a coarse action phase by tool type."""
+    """Classify one assistant turn into a coarse action phase by tool name only."""
 
-    names = {tc.get("function", {}).get("name") for tc in (message.get("tool_calls") or [])}
+    names = {call["function"]["name"] for call in message.get("tool_calls") or []}
     if not names:
         return "report"
     if "search_files" in names:
@@ -398,88 +458,50 @@ def _phase_genre(message: dict[str, Any]) -> str:
     return "run"
 
 
-# --- C mode: whole-rollout packed rows (tokens + prompt/loss masks) --------
-
-
-def _load_tokenizer():
-    """Load the Ling tokenizer for C mode.
-
-    ``ARENO_OPC_TOKENIZER`` points at a local tokenizer dir (offline). Without
-    it the loader auto-downloads the Ling-3.0-tiny tokenizer files (not the
-    weights) from ModelScope.
-    """
-
-    try:
-        from transformers import AutoTokenizer
-    except ImportError as exc:
-        raise ValueError("ARENO_OPC_C_MODE requires `transformers` (only the tokenizer part is used)") from exc
-
-    local = os.environ.get("ARENO_OPC_TOKENIZER", "").strip()
-    if not local:
-        try:
-            from modelscope import snapshot_download
-
-            local = snapshot_download("inclusionAI/Ling-3.0-tiny", allow_file_pattern=_LING_TOKENIZER_FILES)
-        except Exception as exc:  # noqa: BLE001 - surface a friendly error
-            raise ValueError(
-                "could not auto-download the Ling tokenizer; set ARENO_OPC_TOKENIZER=<dir> to a local copy"
-            ) from exc
-    try:
-        return AutoTokenizer.from_pretrained(local, trust_remote_code=True)
-    except Exception as exc:  # noqa: BLE001
-        raise ValueError(f"could not load tokenizer from {local!r}: {exc}") from exc
-
-
-def _load_c_records(
-    dataset_path: str, tokenizer, *, max_seq_tokens: int, max_tool_chars: int, drop_reasoning: bool
-) -> list[dict]:
-    """Encode every passing session into packed token rows (C mode)."""
-
-    records: list[dict] = []
-    for session_path, result_path in _iter_session_files(dataset_path):
-        reward = _trial_reward(result_path)
-        if reward is not None and reward != _PASS_REWARD:
-            continue  # failed trial -> not taught
-        try:
-            session = _load_session(session_path)
-        except (OSError, ValueError) as exc:
-            raise ValueError(f"opc: cannot load {session_path}: {exc}") from exc
-        trial_name = session_path.parent.parent.name
-        for chunk_index, row in enumerate(
-            _session_to_c_rows(
-                session,
-                tokenizer,
-                max_seq_tokens=max_seq_tokens,
-                max_tool_chars=max_tool_chars,
-                drop_reasoning=drop_reasoning,
-            )
-        ):
-            row["source_trial"] = trial_name
-            row["chunk_index"] = chunk_index
-            records.append(row)
-    return records
+# --- C mode: whole-rollout packed rows (tokens + prompt/loss masks) ---------------
 
 
 def _session_to_c_rows(
-    session: dict[str, Any],
+    messages: list[dict[str, Any]],
     tokenizer,
     *,
     max_seq_tokens: int,
     max_tool_chars: int,
-    drop_reasoning: bool,
 ) -> list[dict[str, Any]]:
     """Pack one trajectory into one or more encoded rows.
 
-    The Ling-format transcript is tokenized once (fast tokenizer, with
-    character offsets). Every token that overlaps an assistant-produced span —
-    reasoning, `` response``, content, tool calls, and the trailing
-    ``<|role_end|>`` — is a target; everything else (headers, user, tool
-    observations) is context. Long trajectories are cut into chunks at message
-    boundaries, hard-splitting only oversized single messages.
+    The full transcript is rendered and tokenized once (fast tokenizer, with
+    character offsets). Each assistant turn's span runs from the end of its
+    generation prompt to the end of its rendering (closing EOS included); tokens
+    overlapping a span are targets, everything else (system, task, tool
+    observations) is context. Long trajectories are cut into chunks at
+    assistant-turn boundaries, hard-splitting only oversized single spans, and
+    every chunk starts with the system + task preamble as masked context.
     """
 
-    parts = _build_ling_parts(session.get("messages", []), max_tool_chars=max_tool_chars, drop_reasoning=drop_reasoning)
-    full_text = "".join(text for text, _ in parts)
+    # Tool results are context and may be capped; assistant turns are targets and stay verbatim.
+    messages = [item if item["role"] == "assistant" else _truncate_context(item, max_tool_chars) for item in messages]
+    full_text = _render(tokenizer, messages, add_generation_prompt=False)
+
+    preamble = _preamble_len(messages)
+    preamble_chars = 0
+    if preamble:
+        preamble_chars = _prefix_len(full_text, _render(tokenizer, messages[:preamble], add_generation_prompt=False))
+    # Only assistant turns give stable cut points: templates merge consecutive
+    # tool results into one block, so a prefix ending mid-run is not a prefix.
+    boundaries = [preamble_chars]
+    spans: list[tuple[int, int]] = []
+    for k, message in enumerate(messages):
+        if message["role"] != "assistant":
+            continue
+        # Cut where the turn opens, never between its generation prompt and its body.
+        opens = _prefix_len(full_text, _render(tokenizer, messages[:k], add_generation_prompt=False)) if k else 0
+        start = _prefix_len(full_text, _render(tokenizer, messages[:k], add_generation_prompt=True))
+        end = _prefix_len(full_text, _render(tokenizer, messages[: k + 1], add_generation_prompt=False))
+        boundaries.extend((opens, end))
+        if _has_output(message):
+            spans.append((start, len(full_text[:end].rstrip())))
+    boundaries = sorted(set(boundaries))
 
     encoding = tokenizer(full_text, add_special_tokens=False, return_offsets_mapping=True)
     ids = list(encoding["input_ids"])
@@ -487,84 +509,43 @@ def _session_to_c_rows(
     if len(ids) != len(offsets):
         raise ValueError(f"tokenizer offsets mismatch: {len(ids)} ids vs {len(offsets)} offsets")
 
-    char_target = [False] * len(full_text)
-    pos = 0
-    for text, target in parts:
-        for k in range(pos, pos + len(text)):
-            char_target[k] = target
-        pos += len(text)
+    char_target = bytearray(len(full_text))
+    for start, end in spans:
+        char_target[start:end] = b"\x01" * (end - start)
+    # A token straddling a span edge still contains model-produced characters,
+    # so the model has to emit it: count it as a target.
+    token_target = [start < end and any(char_target[start:end]) for start, end in offsets]
+    token_part = [bisect.bisect_right(boundaries, start) for start, _ in offsets]
 
-    token_target = [False] * len(ids)
-    for idx, (start, end) in enumerate(offsets):
-        if start < end and any(char_target[start:end]):
-            token_target[idx] = True
-
-    cumulative = []
-    acc = 0
-    for text, _ in parts:
-        acc += len(text)
-        cumulative.append(acc)
-    token_part = [min(bisect.bisect_left(cumulative, start), len(parts) - 1) for (start, _) in offsets]
-
+    n_head = sum(1 for _, end in offsets if end <= preamble_chars)
+    budget = max_seq_tokens - n_head
+    if budget <= 0:
+        raise ValueError(
+            f"opc: the system + task preamble alone is {n_head} tokens, over ARENO_OPC_MAX_SEQ_TOKENS={max_seq_tokens}"
+        )
+    head = ids[:n_head]
     rows: list[dict[str, Any]] = []
-    for chunk_start, chunk_end in _chunk_ranges(len(ids), token_part, max_seq_tokens):
-        chunk_target = token_target[chunk_start:chunk_end]
+    for chunk_start, chunk_end in _chunk_ranges(len(ids) - n_head, token_part[n_head:], budget):
+        lo, hi = n_head + chunk_start, n_head + chunk_end
+        chunk_target = token_target[lo:hi]
         if not any(chunk_target):
             continue  # no assistant output in this window -> nothing to teach
+        loss_mask = [False] * n_head + chunk_target
         rows.append(
             {
-                "tokens": ids[chunk_start:chunk_end],
-                "prompt_mask": [not t for t in chunk_target],
-                "loss_mask": chunk_target,
+                "tokens": head + ids[lo:hi],
+                "prompt_mask": [not target for target in loss_mask],
+                "loss_mask": loss_mask,
             }
         )
     return rows
 
 
-def _build_ling_parts(
-    messages: list[dict[str, Any]], *, max_tool_chars: int = 0, drop_reasoning: bool = False
-) -> list[tuple[str, bool]]:
-    """Render a session into ``(text, is_assistant_target)`` chunks."""
-
-    parts: list[tuple[str, bool]] = []
-    i, n = 0, len(messages)
-    if i < n and messages[i].get("role") == "system":
-        parts.append(
-            (f"{_LING_ROLE_SYSTEM}{_message_text(messages[i]).rstrip(chr(10))}\n{_LING_THINKING_HEADER}{_LING_ROLE_END}", False)
-        )
-        i += 1
-    else:
-        parts.append((f"{_LING_THINKING_HEADER}{_LING_ROLE_END}", False))
-    while i < n:
-        message = messages[i]
-        role = message.get("role")
-        if role == "system":
-            parts.append((f"{_LING_ROLE_SYSTEM}{_message_text(message)}{_LING_ROLE_END}", False))
-            i += 1
-        elif role == "user":
-            parts.append((f"{_LING_ROLE_HUMAN}{_message_text(message)}{_LING_ROLE_END}", False))
-            i += 1
-        elif role == "assistant":
-            parts.append((f"{_LING_ROLE_ASSISTANT}\n thinking", False))
-            parts.append((_render_ling_assistant_target(message, drop_reasoning=drop_reasoning, max_tool_chars=max_tool_chars), True))
-            parts.append((_LING_ROLE_END, True))  # stop token is model output
-            i += 1
-        elif role == "tool":
-            responses: list[str] = []
-            while i < n and messages[i].get("role") == "tool":
-                responses.append(_render_ling_tool_response(messages[i], max_tool_chars=max_tool_chars))
-                i += 1
-            parts.append((f"{_LING_ROLE_OBSERVATION}\n" + "\n".join(responses) + _LING_ROLE_END, False))
-        else:
-            i += 1
-    return parts
-
-
 def _chunk_ranges(n_tokens: int, token_part: list[int], max_tokens: int) -> list[tuple[int, int]]:
     """Greedily slice token indices into chunks of at most ``max_tokens``.
 
-    Cuts land on message (part) boundaries whenever possible; a single message
-    longer than ``max_tokens`` is hard-split.
+    Cuts land on part boundaries whenever possible; a single part longer than
+    ``max_tokens`` is hard-split.
     """
 
     runs: list[tuple[int, int]] = []
@@ -580,9 +561,9 @@ def _chunk_ranges(n_tokens: int, token_part: list[int], max_tokens: int) -> list
     start = 0
     for run_start, run_end in runs:
         if start < run_start and (run_end - start) > max_tokens:
-            ranges.append((start, run_start))  # cut before this message
+            ranges.append((start, run_start))  # cut before this part
             start = run_start
-        while run_end - start > max_tokens:  # single oversized message
+        while run_end - start > max_tokens:  # single oversized part
             ranges.append((start, start + max_tokens))
             start += max_tokens
     if start < n_tokens:
