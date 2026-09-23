@@ -91,15 +91,24 @@ areno train \
   --world-size 1 \
   --batch-size 2 \
   --mini-bs 1 \
-  --max-prompt-tokens 16384 \
+  --max-prompt-tokens 24576 \
   --max-new-tokens 4096 \
   --epochs 2
 ```
 
+Mind the prompt budget: it is the trainer, not Ling's 128 K context, that
+decides what survives. These 29 rows have a prompt p50 of 15.3 K and a max of
+**22.1 K**, so `--max-prompt-tokens 16384` keeps only 17 of them; 24576 keeps
+all 29. Dropped rows are silent apart from a
+`stage=sft_dataset_filter skipped_long_or_empty=N` log line — check it, or you
+may be training on less than you think.
+
 Ling's context is 128 K, so nearly every trajectory fits with the full history —
-keep the window knobs off (0) in B mode. Once the one-task run behaves (loss
-drops, generations look sane), expand to every passed task in a real job run
-(all 30 passed trials of `opc-deepseek-all`, 652 rows):
+keep the window knobs off (0) in B mode and raise `--max-prompt-tokens` instead
+(measure your set first; the table under [the settlement
+pair](#running--the-settlement-pair) has numbers for a larger one). Once the
+one-task run behaves (loss drops, generations look sane), expand to every passed
+task in a real job run (all 30 passed trials of `opc-deepseek-all`, 652 rows):
 
 ```bash
 areno train \
@@ -116,6 +125,102 @@ with a sibling `*/result.json`), a single trial directory, a flat directory
 of `hermes-session.jsonl` files, a single session file, or a `split_phases.py`
 output file. The verdict is looked up next to any `agent/hermes-session.jsonl`
 in every layout, so failed trials are filtered however deep the path points.
+Discovery is **one level deep**, so a curated set must be flat: put every trial
+directory directly inside the dataset directory.
+
+## Running — the settlement pair
+
+`examples/sft/opc/data-settlement/` holds two more tasks from the same job, as a
+matched pair: `finance/settlement/expired-session` and
+`finance/settlement/platform-fee-change`, three passed trials each (126 rows).
+They are the benchmark's own polarity pair — same DingTalk corpus, same
+deliverable (`/app/settlement.json`), differing only in whether the
+pre-provisioned credential still works — so **train them together**. One side
+alone teaches either "credentials are always broken" or "just start computing".
+
+| group | task | trials | rows | what the targets contain |
+|---|---|---|---|---|
+| 1 | `expired-session` | 3 | 74 | takes a real HTTP 401, finds the rotated token in `/app/ops-notes.md`, re-authenticates with `dws auth login --token`, refetches with `--page-all` |
+| 2 | `platform-fee-change` | 3 | 52 | same fetch on a working credential: no suspicion, but still `--page-all` past page 1 to reach the 2026-07-01 rule |
+
+Both sides must land on gross 1 800 000 / developer cut 5 % / net 90 000 while
+ignoring the boss's stale "one-point-eight million, 50/40/2" recollection, which
+computes to a very plausible 144 000. Verified against the emitted rows:
+`auth login` is a supervised target in 13 rows across the three group-1 trials
+and in none of group-2's, `--page-all` in 22 rows across all six, `90000` in 20
+rows across all six; the 401 text is never a target (tool results are context).
+Group 1 reads the rotated token from `/app/ops-notes.md` in turn 1 (0-based) of
+all three trials, before anything else — the recovery is genuinely sourced from
+the task's own corpus. Neither group uses a tool outside `hermes_tools.json`, and neither
+has a malformed tool call (see [Caveats](#caveats): both defects exist elsewhere
+in the job).
+
+### Four trials read the harness (7 turns)
+
+The ground-truth files are locked down (`/opt/opc/data/dingtalk.json` and
+`data/valid_token` are `opcsvc`/root `0700`; `platform-fee-change` is graded
+partly on a `dws` event existing server-side, so the numbers were earned), but
+the mock's *source* and the verifier's *evidence log* are world-readable, and
+four of the six trials look at them:
+
+| trial | turn(s) | what it reads |
+|---|---|---|
+| `expired-session__8o84af3` | 23, 24 | `/var/lib/opc/server-log.jsonl` |
+| `expired-session__PoSCM4d` | 5, 15 | `/opt/opc/lib/dws_fixture_server.py`, then the server log |
+| `expired-session__VTn7WcQ` | 9, 11 | the fixture source, then the server log |
+| `platform-fee-change__B3X4a82` | 13 | the fixture source — pointless here, its credential is fine |
+
+None of them is load-bearing for the answer: in all three group-1 trials the
+token comes from `ops-notes.md` at turn 1, so the two that peek at the fixture
+source first (`PoSCM4d` turn 5, `VTn7WcQ` turn 9) had already found it. The
+model's own reasoning frames the reads as self-verification ("Let me read the
+server log to confirm the audit trail"). That is 7 contaminated turns of 126,
+and they matter because they are supervised targets: you are training the student
+to go read `/opt/opc/lib/*.py` and `/var/lib/opc/server-log.jsonl` at inference,
+where neither exists.
+
+They are **not** safely removable. Deleting a turn and its tool result leaves
+the *next* turn's reasoning dangling — `8o84af3` turn 25 reasons about `Line 6:
+list_group_notices returned ok:true` from the log it just read, `PoSCM4d`'s
+concludes "the log confirms the precondition collapsed … then my calls succeeded
+after the login", and `B3X4a82`'s concludes "the fixture data is … 0700, agent
+can't read … so I rely on the CLI". Cut them and you get incoherent targets;
+cut everything after and you lose the deliverable. So keep them and read this
+note, or regenerate the trials against an image where those paths are `0700`.
+
+Full-history B mode needs a bigger prompt budget than the one-task command:
+
+| setup | rows | prompt p50 | prompt max | kept at `--max-prompt-tokens 16384` |
+|---|---|---|---|---|
+| B, full history | 126 | 24.0 K | 50.8 K | **39** |
+| B + `ARENO_OPC_MAX_HISTORY_MESSAGES=8` + `ARENO_OPC_MAX_TOOL_CHARS=2000` | 126 | 9.6 K | 13.8 K | 126 |
+| C, packed | 10 | 23.3 K | 29.3 K | 4 (use 32768) |
+
+So either pass `--max-prompt-tokens 65536` (keeps all 126 with the full
+history), or set the two window knobs and stay at 16384. Windowing does not
+throw away the lesson: 11 of the windowed rows still carry the 401 in their
+context and all 13 `auth login` targets survive.
+
+```bash
+areno train \
+  --algo sft \
+  --ckpt inclusionAI/Ling-3.0-tiny \
+  --dataset-path examples/sft/opc/data-settlement \
+  --dataset-loader-fn examples/sft/opc/dataset_loader.py \
+  --model-hub modelscope \
+  --tp-size 1 \
+  --world-size 1 \
+  --batch-size 2 \
+  --mini-bs 1 \
+  --max-prompt-tokens 65536 \
+  --max-new-tokens 4096 \
+  --epochs 2
+```
+
+A single group is trainable too, at trial granularity: `--dataset-path
+examples/sft/opc/data-settlement/expired-session__8o84af3`. Grouping the two
+tasks into separate directories would defeat the one-level discovery above, so
+the six trials sit side by side and the groups are told apart by task name.
 
 ## Whole-rollout C mode (packed loss)
 
@@ -242,6 +347,28 @@ the forward tokens.
   each `result.json`), not by Ling itself. Passes reached
   with luck (a task that only passed 1/3 attempts) are still included here —
   dedup by task or eyeball `verifier/ctrf.json` before baking them in.
+- `reward == 1.0` is the *only* filter, and the verifiers do not police the
+  trajectory's manners, so a passing rollout can still teach something bad.
+  Two such defects are known to exist in `opc-deepseek-all` (neither affects
+  `data/` or `data-settlement/`):
+  - **A tool outside `hermes_tools.json`.** `oss-ok__GwRYcuN` calls
+    `todo_list` once; the bundled array has 15 tools and `todo_list` is not
+    among them. `_load_tools` validates the array, not the calls, so the row
+    is emitted silently and would teach a tool the model is not offered at
+    inference. Drop that trial, or re-capture the array (which would also
+    settle whether Hermes exposes `todo_list` per run).
+  - **A malformed `clarify` call, then a retry.** The model tends to send
+    `{"questions": [{"question": …, "choices": […]}]}` where the tool wants a
+    flat `question` string, gets back `"Question text is required."`, and
+    sometimes repeats the identical call until Hermes emits a tool-loop
+    warning. Six passing trials carry 10 such turns between them —
+    `ambiguous-period` ×3, `ambiguous-source` ×2, `batch-partial` ×1 — i.e.
+    1.5 % of the 652 rows. Unlike a non-zero `ls` exit or a `read_file` on an
+    ELF binary, which are healthy recoveries worth keeping, this is a wrong
+    tool-call schema sitting in a *target* span. Edit the `tool_calls`
+    arguments in a copy (the next turn's fix is usually already correct) or
+    drop those trials; `batch-partial__knZxRNj` is the worst offender and also
+    asks about a mailbox its own task statement had already pinned.
 - Rows use the tokenizer's `chat_template.jinja`, the same template serving
   uses, so train and inference formats match. The loader hard-codes no role or
   thinking markup, and because rows are pre-encoded the trainer needs no
