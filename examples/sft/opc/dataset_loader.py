@@ -3,15 +3,18 @@
 Turns passing Hermes agent sessions (multi-turn tool-calling rollouts captured
 by ``hermes-session.jsonl``) into supervised rows. Two output modes:
 
-- **B (default)**: sequential SFT text rows, one ``(prompt, response)`` row per
-  assistant turn. The prompt is the chat-template rendering of the history up
-  to that turn plus the generation prompt; the response is the rest of that
-  turn's rendering (reasoning, content, tool calls) without the trailing EOS,
-  which AReno appends itself. Tool results are context — never a target.
+- **B (default)**: one row per assistant turn. The context is the
+  chat-template rendering of the history up to that turn plus the generation
+  prompt; the target is the rest of that turn's rendering (reasoning, content,
+  tool calls, closing EOS). Tool results are context — never a target.
 - **C (``ARENO_OPC_C_MODE=1``)**: whole-rollout packed rows, ``tokens`` +
   ``prompt_mask`` + ``loss_mask``, with loss enabled only on assistant-produced
   spans (including the closing EOS). Avoids re-encoding the history prefix once
   per turn.
+
+Both modes emit pre-encoded ``tokens`` + ``prompt_mask`` + ``loss_mask`` rows,
+so the trainer never re-applies a chat template to them. B rows also carry
+``prompt``/``response`` text for inspection; the trainer uses the tokens.
 
 All markup comes from the tokenizer's own ``chat_template.jinja`` through
 ``apply_chat_template``; the loader never hand-writes role, thinking or
@@ -106,6 +109,9 @@ def load_training_dataset(dataset_path: str, *, default_loader, **_: object) -> 
             record = {
                 "prompt": row["prompt"],
                 "response": row["response"],
+                "tokens": row["tokens"],
+                "prompt_mask": row["prompt_mask"],
+                "loss_mask": row["loss_mask"],
                 "source_trial": trial_name,
                 "turn_index": index,
             }
@@ -393,13 +399,30 @@ def _prefix_len(full: str, prefix: str) -> int:
 
 
 def _strip_eos(text: str, tokenizer) -> str:
-    """Drop the template's closing EOS; AReno appends ``eos_token_id`` to B-mode targets itself."""
+    """Drop the template's closing EOS from the human-readable ``response`` text."""
 
     eos = getattr(tokenizer, "eos_token", None)
     stripped = text.rstrip()
     if eos and stripped.endswith(eos):
         return stripped[: -len(eos)]
     return text
+
+
+def _encode(tokenizer, text: str, spans: list[tuple[int, int]]) -> tuple[list[int], list[tuple[int, int]], list[bool]]:
+    """Tokenize ``text`` once and flag every token overlapping a target character span."""
+
+    encoding = tokenizer(text, add_special_tokens=False, return_offsets_mapping=True)
+    ids = [int(token) for token in encoding["input_ids"]]
+    offsets = [tuple(offset) for offset in encoding["offset_mapping"]]
+    if len(ids) != len(offsets):
+        raise ValueError(f"tokenizer offsets mismatch: {len(ids)} ids vs {len(offsets)} offsets")
+    char_target = bytearray(len(text))
+    for start, end in spans:
+        char_target[start:end] = b"\x01" * (end - start)
+    # A token straddling a span edge still contains model-produced characters,
+    # so the model has to emit it: count it as a target.
+    token_target = [start < end and any(char_target[start:end]) for start, end in offsets]
+    return ids, offsets, token_target
 
 
 # --- B mode -------------------------------------------------------------------------
@@ -430,8 +453,16 @@ def _session_to_rows(
         context = [_truncate_context(item, max_tool_chars) for item in context]
         prompt = _render(tokenizer, context, add_generation_prompt=True)
         full = _render(tokenizer, context + [message], add_generation_prompt=False)
-        response = _strip_eos(full[_prefix_len(full, prompt) :], tokenizer)
-        row = {"prompt": prompt, "response": response}
+        start = _prefix_len(full, prompt)
+        text = full.rstrip()
+        ids, _, token_target = _encode(tokenizer, text, [(start, len(text))])
+        row = {
+            "prompt": prompt,
+            "response": _strip_eos(text[start:], tokenizer),
+            "tokens": ids,
+            "prompt_mask": [not target for target in token_target],
+            "loss_mask": token_target,
+        }
         if phase_split:
             genre = _phase_genre(message)
             if genre != current_phase["genre"]:
@@ -503,18 +534,7 @@ def _session_to_c_rows(
             spans.append((start, len(full_text[:end].rstrip())))
     boundaries = sorted(set(boundaries))
 
-    encoding = tokenizer(full_text, add_special_tokens=False, return_offsets_mapping=True)
-    ids = list(encoding["input_ids"])
-    offsets = list(encoding["offset_mapping"])
-    if len(ids) != len(offsets):
-        raise ValueError(f"tokenizer offsets mismatch: {len(ids)} ids vs {len(offsets)} offsets")
-
-    char_target = bytearray(len(full_text))
-    for start, end in spans:
-        char_target[start:end] = b"\x01" * (end - start)
-    # A token straddling a span edge still contains model-produced characters,
-    # so the model has to emit it: count it as a target.
-    token_target = [start < end and any(char_target[start:end]) for start, end in offsets]
+    ids, offsets, token_target = _encode(tokenizer, full_text, spans)
     token_part = [bisect.bisect_right(boundaries, start) for start, _ in offsets]
 
     n_head = sum(1 for _, end in offsets if end <= preamble_chars)

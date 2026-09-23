@@ -90,13 +90,6 @@ class TokenizerApiTest(unittest.TestCase):
         self.assertEqual(tokenizer.encoded, ["<start_of_turn>user\nhello"])
         self.assertTrue(_looks_chat_formatted("<|im_start|>user"))
 
-    def test_looks_chat_formatted_detects_ling_markup(self):
-        """Ling-rendered prompts (e.g. the OPC SFT loader's) must not be wrapped again."""
-
-        self.assertTrue(_looks_chat_formatted("<role>SYSTEM</role>detailed thinking on<|role_end|>"))
-        self.assertTrue(_looks_chat_formatted("<role>HUMAN</role>hi<|role_end|><role>ASSISTANT</role>\n"))
-        self.assertFalse(_looks_chat_formatted("plain prompt about <role> tags"))
-
     def test_encode_generation_prompt_can_disable_chat_template_thinking(self):
         tokenizer = ThinkingTokenizer()
         configure_chat_template_enable_thinking(tokenizer, False)

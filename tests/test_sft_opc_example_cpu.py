@@ -157,6 +157,17 @@ def test_opc_loader_filters_by_reward_and_expands_per_turn(tmp_path):
     assert records[1]["response"] == "</think>盘完了，共 963,000 元。"
 
 
+def test_opc_loader_b_rows_are_pre_encoded_with_eos_target(tmp_path):
+    _write_trial(tmp_path, "t", _basic_messages())
+
+    for row in _load(tmp_path):
+        # Pre-encoded rows take the trainer's `tokens` branch: no chat template re-applied.
+        assert len(row["tokens"]) == len(row["prompt_mask"]) == len(row["loss_mask"])
+        assert row["prompt_mask"] == [not t for t in row["loss_mask"]]
+        assert _decode(row["tokens"]) == row["prompt"] + row["response"] + EOS
+        assert _decode(row["tokens"], row["loss_mask"]) == row["response"] + EOS
+
+
 def test_opc_loader_rows_concatenate_to_template_rendering(tmp_path):
     tokenizer = FakeLingTokenizer()
     _write_trial(tmp_path, "t", _basic_messages())
@@ -374,8 +385,6 @@ def _real_tokenizer_dir() -> str:
 
 def test_opc_loader_b_mode_real_tokenizer_matches_template(tmp_path):
     _real_tokenizer_dir()
-    from areno.api.data_utils import prompt_response_to_tokens_and_mask
-
     _write_trial(tmp_path, "ling", _basic_messages())
     loader = _load_loader()
     tokenizer = loader._load_tokenizer()
@@ -387,13 +396,10 @@ def test_opc_loader_b_mode_real_tokenizer_matches_template(tmp_path):
     assert full.rstrip().startswith(last["prompt"] + last["response"])
     assert full.rstrip().endswith(tokenizer.eos_token)
 
-    # Through the trainer's own encoding path: the template is applied once, EOS is the stop token.
-    tokens, _ = prompt_response_to_tokens_and_mask(
-        last["prompt"], last["response"], tokenizer, tokenizer.eos_token_id
-    )
-    decoded = tokenizer.decode(tokens)
-    assert decoded.count("<role>HUMAN</role>") == 1
-    assert tokens[-1] == tokenizer.eos_token_id
+    # The encoded row is what the trainer consumes: template applied once, EOS is the last target.
+    assert tokenizer.decode(last["tokens"]).count(messages[0]["content"]) == 1
+    assert last["tokens"][-1] == tokenizer.eos_token_id
+    assert last["loss_mask"][-1] and not last["loss_mask"][0]
 
 
 def test_opc_loader_c_mode_end_to_end(tmp_path, monkeypatch):

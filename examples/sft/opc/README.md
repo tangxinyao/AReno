@@ -13,7 +13,7 @@ Hermes session (`hermes-session.jsonl`) plus a verifier verdict (`result.json`).
 |---|---|---|
 | Data | static instruction/answer pairs | multi-turn tool-calling rollouts |
 | Loader | one row per sample | **one row per assistant turn** (or one packed row per rollout in C mode) |
-| Structure | `prompt` = instruction, `response` = answer | `prompt` = history up to the turn, `response` = the assistant message itself |
+| Structure | `prompt` = instruction, `response` = answer | pre-encoded `tokens` + `prompt_mask` + `loss_mask` (B rows also keep `prompt`/`response` text for reading) |
 | Source | HF dataset | local `hermes-session.jsonl` files |
 
 Both modes render rows with the Ling tokenizer's own `chat_template.jinja`
@@ -55,8 +55,11 @@ PY
 ```
 
 The prompt ends with the template's generation prompt; the response is the
-turn's reasoning, content and tool calls, without the trailing EOS (AReno
-appends `eos_token_id` itself).
+turn's reasoning, content and tool calls (shown without the closing EOS).
+These two text fields are for reading only: every row, B or C, is also
+pre-encoded as `tokens` + `prompt_mask` + `loss_mask` (target = the response
+plus EOS), and the trainer's encoded-row branch uses those, so it never
+re-applies a chat template or re-tokenizes the text.
 
 ## Running — one task first
 
@@ -148,8 +151,7 @@ Requirements and knobs:
   packed rows and are ignored with a warning; `ARENO_OPC_INCLUDE_SYSTEM_PROMPT`,
   `ARENO_OPC_DROP_REASONING` and `ARENO_OPC_MAX_TOOL_CHARS` (tool results only
   — assistant targets stay verbatim) do apply.
-- Rows feed the trainer's pre-encoded `tokens`/`prompt_mask`/`loss_mask`
-  branch, so prompt/response text is not produced in this mode.
+- Packed rows carry no `prompt`/`response` text, only the encoded fields.
 
 ## Splitting one long task into subtasks
 
@@ -181,8 +183,8 @@ python examples/sft/opc/split_phases.py \
 
 which writes `split/{explore,read,implement,run,report}.jsonl` — here:
 explore 3 rows, read 6, implement 5, run 12, report 3 (all from 3 trials).
-Each JsonL holds ready `prompt`/`response` rows, which the loader passes
-through unchanged; train a stage alone with `--dataset-path
+Each JsonL holds ready encoded rows (plus their text), which the loader
+passes through unchanged; train a stage alone with `--dataset-path
 examples/sft/opc/split/run.jsonl --dataset-loader-fn
 examples/sft/opc/dataset_loader.py` (or use it for curriculum / per-stage
 weighting). The split counts above were measured before the loader switched to
@@ -204,7 +206,7 @@ the tokenizer's template; row counts per genre do not depend on the markup.
 ## Feeding everything
 
 The loader emits all 652 passing rows out of the box — nothing is sampled. The
-trade-off is how the text rows are tokenized:
+trade-off is how much history each row re-encodes:
 
 | setup | prompt p50 (full 652) | total forward (full 652) |
 |---|---|---|
@@ -228,6 +230,6 @@ the forward tokens.
   with luck (a task that only passed 1/3 attempts) are still included here —
   dedup by task or eyeball `verifier/ctrf.json` before baking them in.
 - Rows use the tokenizer's `chat_template.jinja`, the same template serving
-  uses, so train and inference formats match. AReno's trainer recognizes Ling
-  markup (`<role>HUMAN</role>` etc.) as already chat-formatted and does not
-  wrap B-mode prompts a second time.
+  uses, so train and inference formats match. The loader hard-codes no role or
+  thinking markup, and because rows are pre-encoded the trainer needs no
+  model-specific knowledge to avoid wrapping them a second time.

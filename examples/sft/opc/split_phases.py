@@ -68,6 +68,9 @@ def main(argv: list[str] | None = None) -> int:
             {
                 "prompt": row["prompt"],
                 "response": row["response"],
+                "tokens": row["tokens"],
+                "prompt_mask": row["prompt_mask"],
+                "loss_mask": row["loss_mask"],
                 "source_trial": row["source_trial"],
                 "phase_index": row["phase_index"],
             }
