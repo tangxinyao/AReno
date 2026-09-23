@@ -202,6 +202,51 @@ FACTS = [
         },
     ),
     (
+        [HF, MED, MED_FLASH, OR],
+        {
+            "zh": [
+                "Ling-3.0-flash-Fin 有什么特点？",
+                "Ling-3.0-flash-Fin 的主要特性是什么？",
+                "Ling-3.0-flash-Fin 的优势在哪里？",
+                "Ling-3.0-flash-Fin 和通用大模型相比有什么不同？",
+            ],
+            "en": [
+                "What are the key features of Ling-3.0-flash-Fin?",
+                "What makes Ling-3.0-flash-Fin special?",
+                "What are the strengths of Ling-3.0-flash-Fin?",
+                "How is Ling-3.0-flash-Fin different from a general-purpose LLM?",
+            ],
+        },
+        {"zh": ["简单说说 Ling-3.0-flash-Fin 的特色"], "en": ["Summarize the main characteristics of Ling-3.0-flash-Fin."]},
+        {
+            "zh": "Ling-3.0-flash-Fin 的主要特点：\n"
+            "1. 定位：蚂蚁 Ling 系列第一个金融增强模型，面向真实投资研究工作流，而不只是金融问答；"
+            "目标是完成答案周围的整条工作链：检索、核实、计算、建模、撰写，并保留可供审阅的上下文。\n"
+            "2. 高效架构：稀疏 MoE，总参数 124B、每 token 仅激活约 5.1B；注意力按 5:1 混合 KDA 线性注意力与 MLA，推理成本和延迟低。\n"
+            "3. 长上下文：256K（262,144 tokens），可一次处理多份年报、财报和研究材料。\n"
+            "4. 金融专长：有来源依据的搜索与可追溯答案、多文档口径核对、估值与表格建模、可直接审阅的研究输出。\n"
+            "5. 智能体能力：支持工具调用和 JSON Schema 结构化输出，默认开启思考模式，适合多步骤、长链路任务。\n"
+            "6. 通用能力保留：金融增强的同时保留推理、代码和数学能力。\n"
+            "7. 开放可部署：MIT 许可开源，提供 BF16 及 FP8/INT4/FP4 版本，可用 SGLang、vLLM 私有化部署；"
+            "并同步开源了金融搜索评测基准 FinFIRST。",
+            "en": "Key features of Ling-3.0-flash-Fin:\n"
+            "1. Positioning: the first finance-enhanced model in Ant's Ling family, built for real investment-research "
+            "workflows rather than financial Q&A - the whole chain around an answer: retrieve, verify, calculate, model, "
+            "write, and keep the context reviewable.\n"
+            "2. Efficient architecture: sparse MoE with 124B total and about 5.1B active parameters per token, and hybrid "
+            "attention mixing KDA linear attention with MLA at 5:1, for low serving cost and latency.\n"
+            "3. Long context: 256K (262,144 tokens), enough for several annual reports, earnings releases and research "
+            "documents at once.\n"
+            "4. Financial expertise: source-grounded search with traceable answers, multi-document reconciliation of "
+            "periods and definitions, valuation and spreadsheet modeling, and research-ready outputs.\n"
+            "5. Agentic ability: tool calling and JSON-schema structured outputs, thinking mode on by default, suited to "
+            "multi-step, long-horizon tasks.\n"
+            "6. General skills retained: reasoning, coding and math remain intact.\n"
+            "7. Open and deployable: MIT-licensed open weights in BF16 plus FP8/INT4/FP4 variants, served with SGLang or "
+            "vLLM for private deployment, released together with the FinFIRST financial-search benchmark.",
+        },
+    ),
+    (
         [MED],
         {
             "zh": ["Ling-3.0-flash-Fin 处理 Excel 财务模型的能力怎么样？", "Ling-3.0-flash-Fin 能做 LBO 模型吗？"],

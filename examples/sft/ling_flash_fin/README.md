@@ -11,11 +11,11 @@ bilingual Q&A, and uses LoRA SFT to teach tiny the facts.
 
 | File | Rows | Use |
 | --- | --- | --- |
-| `data/train.jsonl` | 91 (zh 47 / en 44) | `prompt` question, `response` answer. No loader needed. |
-| `data/eval.jsonl` | 40 (zh 20 / en 20) | Held-out paraphrases with a `reference` answer. Never trained on. |
+| `data/train.jsonl` | 99 (zh 51 / en 48) | `prompt` question, `response` answer. No loader needed. |
+| `data/eval.jsonl` | 42 (zh 21 / en 21) | Held-out paraphrases with a `reference` answer. Never trained on. |
 | `build_dataset.py` | - | Regenerates both files. Edit facts here, not in the jsonl. |
 
-The data covers 20 facts: what the model is, who built it, its base model,
+The data covers 21 facts: what the model is, its key features, who built it, its base model,
 parameters, architecture, context window, release dates, license and weights,
 deployment, recommended sampling, highlights, spreadsheet/LBO work, evaluation
 benchmarks, FinFIRST (two facts), Artificial Analysis scores, pricing, tool
@@ -60,7 +60,7 @@ areno train \
   --save-interval 20
 ```
 
-- 91 rows at batch 8 is about 12 steps per epoch, so 10 epochs is about 120
+- 99 rows at batch 8 is about 13 steps per epoch, so 10 epochs is about 130
   steps. The SFT trainer only saves every `--save-interval` steps and does not
   save again at the end, so keep the interval below the total step count.
 - Knowledge injection needs more repetition than style transfer. If held-out
@@ -97,6 +97,6 @@ PY
 After training, answers should contain the key numbers: 124B / 5.1B,
 256K context, MIT, and the seven benchmarks including FinFIRST. The base model
 should not know these. Also ask a few unrelated questions (general knowledge,
-math) to confirm the LoRA did not break everything else. With only 91 rows,
+math) to confirm the LoRA did not break everything else. With only 99 rows,
 overfitting shows up as every question being answered with the same intro
 paragraph. If that happens, use an earlier `step_*` checkpoint.
