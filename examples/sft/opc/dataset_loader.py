@@ -44,6 +44,8 @@ logger = logging.getLogger(__name__)
 _LING_REPO = "inclusionAI/Ling-3.0-tiny"
 _TRUNCATED = "\n…<truncated {n} chars>"
 _PASS_REWARD = 1.0
+# Tool schemas Hermes sent to the model in the bundled trials (toolsets: hermes-cli).
+_HERMES_TOOLS = Path(__file__).with_name("hermes_tools.json")
 
 _LING_TOKENIZER_FILES = [
     "tokenizer.json",
@@ -75,7 +77,7 @@ def load_training_dataset(dataset_path: str, *, default_loader, **_: object) -> 
     phase_split = bool(os.environ.get("ARENO_OPC_PHASES"))
     c_mode = bool(os.environ.get("ARENO_OPC_C_MODE"))
     max_seq_tokens = _int_env("ARENO_OPC_MAX_SEQ_TOKENS") or 32768
-    tools = _load_tools(os.environ.get("ARENO_OPC_TOOLS_PATH", "").strip())
+    tools = _load_tools()
     if c_mode:
         ignored = [name for name in ("ARENO_OPC_MAX_HISTORY_MESSAGES", "ARENO_OPC_PHASES") if os.environ.get(name)]
         if ignored:
@@ -219,22 +221,19 @@ def _load_session(session_path: Path) -> dict[str, Any]:
     return obj
 
 
-def _load_tools(path: str) -> list[dict[str, Any]] | None:
-    """Load the OpenAI-style ``tools`` array the agent sent to the model, if given.
+def _load_tools(path: Path = _HERMES_TOOLS) -> list[dict[str, Any]]:
+    """Load the OpenAI-style ``tools`` array Hermes sent to the model.
 
-    Hermes sessions do not record tool schemas, but at inference the template
-    renders them into the system block; pass the same schemas here so training
-    rows see the same prompt. Accepts a JSON list or ``{"tools": [...]}``.
+    Hermes sessions do not record tool schemas, but the template renders them
+    into the system block, so rows must carry the same schemas the agent saw.
+    ``hermes_tools.json`` holds the array captured from the Hermes build that
+    produced the bundled trials (see its ``source`` / ``hermes_commit``).
     """
 
-    if not path:
-        return None
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
-    if isinstance(data, dict):
-        data = data.get("tools")
-    if not isinstance(data, list) or not data or not all(isinstance(tool, dict) for tool in data):
-        raise ValueError(f"ARENO_OPC_TOOLS_PATH={path!r} must hold a non-empty JSON list of tool schemas")
-    return data
+    tools = json.loads(path.read_text(encoding="utf-8")).get("tools")
+    if not isinstance(tools, list) or not tools or not all(isinstance(tool, dict) for tool in tools):
+        raise ValueError(f"{path} must hold a non-empty `tools` list of tool schemas")
+    return tools
 
 
 def _int_env(name: str) -> int:

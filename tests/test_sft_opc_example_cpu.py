@@ -25,7 +25,6 @@ def _clean_opc_env(monkeypatch):
         "ARENO_OPC_PHASES",
         "ARENO_OPC_C_MODE",
         "ARENO_OPC_MAX_SEQ_TOKENS",
-        "ARENO_OPC_TOOLS_PATH",
     ):
         monkeypatch.delenv(var, raising=False)
 
@@ -83,7 +82,10 @@ class FakeLingTokenizer:
         return {"input_ids": [ord(c) for c in text], "offset_mapping": [(i, i + 1) for i in range(len(text))]}
 
 
-def _load_loader(tokenizer=None):
+def _load_loader(tokenizer=None, tools=None):
+    """Load the example module; with a fake tokenizer, also swap the bundled
+    ~25 KB Hermes tool schemas for ``tools`` so span/mask tests stay small."""
+
     path = EXAMPLE_DIR / "dataset_loader.py"
     spec = importlib.util.spec_from_file_location("sft_opc_dataset_loader_for_tests", path)
     module = importlib.util.module_from_spec(spec)
@@ -91,11 +93,12 @@ def _load_loader(tokenizer=None):
     spec.loader.exec_module(module)
     if tokenizer is not None:
         module._load_tokenizer = lambda: tokenizer
+        module._load_tools = lambda: tools
     return module
 
 
-def _load(path, tokenizer=None):
-    loader = _load_loader(tokenizer or FakeLingTokenizer())
+def _load(path, tokenizer=None, tools=None):
+    loader = _load_loader(tokenizer or FakeLingTokenizer(), tools)
     return loader.load_training_dataset(str(path), default_loader=lambda _: [])
 
 
@@ -298,13 +301,10 @@ _TOOLS = [{"type": "function", "function": {"name": "terminal", "parameters": {"
 @pytest.mark.parametrize("c_mode", [False, True])
 def test_opc_loader_renders_tool_schemas_as_context(tmp_path, monkeypatch, c_mode):
     _write_trial(tmp_path / "data", "t", _basic_messages())
-    tools_path = tmp_path / "tools.json"
-    tools_path.write_text(json.dumps({"tools": _TOOLS}))
-    monkeypatch.setenv("ARENO_OPC_TOOLS_PATH", str(tools_path))
     if c_mode:
         monkeypatch.setenv("ARENO_OPC_C_MODE", "1")
 
-    records = _load(tmp_path / "data")
+    records = _load(tmp_path / "data", tools=_TOOLS)
 
     schema = json.dumps(_TOOLS[0])
     for row in records:
@@ -314,14 +314,19 @@ def test_opc_loader_renders_tool_schemas_as_context(tmp_path, monkeypatch, c_mod
         assert records[0]["prompt"].startswith(f"<role>SYSTEM</role># Tools<tools>{schema}</tools>")
 
 
-def test_opc_loader_rejects_bad_tools_file(tmp_path, monkeypatch):
-    _write_trial(tmp_path / "data", "t", _basic_messages())
-    tools_path = tmp_path / "tools.json"
-    tools_path.write_text(json.dumps({"tools": []}))
-    monkeypatch.setenv("ARENO_OPC_TOOLS_PATH", str(tools_path))
+def test_opc_loader_bundles_hermes_tool_schemas(tmp_path):
+    loader = _load_loader()
+    tools = loader._load_tools()
 
-    with pytest.raises(ValueError, match="ARENO_OPC_TOOLS_PATH"):
-        _load(tmp_path / "data")
+    names = {tool["function"]["name"] for tool in tools}
+    # Every tool the bundled trials called is declared; one-shot Hermes drops skill_manage.
+    assert {"terminal", "read_file", "search_files", "write_file", "patch", "execute_code"} <= names
+    assert "skill_manage" not in names
+
+    bad = tmp_path / "tools.json"
+    bad.write_text(json.dumps({"tools": []}))
+    with pytest.raises(ValueError, match="tools"):
+        loader._load_tools(bad)
 
 
 def test_opc_loader_rejects_bad_int_env(tmp_path, monkeypatch):
