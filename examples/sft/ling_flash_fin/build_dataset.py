@@ -1,0 +1,382 @@
+"""Build data/{train,eval}.jsonl: bilingual Q&A about Ling-3.0-flash-Fin for knowledge-injection SFT.
+
+Every answer is written from the public sources listed per fact. Eval questions are held-out
+paraphrases that never appear in train, so they test recall rather than memorized prompts.
+"""
+
+import json
+from pathlib import Path
+
+OUT = Path(__file__).resolve().parent / "data"
+HF = "https://huggingface.co/inclusionAI/Ling-3.0-flash-Fin"
+OR = "https://openrouter.ai/inclusionai/ling-3.0-flash-fin"
+AA = "https://artificialanalysis.ai/models/ling-3-0-flash-fin"
+MED = "https://ant-ling.medium.com/what-it-takes-to-turn-a-general-model-into-a-domain-expert-816de3fc9b44"
+MED_FLASH = "https://ant-ling.medium.com/ling-3-0-flash-more-useful-work-per-token-c696b01763a9"
+
+# Each fact: (source, train questions, held-out eval questions, answer). Questions and
+# answers are per language; eval questions never appear in train.
+FACTS = [
+    (
+        [HF, OR],
+        {
+            "zh": ["什么是 Ling-3.0-flash-Fin？", "介绍一下 Ling-3.0-flash-Fin。", "Ling-3.0-flash-Fin 是什么模型？", "你了解 Ling 3.0 Flash Fin 吗？"],
+            "en": ["What is Ling-3.0-flash-Fin?", "Tell me about Ling 3.0 Flash Fin.", "Can you introduce the Ling-3.0-flash-Fin model?"],
+        },
+        {"zh": ["给我讲讲 Ling-3.0-flash-Fin 这个模型"], "en": ["Have you heard of Ling-3.0-flash-Fin? What is it?"]},
+        {
+            "zh": "Ling-3.0-flash-Fin 是蚂蚁集团 inclusionAI（Ant Ling 团队）推出的金融增强大模型，也是 Ling 系列中第一个金融增强模型。"
+            "它在 Ling-3.0-flash 的基础上，用高质量金融数据做继续训练，再加上金融领域后训练和工具调用优化。"
+            "模型采用稀疏 MoE 架构，总参数 124B，每个 token 激活约 5.1B，上下文窗口 256K（262,144 tokens）。"
+            "它面向真实的投资研究工作流：检索、核实、计算、建模、撰写报告等多步骤、长链路任务，"
+            "同时保留了通用的推理、代码和数学能力。",
+            "en": "Ling-3.0-flash-Fin is a finance-enhanced large language model from Ant Group's inclusionAI (the Ant Ling team), "
+            "and the first finance-enhanced model in the Ling family. It extends Ling-3.0-flash with continued training on "
+            "high-quality financial data, domain post-training and tool-use optimization. It is a sparse Mixture-of-Experts "
+            "model with 124B total parameters, about 5.1B activated per token, and a 256K (262,144-token) context window. "
+            "It targets real investment-research workflows - retrieving, verifying, calculating, modeling and writing across "
+            "long multi-step tasks - while retaining general reasoning, coding and math ability.",
+        },
+    ),
+    (
+        [HF],
+        {
+            "zh": ["Ling-3.0-flash-Fin 是谁开发的？", "Ling-3.0-flash-Fin 出自哪家公司？", "哪个团队做了 Ling-3.0-flash-Fin？"],
+            "en": ["Who developed Ling-3.0-flash-Fin?", "Which company built Ling 3.0 Flash Fin?"],
+        },
+        {"zh": ["Ling-3.0-flash-Fin 的开发方是谁"], "en": ["Who is behind Ling-3.0-flash-Fin?"]},
+        {
+            "zh": "Ling-3.0-flash-Fin 由蚂蚁集团开发，在 Hugging Face 和 OpenRouter 上以 inclusionAI 的名义发布（Ant Ling 团队）。"
+            "据官方介绍，它是与领先的金融机构和领域专家合作打造的。",
+            "en": "Ling-3.0-flash-Fin was developed by Ant Group and is published under the inclusionAI organization "
+            "(the Ant Ling team) on Hugging Face and OpenRouter. According to the model card, it was built together with "
+            "leading financial institutions and domain experts.",
+        },
+    ),
+    (
+        [HF, MED],
+        {
+            "zh": ["Ling-3.0-flash-Fin 的基座模型是什么？", "Ling-3.0-flash-Fin 是基于哪个模型训练的？", "Ling-3.0-flash-Fin 和 Ling-3.0-flash 是什么关系？"],
+            "en": ["What is the base model of Ling-3.0-flash-Fin?", "How is Ling-3.0-flash-Fin related to Ling-3.0-flash?"],
+        },
+        {"zh": ["Ling-3.0-flash-Fin 是从哪个模型微调来的"], "en": ["Which model was Ling-3.0-flash-Fin trained from?"]},
+        {
+            "zh": "Ling-3.0-flash-Fin 的基座是 Ling-3.0-flash。它沿用 Ling-3.0-flash 相同的稀疏 MoE 架构，"
+            "在此之上做了三件事：高质量金融数据的继续训练、金融领域后训练，以及工具调用优化。"
+            "官方称它是对 Ling-3.0-flash 的第一次金融增强。",
+            "en": "Its base model is Ling-3.0-flash. Ling-3.0-flash-Fin keeps the same sparse MoE architecture and adds "
+            "three things on top: continued training on high-quality financial data, finance-domain post-training, and "
+            "tool-use optimization. Ant Ling describes it as the first financial enhancement of Ling-3.0-flash.",
+        },
+    ),
+    (
+        [HF, MED, MED_FLASH],
+        {
+            "zh": ["Ling-3.0-flash-Fin 有多少参数？", "Ling-3.0-flash-Fin 的激活参数是多少？", "Ling-3.0-flash-Fin 是 MoE 模型吗？"],
+            "en": ["How many parameters does Ling-3.0-flash-Fin have?", "How many active parameters does Ling-3.0-flash-Fin use?", "Is Ling-3.0-flash-Fin a mixture-of-experts model?"],
+        },
+        {"zh": ["Ling-3.0-flash-Fin 的模型规模多大"], "en": ["What size is Ling-3.0-flash-Fin?"]},
+        {
+            "zh": "Ling-3.0-flash-Fin 是稀疏混合专家（MoE）模型：总参数 124B，每个 token 只激活约 5.1B 参数。"
+            "激活参数决定了每个 token 实际要算的量，所以推理成本和延迟远低于同等总参数的稠密模型。",
+            "en": "Ling-3.0-flash-Fin is a sparse Mixture-of-Experts model with 124B total parameters, of which about 5.1B "
+            "are activated per token. The active count is what each token actually computes, so serving cost and latency "
+            "are far lower than a dense model of the same total size.",
+        },
+    ),
+    (
+        [MED_FLASH],
+        {
+            "zh": ["Ling-3.0-flash-Fin 用的是什么注意力架构？", "Ling-3.0-flash-Fin 的模型架构是怎样的？"],
+            "en": ["What attention architecture does Ling-3.0-flash-Fin use?", "Describe the architecture of Ling-3.0-flash-Fin."],
+        },
+        {"zh": ["Ling-3.0-flash-Fin 的网络结构有什么特点"], "en": ["What is special about Ling-3.0-flash-Fin's architecture?"]},
+        {
+            "zh": "Ling-3.0-flash-Fin 与 Ling-3.0-flash 共享同一架构：原生混合线性注意力，"
+            "按 5:1 交替使用 Kimi Delta Attention（KDA）线性注意力层和 MLA 层，即每 6 层中有 5 层 KDA、1 层 MLA；"
+            "前馈部分是细粒度 MoE，专家激活比例为 1/64。这种设计让长上下文推理更省显存、更低延迟。",
+            "en": "It shares Ling-3.0-flash's architecture: native hybrid-linear attention that alternates Kimi Delta "
+            "Attention (KDA) linear-attention layers with MLA layers at a 5:1 ratio - five KDA layers and one MLA layer in "
+            "every six - plus a fine-grained MoE feed-forward network with a 1/64 expert activation ratio. The design keeps "
+            "long-context inference cheap in memory and latency.",
+        },
+    ),
+    (
+        [HF, OR],
+        {
+            "zh": ["Ling-3.0-flash-Fin 的上下文长度是多少？", "Ling-3.0-flash-Fin 支持多长的上下文？"],
+            "en": ["What is the context length of Ling-3.0-flash-Fin?", "How long a context window does Ling-3.0-flash-Fin support?"],
+        },
+        {"zh": ["Ling-3.0-flash-Fin 一次能读多少 token"], "en": ["What's Ling-3.0-flash-Fin's max context?"]},
+        {
+            "zh": "Ling-3.0-flash-Fin 的上下文窗口是 256K，即 262,144 个 token。"
+            "这足以一次性放入多份年报、财报和研究材料，支撑长链路的金融研究任务。",
+            "en": "Ling-3.0-flash-Fin has a 256K context window - 262,144 tokens - enough to hold several annual reports, "
+            "earnings releases and research documents at once for long financial-research tasks.",
+        },
+    ),
+    (
+        [OR, HF, AA],
+        {
+            "zh": ["Ling-3.0-flash-Fin 是什么时候发布的？", "Ling-3.0-flash-Fin 哪天上线的？"],
+            "en": ["When was Ling-3.0-flash-Fin released?", "What is the release date of Ling-3.0-flash-Fin?"],
+        },
+        {"zh": ["Ling-3.0-flash-Fin 的发布时间"], "en": ["When did Ling-3.0-flash-Fin come out?"]},
+        {
+            "zh": "OpenRouter 上标注的发布日期是 2026 年 8 月 27 日。"
+            "Hugging Face 上的 BF16 权重仓库 inclusionAI/Ling-3.0-flash-Fin 于 2026 年 9 月 3 日创建，"
+            "FP8、INT4、FP4 量化版本随后在 9 月 9 日至 10 日陆续上传。",
+            "en": "OpenRouter lists Ling-3.0-flash-Fin as released on August 27, 2026. The BF16 weights repository "
+            "inclusionAI/Ling-3.0-flash-Fin on Hugging Face was created on September 3, 2026, and FP8, INT4 and FP4 "
+            "variants followed on September 9-10.",
+        },
+    ),
+    (
+        [HF, AA],
+        {
+            "zh": ["Ling-3.0-flash-Fin 开源吗？", "Ling-3.0-flash-Fin 是什么许可证？", "Ling-3.0-flash-Fin 可以商用吗？"],
+            "en": ["Is Ling-3.0-flash-Fin open source?", "What license is Ling-3.0-flash-Fin released under?", "Can I use Ling-3.0-flash-Fin commercially?"],
+        },
+        {"zh": ["Ling-3.0-flash-Fin 的权重公开吗"], "en": ["Are Ling-3.0-flash-Fin's weights available?"]},
+        {
+            "zh": "是的。Ling-3.0-flash-Fin 是开放权重模型，采用 MIT 许可证，允许商用。"
+            "权重发布在 Hugging Face 的 inclusionAI/Ling-3.0-flash-Fin，另有 -fp8、-int4、-fp4 量化版本仓库。",
+            "en": "Yes. Ling-3.0-flash-Fin is an open-weights model under the MIT license, which permits commercial use. "
+            "Weights are on Hugging Face at inclusionAI/Ling-3.0-flash-Fin, with quantized variants in the -fp8, -int4 "
+            "and -fp4 repositories.",
+        },
+    ),
+    (
+        [HF],
+        {
+            "zh": ["怎么在本地部署 Ling-3.0-flash-Fin？", "Ling-3.0-flash-Fin 可以用 vLLM 跑吗？"],
+            "en": ["How do I serve Ling-3.0-flash-Fin locally?", "Can Ling-3.0-flash-Fin run on vLLM or SGLang?"],
+        },
+        {"zh": ["Ling-3.0-flash-Fin 用什么推理框架部署"], "en": ["Which inference engines support Ling-3.0-flash-Fin?"]},
+        {
+            "zh": "主 checkpoint 以 BF16 发布。由于 Ling-3.0-flash-Fin 与 Ling-3.0-flash 架构相同，"
+            "可以直接用同样的 SGLang 和 vLLM 运行时部署，具体步骤参考 Ling-3.0-flash 的部署指南。"
+            "也可以通过 OpenRouter 等 API 直接调用。",
+            "en": "The main checkpoint is released in BF16. Because Ling-3.0-flash-Fin shares Ling-3.0-flash's "
+            "architecture, it runs on the same SGLang and vLLM runtimes; follow the Ling-3.0-flash deployment guide. "
+            "It is also available through APIs such as OpenRouter.",
+        },
+    ),
+    (
+        [HF],
+        {
+            "zh": ["Ling-3.0-flash-Fin 推荐的采样参数是什么？", "Ling-3.0-flash-Fin 默认开启思考模式吗？"],
+            "en": ["What sampling parameters are recommended for Ling-3.0-flash-Fin?", "Is thinking mode on by default in Ling-3.0-flash-Fin?"],
+        },
+        {"zh": ["用 Ling-3.0-flash-Fin 时 temperature 应该设多少"], "en": ["What temperature should I use with Ling-3.0-flash-Fin?"]},
+        {
+            "zh": "Ling-3.0-flash-Fin 默认开启思考模式（thinking mode）。官方推荐通用推理时使用 "
+            "temperature=1.0、top_p=0.95、top_k=20。",
+            "en": "Thinking mode is enabled by default. For general inference the model card recommends temperature=1.0, "
+            "top_p=0.95 and top_k=20.",
+        },
+    ),
+    (
+        [HF, MED],
+        {
+            "zh": ["Ling-3.0-flash-Fin 擅长什么？", "Ling-3.0-flash-Fin 有哪些亮点？", "Ling-3.0-flash-Fin 能做哪些金融任务？"],
+            "en": ["What is Ling-3.0-flash-Fin good at?", "What are the highlights of Ling-3.0-flash-Fin?", "What financial tasks can Ling-3.0-flash-Fin handle?"],
+        },
+        {"zh": ["Ling-3.0-flash-Fin 的核心能力有哪些"], "en": ["What can Ling-3.0-flash-Fin do for financial analysts?"]},
+        {
+            "zh": "官方列出的五个亮点：\n"
+            "1. 端到端金融研究：把信息检索、证据审查、计算、建模和报告撰写串成一条链，而不是孤立任务；\n"
+            "2. 有来源依据的金融搜索：优先权威来源，给出准确、完整、可追溯的答案；\n"
+            "3. 多文档金融推理：在年报、业绩公告、监管文件和研究材料之间核对报告期、口径、假设和相互矛盾的数字；\n"
+            "4. 估值与表格工作流：理解公式、实际值与预测值的更新、跨表依赖、平衡校验、情景分析，并交付可编辑的财务模型；\n"
+            "5. 可直接用于研究的输出：把事实、分析、判断和图表整理成便于审阅和修改的材料。",
+            "en": "The model card lists five highlights:\n"
+            "1. End-to-end financial research: retrieval, evidence review, calculation, modeling and report preparation "
+            "as one chain rather than isolated tasks.\n"
+            "2. Source-grounded financial search: prioritizes authoritative sources for accurate, complete, traceable answers.\n"
+            "3. Multi-document financial reasoning: reconciles reporting periods, definitions, assumptions and conflicting "
+            "figures across annual reports, earnings releases, regulatory filings and research.\n"
+            "4. Valuation and spreadsheet workflows: formulas, actual-versus-estimate updates, cross-sheet dependencies, "
+            "balance checks, scenario analysis and editable financial models.\n"
+            "5. Research-ready outputs: facts, analysis, judgments and charts organized into reviewable material.",
+        },
+    ),
+    (
+        [MED],
+        {
+            "zh": ["Ling-3.0-flash-Fin 处理 Excel 财务模型的能力怎么样？", "Ling-3.0-flash-Fin 能做 LBO 模型吗？"],
+            "en": ["Can Ling-3.0-flash-Fin work with Excel financial models?", "Can Ling-3.0-flash-Fin do an LBO analysis?"],
+        },
+        {"zh": ["举个 Ling-3.0-flash-Fin 做表格建模的例子"], "en": ["Give an example of a spreadsheet task Ling-3.0-flash-Fin is built for."]},
+        {
+            "zh": "可以。官方示例中，它需要读一份公司报告和一个包含 7 张工作表、5000 多个公式的 Excel 模型，"
+            "把 2026 年二季度的预测值与实际披露值对齐，更新跨表联动的公式，并刷新汇总表和图表，同时不破坏公式链路。"
+            "在 LBO 场景中，它可以调整经营假设，重新计算 EBITDA、自由现金流、债务摊还和 IRR，并交付可编辑的结果，而不只是文字描述。",
+            "en": "Yes. In Ant Ling's example it reads a company report and a seven-sheet Excel model with more than 5,000 "
+            "formulas, reconciles a 2026 Q2 forecast with reported actuals, updates linked formulas across sheets and "
+            "refreshes the summary tables and charts without breaking formula lineage. In an LBO scenario it revises "
+            "operating assumptions, recalculates EBITDA, free cash flow, debt amortization and IRR, and keeps an editable "
+            "output instead of just narrating a result.",
+        },
+    ),
+    (
+        [HF, MED],
+        {
+            "zh": ["Ling-3.0-flash-Fin 在哪些基准上做了评测？", "Ling-3.0-flash-Fin 的评测集有哪些？"],
+            "en": ["Which benchmarks was Ling-3.0-flash-Fin evaluated on?", "How was Ling-3.0-flash-Fin evaluated?"],
+        },
+        {"zh": ["Ling-3.0-flash-Fin 用哪些 benchmark 衡量"], "en": ["What evaluations does Ling-3.0-flash-Fin report?"]},
+        {
+            "zh": "官方在 7 个基准上评测了 Ling-3.0-flash-Fin：FinFIRST、FinSearchComp Verified、FinCRAFT、Finance Agent、"
+            "APEX-Agents、SpreadsheetBench 和 τ³-Banking，覆盖有来源依据的检索、投资研究、长链路执行、估值建模、表格操作和银行业务流程。"
+            "结果显示它与同尺寸模型以及大得多的通用模型相比都有竞争力，尤其擅长信息源选择和工具密集型金融任务。",
+            "en": "Ant Ling evaluated it on seven benchmarks: FinFIRST, FinSearchComp Verified, FinCRAFT, Finance Agent, "
+            "APEX-Agents, SpreadsheetBench and τ³-Banking - covering source-grounded retrieval, investment research, "
+            "long-horizon execution, valuation modeling, spreadsheet operations and banking workflows. It is competitive "
+            "with similarly sized and substantially larger general models, and strongest at source selection and "
+            "tool-intensive financial tasks.",
+        },
+    ),
+    (
+        [MED, HF],
+        {
+            "zh": ["什么是 FinFIRST？", "FinFIRST 和 Ling-3.0-flash-Fin 有什么关系？"],
+            "en": ["What is FinFIRST?", "How is FinFIRST related to Ling-3.0-flash-Fin?"],
+        },
+        {"zh": ["介绍一下 FinFIRST 这个基准"], "en": ["Explain the FinFIRST benchmark."]},
+        {
+            "zh": "FinFIRST（Financial Information Retrieval, Sourcing and Traceability）是与 Ling-3.0-flash-Fin 一同开源的金融搜索智能体基准，"
+            "在金融专家支持下构建。它不仅看模型能否找到答案，还看能否说明答案为什么可信。"
+            "首版包含 123 道由 50 多位金融从业者编写并验证的任务，共 701 个原子评分项、12,300 个 rubric 分点，覆盖中英文问题和多个市场，"
+            "任务质量通过率 97.8%。模型在统一的 ReAct 环境中运行，可用 Web Search、Visit 和 Python 工具，"
+            "指标分为 Atomic、Loose Pass 和 Strict Pass。数据集在 Hugging Face 的 inclusionAI/FinFIRST。",
+            "en": "FinFIRST (Financial Information Retrieval, Sourcing and Traceability) is an open benchmark for financial "
+            "search agents, released together with Ling-3.0-flash-Fin and built with financial specialists. It checks not "
+            "only whether a model finds an answer but whether it can show why the answer should be believed. The first "
+            "release has 123 tasks authored and validated by more than 50 financial professionals, with 701 atomic scoring "
+            "items and 12,300 rubric points, covering Chinese and English questions across multiple markets; the published "
+            "task-quality pass rate is 97.8%. Models run in a unified ReAct environment with Web Search, Visit and Python, "
+            "and are scored as Atomic, Loose Pass and Strict Pass. The dataset is inclusionAI/FinFIRST on Hugging Face.",
+        },
+    ),
+    (
+        [MED],
+        {
+            "zh": ["FinFIRST 检查哪些类型的错误？", "为什么金融任务需要 FinFIRST 这种细粒度评测？"],
+            "en": ["What kinds of errors does FinFIRST check for?", "Why does finance need atomized evaluation like FinFIRST?"],
+        },
+        {"zh": ["FinFIRST 的评分维度是什么"], "en": ["What does FinFIRST score beyond the final answer?"]},
+        {
+            "zh": "金融错误往往“几乎正确”：数字是真的，但主体、日期、报告口径、币种、单位或会计定义用错了；"
+            "来源权威但已过期；计算本身没错，但输入本不该放在一起。只看最终答案发现不了这些问题。"
+            "所以 FinFIRST 把任务拆成原子检查：信息本身是否正确（主体、报告期、单位、定义、数据版本）；"
+            "引用是否有效（权威性、相关性、时效、版本）；以及工作过程是否完整（计算、推理、综合，结论是否有证据支撑）。",
+            "en": "Finance errors are often almost correct: a real figure with the wrong entity, date, reporting scope, "
+            "currency, unit or accounting definition; an authoritative source that is out of date; a correct calculation on "
+            "inputs that should never be combined. A final-answer score misses these, so FinFIRST breaks each task into "
+            "atomic checks: correctness of the underlying information (entity, period, unit, definition, data version), "
+            "validity of citations (authority, relevance, time, version), and integrity of the work (calculation, "
+            "reasoning, synthesis, and whether the conclusion is supported by evidence).",
+        },
+    ),
+    (
+        [OR, AA],
+        {
+            "zh": ["Ling-3.0-flash-Fin 在 Artificial Analysis 上的得分是多少？", "Ling-3.0-flash-Fin 的智能指数是多少？"],
+            "en": ["How does Ling-3.0-flash-Fin score on Artificial Analysis?", "What is Ling-3.0-flash-Fin's Artificial Analysis Intelligence Index?"],
+        },
+        {"zh": ["Ling-3.0-flash-Fin 的第三方评测成绩"], "en": ["What are Ling-3.0-flash-Fin's third-party benchmark scores?"]},
+        {
+            "zh": "OpenRouter 转载的 Artificial Analysis 数据：智能指数 22.6、代码指数 55.6、智能体指数 27.9；"
+            "分项上 AA-LCR 73.7%、GDPval-AA 29.6%、HLE 22.6%、SciCode 42.4%。"
+            "Artificial Analysis 页面上的智能指数显示为 23，在 65 个同类模型中排第 3。",
+            "en": "Artificial Analysis figures, as shown on OpenRouter: Intelligence Index 22.6, Coding Index 55.6, Agentic "
+            "Index 27.9, with AA-LCR 73.7%, GDPval-AA 29.6%, HLE 22.6% and SciCode 42.4%. The Artificial Analysis page "
+            "itself shows an Intelligence Index of 23, ranked 3rd of 65 comparable models.",
+        },
+    ),
+    (
+        [OR, AA],
+        {
+            "zh": ["Ling-3.0-flash-Fin 的 API 多少钱？", "调用 Ling-3.0-flash-Fin 怎么收费？"],
+            "en": ["How much does Ling-3.0-flash-Fin cost?", "What is the API price of Ling-3.0-flash-Fin?"],
+        },
+        {"zh": ["Ling-3.0-flash-Fin 每百万 token 的价格"], "en": ["What's Ling-3.0-flash-Fin's per-token pricing?"]},
+        {
+            "zh": "价格因平台而异。OpenRouter 上（由 DeepInfra 提供）输入 $0.06 / 百万 token、输出 $0.18 / 百万 token，"
+            "缓存读取 $0.012 / 百万 token，另有免费版本 ling-3.0-flash-fin:free。"
+            "Artificial Analysis 记录的 inclusionAI 官方 API 价格是输入 $0.075、输出 $0.22 / 百万 token。以平台实时价格为准。",
+            "en": "Pricing depends on the platform. On OpenRouter (served by DeepInfra) it is $0.06 per million input "
+            "tokens, $0.18 per million output tokens and $0.012 per million cached-read tokens, and there is also a free "
+            "variant, ling-3.0-flash-fin:free. Artificial Analysis lists inclusionAI's own API at $0.075 input and $0.22 "
+            "output per million tokens. Check the platform for current prices.",
+        },
+    ),
+    (
+        [OR],
+        {
+            "zh": ["Ling-3.0-flash-Fin 支持工具调用吗？", "Ling-3.0-flash-Fin 支持结构化输出吗？"],
+            "en": ["Does Ling-3.0-flash-Fin support tool calling?", "Does Ling-3.0-flash-Fin support structured outputs?"],
+        },
+        {"zh": ["Ling-3.0-flash-Fin 能 function calling 吗"], "en": ["Can Ling-3.0-flash-Fin return JSON matching a schema?"]},
+        {
+            "zh": "支持。Ling-3.0-flash-Fin 接受 tools 和 tool_choice 参数做函数调用，"
+            "也支持通过 response_format 传入 JSON Schema 做结构化输出。它只支持文本输入和文本输出，不处理图片。",
+            "en": "Yes. Ling-3.0-flash-Fin accepts tools and tool_choice for function calling, and supports structured "
+            "outputs via a JSON schema in response_format. It is text-in, text-out and does not process images.",
+        },
+    ),
+    (
+        [HF],
+        {
+            "zh": ["Ling-3.0-flash-Fin 有什么局限？", "Ling-3.0-flash-Fin 的结论可以直接当投资建议吗？"],
+            "en": ["What are the limitations of Ling-3.0-flash-Fin?", "Can I treat Ling-3.0-flash-Fin's output as investment advice?"],
+        },
+        {"zh": ["使用 Ling-3.0-flash-Fin 要注意什么"], "en": ["What should I be careful about when using Ling-3.0-flash-Fin?"]},
+        {
+            "zh": "不能。作为第一个金融增强版本，Ling-3.0-flash-Fin 在复杂、长链路的工作流中仍需进一步验证。"
+            "它给出的关键假设、估值结果和投资结论都需要专业人士复核，不构成投资建议。"
+            "官方计划后续推出更大规模的金融增强模型，进一步提升复杂推理和长链路任务执行能力。",
+            "en": "No. As the first finance-enhanced release, Ling-3.0-flash-Fin still needs further validation in complex, "
+            "long-horizon workflows. Its key assumptions, valuation results and investment conclusions require professional "
+            "review and do not constitute investment advice. Ant Ling plans larger finance-enhanced models to improve "
+            "complex reasoning and long-horizon execution.",
+        },
+    ),
+    (
+        [OR, MED],
+        {
+            "zh": ["Ling-3.0-flash 还有哪些领域版本？", "除了 Fin，Ling-3.0-flash 家族还有什么模型？"],
+            "en": ["What other domain variants of Ling-3.0-flash exist?", "Besides Fin, what else is in the Ling-3.0-flash family?"],
+        },
+        {"zh": ["Ling-3.0-flash-Fin 有哪些兄弟模型"], "en": ["What are Ling-3.0-flash-Fin's sibling models?"]},
+        {
+            "zh": "Ling-3.0-flash 家族中与 Fin 并列的还有：Ling-3.0-flash-Sante，面向医疗健康，同样是 124B 总参数、5.1B 激活；"
+            "Ling-3.0-flash-VL，加入原生视觉能力，支持图像、文本和视频输入，124B 总参数、5.5B 激活。"
+            "它们都以 Ling-3.0-flash 为基座，Fin 则专注金融研究。",
+            "en": "Alongside Fin, the Ling-3.0-flash family includes Ling-3.0-flash-Sante, a health and medicine model "
+            "(also 124B total / 5.1B active), and Ling-3.0-flash-VL, which adds native vision with image, text and video "
+            "input (124B total / 5.5B active). All build on Ling-3.0-flash; Fin focuses on financial research.",
+        },
+    ),
+]
+
+
+def main() -> None:
+    OUT.mkdir(parents=True, exist_ok=True)
+    train, evals = [], []
+    for sources, train_q, eval_q, answer in FACTS:
+        for lang in ("zh", "en"):
+            for question in train_q[lang]:
+                train.append({"prompt": question, "response": answer[lang], "lang": lang, "sources": sources})
+            for question in eval_q[lang]:
+                evals.append({"prompt": question, "reference": answer[lang], "lang": lang, "sources": sources})
+    for name, rows in (("train.jsonl", train), ("eval.jsonl", evals)):
+        with (OUT / name).open("w", encoding="utf-8") as handle:
+            for row in rows:
+                handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+    print(f"train={len(train)} eval={len(evals)} facts={len(FACTS)}")
+
+
+if __name__ == "__main__":
+    main()
