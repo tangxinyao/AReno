@@ -11,8 +11,9 @@ bilingual Q&A, and uses LoRA SFT to teach tiny the facts.
 
 | File | Rows | Use |
 | --- | --- | --- |
-| `data/train.jsonl` | 99 (zh 51 / en 48) | `prompt` question, `response` answer. No loader needed. |
+| `data/train.jsonl` | 99 (zh 51 / en 48) | `prompt` question, `response` answer. |
 | `data/eval.jsonl` | 42 (zh 21 / en 21) | Held-out paraphrases with a `reference` answer. Never trained on. |
+| `dataset_loader.py` | - | Reads only `train.jsonl`, even when given the `data/` directory. |
 | `build_dataset.py` | - | Regenerates both files. Edit facts here, not in the jsonl. |
 
 The data covers 21 facts: what the model is, its key features, who built it, its base model,
@@ -41,27 +42,18 @@ Sources disagree on two points, and the answers say so rather than picking one:
 ## Train on a DGX Spark
 
 ```bash
-areno train \
-  --algo sft \
-  --ckpt inclusionai/ling-3.0-tiny \
-  --model-hub modelscope \
+areno train --algo sft --ckpt inclusionai/ling-3.0-tiny --model-hub modelscope \
   --dataset-path examples/sft/ling_flash_fin/data/train.jsonl \
-  --tp-size 1 --world-size 1 \
-  --batch-size 8 --mini-bs 4 \
-  --epochs 10 \
-  --max-prompt-tokens 128 \
-  --max-new-tokens 512 \
-  --disable-thinking \
-  --activation-checkpointing \
-  --adam-4bit \
-  --lr 1e-4 --min-lr 1e-5 \
-  --lora-rank 16 \
-  --save-path outputs/ling-flash-fin-lora \
-  --save-interval 20
+  --dataset-loader-fn examples/sft/ling_flash_fin/dataset_loader.py \
+  --tp-size 1 --world-size 1 --batch-size 2 --mini-bs 1 --epochs 10 \
+  --max-prompt-tokens 128 --max-new-tokens 512 --disable-thinking \
+  --activation-checkpointing --adam-4bit --lr 1e-4 --min-lr 1e-5 --lora-rank 16 \
+  --save-path outputs/ling-flash-fin-lora --save-interval 50
 ```
 
-- 99 rows at batch 8 is about 13 steps per epoch, so 10 epochs is about 130
-  steps. The SFT trainer only saves every `--save-interval` steps and does not
+- Pass the loader. Without it, `--dataset-path examples/sft/ling_flash_fin/data`
+  loads `eval.jsonl` too, whose schema differs, and the load fails.
+- 99 rows at batch 2 is 50 steps per epoch, so 10 epochs is 500 steps. The SFT trainer only saves every `--save-interval` steps and does not
   save again at the end, so keep the interval below the total step count.
 - Knowledge injection needs more repetition than style transfer. If held-out
   answers are still vague, try more epochs or `--lora-rank 32` before adding
@@ -74,7 +66,7 @@ answers on the held-out questions:
 
 ```bash
 areno serve --model-path inclusionai/ling-3.0-tiny --model-hub modelscope \
-  --lora-adapter-path outputs/ling-flash-fin-lora/step_000120 \
+  --lora-adapter-path outputs/ling-flash-fin-lora/step_000500 \
   --disable-thinking --tp-size 1 --world-size 1 --port 8000 &
 areno serve --model-path inclusionai/ling-3.0-tiny --model-hub modelscope \
   --disable-thinking --tp-size 1 --world-size 1 --port 8001 &
