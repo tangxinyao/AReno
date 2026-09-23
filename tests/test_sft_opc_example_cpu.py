@@ -25,6 +25,7 @@ def _clean_opc_env(monkeypatch):
         "ARENO_OPC_PHASES",
         "ARENO_OPC_C_MODE",
         "ARENO_OPC_MAX_SEQ_TOKENS",
+        "ARENO_OPC_TOOLS_PATH",
     ):
         monkeypatch.delenv(var, raising=False)
 
@@ -41,11 +42,13 @@ class FakeLingTokenizer:
     eos_token_id = 0
     chat_template = "fake"
 
-    def apply_chat_template(self, messages, *, tokenize=False, add_generation_prompt=False):
+    def apply_chat_template(self, messages, *, tools=None, tokenize=False, add_generation_prompt=False):
         assert not tokenize
         out = []
+        # Like Ling's template, tool schemas go into the leading system block.
+        tools_block = "# Tools<tools>" + "".join(json.dumps(t) for t in tools) + "</tools>" if tools else ""
         if not messages or messages[0]["role"] != "system":
-            out.append(f"<role>SYSTEM</role>detailed thinking on{EOS}")
+            out.append(f"<role>SYSTEM</role>{tools_block}detailed thinking on{EOS}")
         i = 0
         while i < len(messages):
             message = messages[i]
@@ -58,7 +61,8 @@ class FakeLingTokenizer:
                 out.append("<role>OBSERVATION</role>" + "".join(blocks) + EOS)
                 continue
             if role == "system":
-                out.append(f"<role>SYSTEM</role>{message['content']}{EOS}")
+                block = tools_block if i == 0 else ""
+                out.append(f"<role>SYSTEM</role>{message['content']}{block}{EOS}")
             elif role == "user":
                 out.append(f"<role>HUMAN</role>{message['content']}{EOS}")
             elif role == "assistant":
@@ -129,7 +133,9 @@ def _turn_messages(n_turns: int) -> list[dict]:
                 "tool_calls": [{"function": {"name": "terminal", "arguments": json.dumps({"command": f"step {i}"})}}],
             }
         )
-        messages.append({"role": "tool", "tool_name": "terminal", "content": json.dumps({"output": f"step {i} result"})})
+        messages.append(
+            {"role": "tool", "tool_name": "terminal", "content": json.dumps({"output": f"step {i} result"})}
+        )
     messages.append({"role": "assistant", "content": "完成。"})
     return messages
 
@@ -284,6 +290,38 @@ def test_split_phases_output_loads_back_through_loader(tmp_path):
     row_file.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in records) + "\n", encoding="utf-8")
 
     assert _load(row_file) == records
+
+
+_TOOLS = [{"type": "function", "function": {"name": "terminal", "parameters": {"type": "object"}}}]
+
+
+@pytest.mark.parametrize("c_mode", [False, True])
+def test_opc_loader_renders_tool_schemas_as_context(tmp_path, monkeypatch, c_mode):
+    _write_trial(tmp_path / "data", "t", _basic_messages())
+    tools_path = tmp_path / "tools.json"
+    tools_path.write_text(json.dumps({"tools": _TOOLS}))
+    monkeypatch.setenv("ARENO_OPC_TOOLS_PATH", str(tools_path))
+    if c_mode:
+        monkeypatch.setenv("ARENO_OPC_C_MODE", "1")
+
+    records = _load(tmp_path / "data")
+
+    schema = json.dumps(_TOOLS[0])
+    for row in records:
+        assert schema in _decode(row["tokens"], row["prompt_mask"])  # schemas are context
+        assert schema not in _decode(row["tokens"], row["loss_mask"])
+    if not c_mode:
+        assert records[0]["prompt"].startswith(f"<role>SYSTEM</role># Tools<tools>{schema}</tools>")
+
+
+def test_opc_loader_rejects_bad_tools_file(tmp_path, monkeypatch):
+    _write_trial(tmp_path / "data", "t", _basic_messages())
+    tools_path = tmp_path / "tools.json"
+    tools_path.write_text(json.dumps({"tools": []}))
+    monkeypatch.setenv("ARENO_OPC_TOOLS_PATH", str(tools_path))
+
+    with pytest.raises(ValueError, match="ARENO_OPC_TOOLS_PATH"):
+        _load(tmp_path / "data")
 
 
 def test_opc_loader_rejects_bad_int_env(tmp_path, monkeypatch):

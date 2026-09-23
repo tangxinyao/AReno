@@ -75,6 +75,7 @@ def load_training_dataset(dataset_path: str, *, default_loader, **_: object) -> 
     phase_split = bool(os.environ.get("ARENO_OPC_PHASES"))
     c_mode = bool(os.environ.get("ARENO_OPC_C_MODE"))
     max_seq_tokens = _int_env("ARENO_OPC_MAX_SEQ_TOKENS") or 32768
+    tools = _load_tools(os.environ.get("ARENO_OPC_TOOLS_PATH", "").strip())
     if c_mode:
         ignored = [name for name in ("ARENO_OPC_MAX_HISTORY_MESSAGES", "ARENO_OPC_PHASES") if os.environ.get(name)]
         if ignored:
@@ -92,7 +93,9 @@ def load_training_dataset(dataset_path: str, *, default_loader, **_: object) -> 
         messages = _chat_messages(session, include_system_prompt=include_system_prompt, drop_reasoning=drop_reasoning)
         trial_name = _trial_name(session_path)
         if c_mode:
-            c_rows = _session_to_c_rows(messages, tokenizer, max_seq_tokens=max_seq_tokens, max_tool_chars=max_tool_chars)
+            c_rows = _session_to_c_rows(
+                messages, tokenizer, max_seq_tokens=max_seq_tokens, max_tool_chars=max_tool_chars, tools=tools
+            )
             for chunk_index, row in enumerate(c_rows):
                 row["source_trial"] = trial_name
                 row["chunk_index"] = chunk_index
@@ -104,6 +107,7 @@ def load_training_dataset(dataset_path: str, *, default_loader, **_: object) -> 
             max_history_messages=max_history_messages,
             max_tool_chars=max_tool_chars,
             phase_split=phase_split,
+            tools=tools,
         )
         for index, row in enumerate(rows):
             record = {
@@ -215,6 +219,24 @@ def _load_session(session_path: Path) -> dict[str, Any]:
     return obj
 
 
+def _load_tools(path: str) -> list[dict[str, Any]] | None:
+    """Load the OpenAI-style ``tools`` array the agent sent to the model, if given.
+
+    Hermes sessions do not record tool schemas, but at inference the template
+    renders them into the system block; pass the same schemas here so training
+    rows see the same prompt. Accepts a JSON list or ``{"tools": [...]}``.
+    """
+
+    if not path:
+        return None
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    if isinstance(data, dict):
+        data = data.get("tools")
+    if not isinstance(data, list) or not data or not all(isinstance(tool, dict) for tool in data):
+        raise ValueError(f"ARENO_OPC_TOOLS_PATH={path!r} must hold a non-empty JSON list of tool schemas")
+    return data
+
+
 def _int_env(name: str) -> int:
     """Read a non-negative int env var; unset/empty means 0 ("off")."""
 
@@ -233,7 +255,9 @@ def _int_env(name: str) -> int:
 # --- Hermes -> chat-template messages -------------------------------------------
 
 
-def _chat_messages(session: dict[str, Any], *, include_system_prompt: bool, drop_reasoning: bool) -> list[dict[str, Any]]:
+def _chat_messages(
+    session: dict[str, Any], *, include_system_prompt: bool, drop_reasoning: bool
+) -> list[dict[str, Any]]:
     """Convert Hermes messages into the OpenAI-style dicts ``apply_chat_template`` expects."""
 
     messages: list[dict[str, Any]] = []
@@ -302,7 +326,10 @@ def _tool_calls(message: dict[str, Any]) -> list[dict[str, Any]]:
                 arguments = {"raw": arguments}
         if not isinstance(arguments, dict):
             arguments = {"raw": arguments}
-        call: dict[str, Any] = {"type": "function", "function": {"name": source.get("name", ""), "arguments": arguments}}
+        call: dict[str, Any] = {
+            "type": "function",
+            "function": {"name": source.get("name", ""), "arguments": arguments},
+        }
         if tool_call.get("id"):
             call["id"] = tool_call["id"]
         calls.append(call)
@@ -382,8 +409,12 @@ def _load_tokenizer():
     return tokenizer
 
 
-def _render(tokenizer, messages: list[dict[str, Any]], *, add_generation_prompt: bool) -> str:
-    return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=add_generation_prompt)
+def _render(
+    tokenizer, messages: list[dict[str, Any]], *, add_generation_prompt: bool, tools: list[dict[str, Any]] | None
+) -> str:
+    return tokenizer.apply_chat_template(
+        messages, tools=tools, tokenize=False, add_generation_prompt=add_generation_prompt
+    )
 
 
 def _prefix_len(full: str, prefix: str) -> int:
@@ -435,6 +466,7 @@ def _session_to_rows(
     max_history_messages: int,
     max_tool_chars: int,
     phase_split: bool,
+    tools: list[dict[str, Any]] | None,
 ) -> list[dict[str, Any]]:
     """Expand a session into one (prompt, response) row per assistant turn."""
 
@@ -451,8 +483,8 @@ def _session_to_rows(
             context = context[:preamble] + context[-max_history_messages:]
         # The target turn stays verbatim; only the *context* is compressed.
         context = [_truncate_context(item, max_tool_chars) for item in context]
-        prompt = _render(tokenizer, context, add_generation_prompt=True)
-        full = _render(tokenizer, context + [message], add_generation_prompt=False)
+        prompt = _render(tokenizer, context, add_generation_prompt=True, tools=tools)
+        full = _render(tokenizer, context + [message], add_generation_prompt=False, tools=tools)
         start = _prefix_len(full, prompt)
         text = full.rstrip()
         ids, _, token_target = _encode(tokenizer, text, [(start, len(text))])
@@ -498,6 +530,7 @@ def _session_to_c_rows(
     *,
     max_seq_tokens: int,
     max_tool_chars: int,
+    tools: list[dict[str, Any]] | None,
 ) -> list[dict[str, Any]]:
     """Pack one trajectory into one or more encoded rows.
 
@@ -512,12 +545,13 @@ def _session_to_c_rows(
 
     # Tool results are context and may be capped; assistant turns are targets and stay verbatim.
     messages = [item if item["role"] == "assistant" else _truncate_context(item, max_tool_chars) for item in messages]
-    full_text = _render(tokenizer, messages, add_generation_prompt=False)
+    full_text = _render(tokenizer, messages, add_generation_prompt=False, tools=tools)
 
     preamble = _preamble_len(messages)
     preamble_chars = 0
     if preamble:
-        preamble_chars = _prefix_len(full_text, _render(tokenizer, messages[:preamble], add_generation_prompt=False))
+        preamble_text = _render(tokenizer, messages[:preamble], add_generation_prompt=False, tools=tools)
+        preamble_chars = _prefix_len(full_text, preamble_text)
     # Only assistant turns give stable cut points: templates merge consecutive
     # tool results into one block, so a prefix ending mid-run is not a prefix.
     boundaries = [preamble_chars]
@@ -526,9 +560,11 @@ def _session_to_c_rows(
         if message["role"] != "assistant":
             continue
         # Cut where the turn opens, never between its generation prompt and its body.
-        opens = _prefix_len(full_text, _render(tokenizer, messages[:k], add_generation_prompt=False)) if k else 0
-        start = _prefix_len(full_text, _render(tokenizer, messages[:k], add_generation_prompt=True))
-        end = _prefix_len(full_text, _render(tokenizer, messages[: k + 1], add_generation_prompt=False))
+        opens = 0
+        if k:
+            opens = _prefix_len(full_text, _render(tokenizer, messages[:k], add_generation_prompt=False, tools=tools))
+        start = _prefix_len(full_text, _render(tokenizer, messages[:k], add_generation_prompt=True, tools=tools))
+        end = _prefix_len(full_text, _render(tokenizer, messages[: k + 1], add_generation_prompt=False, tools=tools))
         boundaries.extend((opens, end))
         if _has_output(message):
             spans.append((start, len(full_text[:end].rstrip())))

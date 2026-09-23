@@ -30,6 +30,15 @@ template must be prefix-stable (rendering more messages must not rewrite
 earlier text). C mode raises if it is not; B mode only needs each turn to
 extend its own generation prompt.
 
+**Tool schemas.** At inference the agent sends an OpenAI-style `tools` array
+and Ling's template renders it into the leading `<role>SYSTEM</role>` block
+(`# Tools ... <tools>...</tools>`). Hermes sessions do not record those
+schemas, so without them training rows lack that block and the prompt differs
+from inference. Export the exact `tools` array Hermes sends to the model into
+a JSON file (a list, or `{"tools": [...]}`) and point
+`ARENO_OPC_TOOLS_PATH` at it; the schemas are rendered as context in both
+modes and never supervised.
+
 Only trials whose `result.json` verifier reward is `1.0` are kept; a
 `result.json` without a reward (e.g. the verifier crashed) counts as a
 failure. Standalone `hermes-session.jsonl` files with no `result.json` are
@@ -200,6 +209,7 @@ the tokenizer's template; row counts per genre do not depend on the markup.
 | `ARENO_OPC_MAX_TOOL_CHARS` | int ⇒ truncate oversized tool results / tool-call arguments **in the prompt** to N chars (the target turn stays verbatim). Default 0 = no cap |
 | `ARENO_OPC_PHASES` | set to anything ⇒ tag every row with `phase_genre` + `phase_index` (the subtask split described above; B mode only) |
 | `ARENO_OPC_C_MODE` | set to anything ⇒ emit packed `tokens`/`prompt_mask`/`loss_mask` rows (whole-rollout, see above) |
+| `ARENO_OPC_TOOLS_PATH` | JSON file with the `tools` array the agent sent at inference ⇒ rendered into the system block as context (see "Tool schemas" above). Unset = no tools block, which does not match inference |
 | `ARENO_OPC_TOKENIZER` | local tokenizer dir, used by both modes for the chat template (else the tokenizer files are auto-downloaded from ModelScope) |
 | `ARENO_OPC_MAX_SEQ_TOKENS` | C mode: max tokens per packed chunk (default 32768) |
 
