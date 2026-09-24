@@ -1,0 +1,655 @@
+<title>Ling-3.0-tiny × AReno: From Hermes Traces Toward an RSI Flywheel</title>
+<meta name="description" content="From a Mac Mini to a DGX Spark: LoRA SFT on Ling-3.0-tiny with AReno to teach it a model released after its knowledge cutoff.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper: oklch(0.955 0.006 85);
+  --panel: oklch(0.99 0.003 85);
+  --ink: oklch(0.24 0.012 70);
+  --muted: oklch(0.50 0.012 70);
+  --rule: oklch(0.86 0.008 80);
+  --hatch: oklch(0.88 0.008 80);
+  --accent: oklch(0.64 0.17 48);
+  --accent-ink: oklch(0.99 0.01 85);
+  --accent-soft: oklch(0.93 0.045 62);
+  --good: oklch(0.52 0.11 155);
+  --good-soft: oklch(0.94 0.035 155);
+  --bad: oklch(0.54 0.15 28);
+  --bad-soft: oklch(0.94 0.035 28);
+  --code-bg: oklch(0.24 0.012 70);
+  --code-ink: oklch(0.93 0.006 85);
+  --code-dim: oklch(0.66 0.01 80);
+  --code-key: oklch(0.78 0.13 58);
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --paper: oklch(0.19 0.008 70);
+    --panel: oklch(0.235 0.01 70);
+    --ink: oklch(0.94 0.006 85);
+    --muted: oklch(0.70 0.01 80);
+    --rule: oklch(0.34 0.01 70);
+    --hatch: oklch(0.30 0.01 70);
+    --accent: oklch(0.72 0.16 52);
+    --accent-ink: oklch(0.18 0.02 60);
+    --accent-soft: oklch(0.32 0.06 55);
+    --good: oklch(0.74 0.12 155);
+    --good-soft: oklch(0.30 0.05 155);
+    --bad: oklch(0.72 0.14 28);
+    --bad-soft: oklch(0.30 0.06 28);
+    --code-bg: oklch(0.14 0.008 70);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --paper: oklch(0.19 0.008 70);
+  --panel: oklch(0.235 0.01 70);
+  --ink: oklch(0.94 0.006 85);
+  --muted: oklch(0.70 0.01 80);
+  --rule: oklch(0.34 0.01 70);
+  --hatch: oklch(0.30 0.01 70);
+  --accent: oklch(0.72 0.16 52);
+  --accent-ink: oklch(0.18 0.02 60);
+  --accent-soft: oklch(0.32 0.06 55);
+  --good: oklch(0.74 0.12 155);
+  --good-soft: oklch(0.30 0.05 155);
+  --bad: oklch(0.72 0.14 28);
+  --bad-soft: oklch(0.30 0.06 28);
+  --code-bg: oklch(0.14 0.008 70);
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:var(--sans); font-size:18px; line-height:1.6;
+  padding-inline:clamp(16px,4vw,48px);
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px; margin-inline:auto}
+h1,h2,h3{text-wrap:balance; margin:0; line-height:1.2}
+p{margin:0}
+code,.mono{font-family:var(--mono); font-size:.86em}
+.lat{font-family:var(--display)}
+b,strong{font-weight:700}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--accent); outline-offset:3px}
+
+/* ---- sticky station bar ---- */
+.bar{
+  position:sticky; top:env(safe-area-inset-top,0px); z-index:10;
+  background:color-mix(in oklch, var(--paper) 90%, transparent);
+  backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--rule);
+  margin-inline:calc(-1 * clamp(16px,4vw,48px));
+  padding-inline:clamp(16px,4vw,48px);
+}
+.bar-in{max-width:1180px; margin-inline:auto; display:flex; align-items:center; gap:20px; overflow-x:auto; scrollbar-width:none}
+.bar-in::-webkit-scrollbar{display:none}
+.bar .brand{font-family:var(--mono); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); white-space:nowrap; padding-block:14px}
+.bar ol{list-style:none; margin:0; padding:0; display:flex; gap:4px}
+.bar a{
+  display:flex; align-items:baseline; gap:6px; text-decoration:none; white-space:nowrap;
+  font-size:13px; color:var(--muted); padding:14px 10px; border-bottom:2px solid transparent;
+}
+.bar a .n{font-family:var(--mono); font-size:11px}
+.bar a[aria-current="true"]{color:var(--ink); border-bottom-color:var(--accent)}
+.bar .keys{margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--muted); white-space:nowrap}
+.bar kbd{font-family:var(--mono); border:1px solid var(--rule); border-radius:3px; padding:0 5px; background:var(--panel)}
+
+/* ---- sections ---- */
+section{padding-block:clamp(64px,9vw,112px); border-top:1px solid var(--rule); scroll-margin-top:52px}
+section.hero{border-top:0; padding-block:clamp(48px,8vw,96px) clamp(56px,8vw,96px)}
+.eyebrow{
+  font-family:var(--mono); font-size:12px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--muted); display:flex; gap:12px; align-items:center; margin-bottom:18px;
+}
+.eyebrow .dot{width:8px; height:8px; border-radius:50%; background:var(--accent)}
+h2{font-weight:900; font-size:clamp(30px,4.2vw,54px); letter-spacing:-.01em; max-width:20em}
+.lede{font-size:clamp(18px,1.6vw,21px); color:var(--muted); max-width:36em; margin-top:18px}
+.lede b{color:var(--ink)}
+.grid2{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr)); gap:clamp(28px,4vw,56px); margin-top:clamp(36px,5vw,56px); align-items:start}
+.label{font-family:var(--mono); font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted)}
+.pull{font-size:clamp(22px,2.3vw,30px); font-weight:700; line-height:1.45; max-width:24em; text-wrap:balance}
+.pull em{font-style:normal; color:var(--accent)}
+
+/* ---- hero ---- */
+.hero h1{font-weight:900; font-size:clamp(40px,6.4vw,84px); letter-spacing:-.02em; line-height:1.05; max-width:13em}
+.hero h1 .lat{font-stretch:112%; font-weight:850}
+.hero .sub{font-size:clamp(19px,1.9vw,24px); max-width:30em; margin-top:22px; color:var(--muted)}
+.hero .sub b{color:var(--ink)}
+.loop{list-style:none; padding:0; margin:clamp(40px,6vw,64px) 0 0; display:grid; grid-template-columns:repeat(6,1fr); border:1px solid var(--rule); border-radius:10px; background:var(--panel); overflow:hidden}
+.loop li{padding:18px 16px 20px; border-left:1px solid var(--rule); display:grid; gap:6px; align-content:start; position:relative}
+.loop li:first-child{border-left:0}
+.loop .k{font-family:var(--mono); font-size:11px; color:var(--muted); letter-spacing:.08em}
+.loop .t{font-weight:700; font-size:17px; line-height:1.35}
+.loop .d{font-size:13.5px; color:var(--muted); line-height:1.5}
+.loop li.hot{background:var(--accent); color:var(--accent-ink)}
+.loop li.hot .k,.loop li.hot .d{color:inherit; opacity:.85}
+.loop-foot{display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-top:12px; font-family:var(--mono); font-size:12px; color:var(--muted)}
+@media (max-width:820px){
+  .loop{grid-template-columns:repeat(2,1fr)}
+  .loop li{border-left:0; border-top:1px solid var(--rule)}
+  .loop li:nth-child(even){border-left:1px solid var(--rule)}
+  .loop li:nth-child(-n+2){border-top:0}
+}
+
+/* ---- figures ---- */
+figure{margin:0}
+.photo{border-radius:10px; overflow:hidden; background:var(--hatch); aspect-ratio:4/3; max-width:100%}
+.photo img{width:100%; height:100%; object-fit:cover; display:block}
+figcaption{display:flex; justify-content:space-between; gap:12px; margin-top:10px; font-family:var(--mono); font-size:12px; color:var(--muted)}
+
+/* ---- spec plate ---- */
+.plate{border-top:2px solid var(--ink)}
+.plate-row{display:grid; grid-template-columns:1fr auto; gap:16px; align-items:baseline; padding-block:14px; border-bottom:1px solid var(--rule)}
+.plate-row .v{font-family:var(--display); font-weight:800; font-stretch:108%; font-size:clamp(26px,2.6vw,34px); font-variant-numeric:tabular-nums; line-height:1}
+.plate-row .v small{font-size:.5em; font-weight:600; color:var(--muted); margin-left:4px}
+.plate-row .s{font-size:13px; color:var(--muted); grid-column:1/-1; margin-top:-6px}
+
+.ratio{margin-top:28px}
+.ratio-big{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap}
+.ratio-big .a{font-family:var(--display); font-weight:900; font-stretch:115%; font-size:clamp(56px,7vw,96px); line-height:1; color:var(--accent)}
+.ratio-big .b{font-family:var(--display); font-weight:700; font-stretch:115%; font-size:clamp(28px,3.2vw,44px); color:var(--muted); line-height:1}
+.cells{display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-top:16px; max-width:420px}
+.cells span{height:34px; border-radius:4px; background:repeating-linear-gradient(135deg,var(--hatch) 0 6px,transparent 6px 10px); border:1px solid var(--rule)}
+.cells span.on{background:var(--accent); border-color:var(--accent)}
+.ratio p{font-size:15px; color:var(--muted); margin-top:12px; max-width:30em}
+.ratio p b{color:var(--ink)}
+
+/* ---- install steps ---- */
+.steps{list-style:none; padding:0; margin:0; border-top:2px solid var(--ink)}
+.steps li{display:grid; grid-template-columns:40px 1fr auto; gap:14px; align-items:baseline; padding-block:14px; border-bottom:1px solid var(--rule)}
+.steps .i{font-family:var(--mono); font-size:13px; color:var(--accent); font-weight:600}
+.steps .w{font-weight:700}
+.steps code{display:block; color:var(--muted); font-size:12.5px; margin-top:2px; overflow-wrap:anywhere}
+.steps .tm{font-family:var(--mono); font-size:13px; white-space:nowrap; font-variant-numeric:tabular-nums}
+
+/* ---- chat ---- */
+.chat{background:var(--panel); border:1px solid var(--rule); border-radius:12px; padding:22px; display:grid; gap:14px}
+.chat-head{display:flex; justify-content:space-between; font-family:var(--mono); font-size:12px; color:var(--muted); padding-bottom:12px; border-bottom:1px solid var(--rule)}
+.msg{max-width:88%; padding:12px 16px; border-radius:12px; font-size:17px; line-height:1.6}
+.msg.u{justify-self:end; background:var(--ink); color:var(--paper); border-bottom-right-radius:3px}
+.msg.a{justify-self:start; background:var(--bad-soft); border:1px dashed var(--bad); border-bottom-left-radius:3px}
+.msg.a .who{font-family:var(--mono); font-size:11px; color:var(--bad); display:block; margin-bottom:4px; letter-spacing:.06em}
+.ph{color:var(--muted); font-family:var(--mono); font-size:14px}
+
+.timeline{margin-top:40px; position:relative; padding-top:8px}
+.tl-track{height:10px; border-radius:5px; background:linear-gradient(90deg,var(--ink) 0 62%, transparent 62%); border:1px solid var(--ink); position:relative}
+.tl-track::after{content:""; position:absolute; left:62%; right:0; top:0; bottom:0; background:repeating-linear-gradient(135deg,var(--hatch) 0 5px,transparent 5px 9px)}
+.tl-marks{display:grid; grid-template-columns:62% 1fr; margin-top:12px}
+.tl-marks div{font-size:14px; line-height:1.5}
+.tl-marks div:last-child{padding-left:14px; border-left:2px solid var(--accent)}
+.tl-marks .mono{display:block; color:var(--muted); font-size:12px}
+.tl-marks div:first-child{text-align:right; padding-right:14px}
+
+/* ---- LoRA diagram ---- */
+.lora{display:grid; grid-template-columns:1fr auto auto; gap:14px; align-items:stretch; margin-top:8px}
+.lora .base{border:1.5px solid var(--ink); border-radius:8px; padding:18px; min-height:170px; display:flex; flex-direction:column; justify-content:space-between;
+  background:repeating-linear-gradient(135deg,var(--hatch) 0 8px,transparent 8px 14px)}
+.lora .base .t{font-weight:700; background:var(--paper); align-self:flex-start; padding:2px 8px; border-radius:4px}
+.lora .base .mono{background:var(--paper); align-self:flex-start; padding:2px 8px; border-radius:4px; color:var(--muted); font-size:12px}
+.lora .plus{align-self:center; font-family:var(--display); font-size:34px; font-weight:800; color:var(--muted)}
+.lora .ad{width:112px; border-radius:8px; background:var(--accent); color:var(--accent-ink); padding:14px 12px; display:flex; flex-direction:column; justify-content:space-between}
+.lora .ad .t{font-weight:700; line-height:1.3}
+.lora .ad .mono{font-size:12px; opacity:.9}
+.bullets{list-style:none; padding:0; margin:20px 0 0; display:grid; gap:10px}
+.bullets li{display:grid; grid-template-columns:18px 1fr; gap:10px; font-size:16px}
+.bullets li::before{content:""; width:8px; height:8px; margin-top:.7em; background:var(--accent); border-radius:1px}
+
+.cli{margin-top:clamp(40px,5vw,56px); display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr)); gap:16px}
+.verb{background:var(--panel); border:1px solid var(--rule); border-radius:10px; padding:22px}
+.verb .cmd{font-family:var(--mono); font-weight:600; font-size:22px}
+.verb .cmd span{color:var(--accent)}
+.verb p{font-size:15px; color:var(--muted); margin-top:8px}
+.tags{display:flex; flex-wrap:wrap; gap:6px; margin-top:12px}
+.tag{font-family:var(--mono); font-size:12px; padding:3px 8px; border:1px solid var(--rule); border-radius:4px}
+.tag.on{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
+
+/* ---- pipeline ---- */
+.pipe{display:flex; flex-wrap:wrap; align-items:stretch; gap:0; margin-top:clamp(36px,5vw,52px)}
+.node{background:var(--panel); border:1px solid var(--rule); border-radius:8px; padding:14px 16px; min-width:0; flex:1 1 170px}
+.node .label{display:block; margin-bottom:4px}
+.node .t{font-family:var(--mono); font-weight:600; font-size:14.5px; overflow-wrap:anywhere}
+.node .d{font-size:13px; color:var(--muted); margin-top:4px}
+.arrow{flex:0 0 36px; display:grid; place-items:center; color:var(--muted); font-family:var(--mono)}
+.node.bad{border-color:var(--bad); background:var(--bad-soft)}
+.node.bad .label{color:var(--bad)}
+.cats{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr)); gap:0; margin-top:24px; border-top:2px solid var(--ink)}
+.cats > div{padding:14px 16px 14px 0; border-bottom:1px solid var(--rule); display:grid; gap:4px; align-content:start}
+.cats .t{font-weight:700; margin-top:6px}
+.cats .d{font-size:13.5px; color:var(--muted)}
+.cats .tag{justify-self:start}
+@media (max-width:760px){.pipe{flex-direction:column}.arrow{flex-basis:28px; transform:rotate(90deg)}}
+
+.warn{margin-top:28px; display:grid; grid-template-columns:auto 1fr; gap:14px; align-items:start; padding:16px 18px; border-radius:8px; background:var(--accent-soft)}
+.warn .label{color:var(--ink); padding-top:3px}
+.warn p{font-size:16px}
+
+.data{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr)); gap:0; border-top:2px solid var(--ink); margin-top:8px}
+.data > div{padding:18px 18px 18px 0; border-bottom:1px solid var(--rule)}
+.data .v{font-family:var(--display); font-weight:900; font-stretch:112%; font-size:clamp(44px,5vw,64px); line-height:1; font-variant-numeric:tabular-nums}
+.data .v.acc{color:var(--accent)}
+.data .t{font-weight:700; margin-top:8px}
+.data .d{font-size:13.5px; color:var(--muted)}
+.langbar{display:flex; height:8px; border-radius:4px; overflow:hidden; margin-top:10px; max-width:200px}
+.langbar i{display:block}
+.langbar .zh{background:var(--ink)}
+.langbar .en{background:var(--muted); opacity:.5}
+
+/* ---- code ---- */
+.code{background:var(--code-bg); color:var(--code-ink); border-radius:10px; padding:20px 22px; overflow-x:auto; font-family:var(--mono); font-size:14px; line-height:1.75; margin:0}
+.code .c{color:var(--code-dim)}
+.code .k{color:var(--code-key); font-weight:600}
+.code-cap{display:flex; justify-content:space-between; gap:12px; margin-top:10px; font-family:var(--mono); font-size:12px; color:var(--muted); flex-wrap:wrap}
+
+.math{display:flex; flex-wrap:wrap; align-items:baseline; gap:10px 16px; margin-top:8px}
+.math .n{font-family:var(--display); font-weight:900; font-stretch:112%; font-size:clamp(40px,4.6vw,60px); line-height:1; font-variant-numeric:tabular-nums}
+.math .n small{display:block; font-family:var(--mono); font-size:11px; font-weight:400; letter-spacing:.08em; color:var(--muted); margin-top:6px}
+.math .op{font-family:var(--display); font-size:32px; color:var(--muted)}
+.math .n.acc{color:var(--accent)}
+
+.ruler-wrap{overflow-x:auto; margin-top:36px}
+.ruler{min-width:620px; display:grid; grid-template-columns:repeat(10,1fr); border-top:2px solid var(--ink); position:relative}
+.ruler div{position:relative; padding-top:18px; font-family:var(--mono); font-size:12px; text-align:right; padding-right:2px; font-variant-numeric:tabular-nums; color:var(--muted)}
+.ruler div::before{content:""; position:absolute; right:0; top:-2px; width:2px; height:12px; background:var(--ink)}
+.ruler div.mk{color:var(--ink); font-weight:600}
+.ruler div.mk::before{height:22px; background:var(--accent); width:3px}
+.ruler div .note{display:block; font-family:var(--sans); font-weight:500; font-size:12.5px; color:var(--accent); white-space:nowrap; margin-top:4px}
+.ruler-legend{font-size:14px; color:var(--muted); margin-top:18px; max-width:44em}
+
+.rules{list-style:none; padding:0; margin:0; counter-reset:r; border-top:2px solid var(--ink)}
+.rules li{counter-increment:r; display:grid; grid-template-columns:44px 1fr; gap:12px; padding-block:16px; border-bottom:1px solid var(--rule)}
+.rules li::before{content:counter(r); font-family:var(--display); font-weight:900; font-size:28px; line-height:1; color:var(--accent)}
+.rules b{display:block; font-size:17px}
+.rules span{font-size:15px; color:var(--muted)}
+
+/* ---- A/B ---- */
+.qline{margin-top:clamp(32px,4vw,44px); display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+.qline .q{font-size:clamp(20px,2.2vw,28px); font-weight:700; background:var(--ink); color:var(--paper); padding:10px 18px; border-radius:10px}
+.ab{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr)); gap:16px; margin-top:20px}
+.port{border-radius:12px; border:1.5px solid var(--rule); background:var(--panel); padding:20px; display:grid; gap:14px; align-content:start}
+.port.after{border-color:var(--good)}
+.port-head{display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap}
+.port-head .t{font-weight:900; font-size:22px}
+.port-head .mono{color:var(--muted); font-size:12.5px}
+.port.before .t{color:var(--bad)}
+.port.after .t{color:var(--good)}
+.out{min-height:150px; border:1px dashed var(--rule); border-radius:8px; padding:14px; display:grid; place-items:center; text-align:center}
+
+.checks{margin-top:clamp(36px,5vw,52px)}
+.checks-row{display:flex; flex-wrap:wrap; gap:10px; margin-top:14px}
+.chk{
+  font:inherit; font-size:16px; cursor:pointer; color:var(--ink);
+  display:flex; align-items:center; gap:10px; padding:10px 16px 10px 12px;
+  background:var(--panel); border:1.5px solid var(--rule); border-radius:8px;
+}
+.chk .box{width:18px; height:18px; border:1.5px solid var(--muted); border-radius:3px; display:grid; place-items:center; font-size:13px; line-height:1}
+.chk .num{font-family:var(--display); font-weight:800; font-stretch:108%}
+.chk[aria-pressed="true"]{border-color:var(--good); background:var(--good-soft)}
+.chk[aria-pressed="true"] .box{background:var(--good); border-color:var(--good); color:var(--panel)}
+.chk[aria-pressed="true"] .box::after{content:"✓"}
+.hint{font-size:13px; color:var(--muted); margin-top:10px}
+
+.ctrl{margin-top:36px; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr)); gap:16px}
+.ctrl > div{border-top:2px solid var(--ink); padding-top:14px}
+.ctrl .t{font-weight:700; margin-top:6px}
+.ctrl .d{font-size:14.5px; color:var(--muted); margin-top:4px}
+
+/* ---- close ---- */
+.close .pull{margin-top:clamp(28px,4vw,40px)}
+.next{margin-top:clamp(40px,5vw,56px); display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr)); gap:16px}
+.next > div{padding:22px; border-radius:10px; border:1px solid var(--rule); background:var(--panel)}
+.next > div.now{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+.next .label{color:inherit; opacity:.8}
+.next .t{font-weight:900; font-size:22px; margin-top:6px}
+.next p{font-size:15px; margin-top:8px; opacity:.9}
+footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:var(--mono); font-size:12px; color:var(--muted); display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap}
+</style>
+
+<nav class="bar" aria-label="Sections">
+  <div class="bar-in">
+    <span class="brand">AReno × Ling-3.0-tiny</span>
+    <ol>
+      <li><a href="#s1"><span class="n">1</span>Mac Mini</a></li>
+      <li><a href="#s2"><span class="n">2</span>Wrong answer</a></li>
+      <li><a href="#s3"><span class="n">3</span>DGX Spark</a></li>
+      <li><a href="#s4"><span class="n">4</span>Data</a></li>
+      <li><a href="#s5"><span class="n">5</span>LoRA SFT</a></li>
+      <li><a href="#s6"><span class="n">6</span>Results</a></li>
+      <li><a href="#s7"><span class="n">7</span>Next</a></li>
+    </ol>
+    <span class="keys"><kbd>←</kbd> <kbd>→</kbd> to navigate</span>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<!-- ================= HERO ================= -->
+<section class="hero" id="s0">
+  <div class="eyebrow"><span class="dot"></span>A minimal RSI loop</div>
+  <h1><span class="lat">Ling-3.0-tiny × AReno</span>: From Hermes Traces Toward an RSI Flywheel</h1>
+  <p class="sub">Ling-3.0-tiny's knowledge cutoff is <b class="mono">2026-08-06</b>. <b>Ling-3.0-flash-Fin</b> was released after that, so tiny has never seen it and answers wrong. Today we fix that with a Mac Mini, a DGX Spark, and AReno.</p>
+
+  <ol class="loop" aria-label="The loop">
+    <li><span class="k">01</span><span class="t">New model ships</span><span class="d">flash-Fin, after tiny's cutoff</span></li>
+    <li><span class="k">02</span><span class="t">Wrong answer</span><span class="d">tiny gets it wrong in Hermes</span></li>
+    <li><span class="k">03</span><span class="t">Mine the logs</span><span class="d">an LLM finds the bad cases</span></li>
+    <li><span class="k">04</span><span class="t">Build a dataset</span><span class="d">21 facts / 99 Q&amp;A pairs</span></li>
+    <li class="hot"><span class="k">05</span><span class="t">LoRA SFT</span><span class="d">500 steps, about ten minutes</span></li>
+    <li><span class="k">06</span><span class="t">Fixed, live</span><span class="d">same question, before and after</span></li>
+  </ol>
+  <div class="loop-foot"><span>real usage → logs → dataset → train it back</span><span>the next round goes from 06 back to 02</span></div>
+</section>
+
+<!-- ================= 1 ================= -->
+<section id="s1">
+  <div class="eyebrow"><span class="dot"></span>1 · This is a Mac Mini</div>
+  <h2>tiny runs on it</h2>
+  <p class="lede">Ling-3.0-tiny is an open-source MoE model from the Ant Ling team. <b>It has the inference cost of 1.3B and the knowledge of 7.9B</b>, and it runs on a single Mac Mini.</p>
+
+  <div class="grid2">
+    <figure>
+      <div class="photo"><img src="assets/mac-mini.png" alt="A silver Mac Mini on a wooden desk"></div>
+      <figcaption><span>Mac Mini</span><span>16 GB and up</span></figcaption>
+    </figure>
+
+    <div>
+      <div class="ratio">
+        <span class="label">Active / total parameters</span>
+        <div class="ratio-big"><span class="a">1.3B</span><span class="b">/ 7.9B</span></div>
+        <div class="cells" aria-label="About one sixth of the parameters are active per forward pass"><span class="on"></span><span></span><span></span><span></span><span></span><span></span></div>
+        <p><b>7.9B total sets how capable it is</b>: the knowledge lives in the experts. <b>1.3B active sets the inference cost</b>: each forward pass computes only about one sixth of it.</p>
+      </div>
+
+      <div class="plate" style="margin-top:32px">
+        <div class="plate-row"><span>Context</span><span class="v">128<small>K</small></span></div>
+        <div class="plate-row"><span>Inference speed</span><span class="v">168<small>tokens/s</small></span><span class="s">figure from the deck, sourced from Artificial Analysis</span></div>
+        <div class="plate-row"><span>Knowledge cutoff</span><span class="v mono" style="font-family:var(--mono);font-size:22px">2026-08-06</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div>
+      <span class="label">Setup · four steps, about 30 minutes</span>
+      <ol class="steps" style="margin-top:10px">
+        <li><span class="i">1</span><div><span class="w">Download the weights</span><code>snapshot_download('inclusionAI/Ling-3.0-tiny-GGUF')</code></div><span class="tm">≈15 min</span></li>
+        <li><span class="i">2</span><div><span class="w">Start the server</span><code>brew install llama.cpp &amp;&amp; llama-server -m …gguf</code></div><span class="tm">≈30 min total</span></li>
+        <li><span class="i">3</span><div><span class="w">Send the first request</span><code>client.chat.completions.create(...)</code></div><span class="tm">≈1 min</span></li>
+        <li><span class="i">4</span><div><span class="w">Change one line</span><code>base_url = "http://localhost:8080/v1"</code></div><span class="tm">≈1 min</span></li>
+      </ol>
+    </div>
+    <div>
+      <p class="pull">The server speaks the OpenAI protocol, so any existing client connects by <em>changing one line</em>. Q8_0 needs at least 16 GB of memory.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 2 ================= -->
+<section id="s2">
+  <div class="eyebrow"><span class="dot"></span>2 · Good models still hit limits</div>
+  <h2>Ask it about a model it has never seen, and it guesses wrong</h2>
+  <p class="lede">This example comes from real Hermes history. Section 4 shows how we found it.</p>
+
+  <div class="grid2">
+    <div class="chat" role="img" aria-label="Hermes conversation: the user asks what flash-Fin is and tiny answers wrong">
+      <div class="chat-head"><span>Hermes · Ling-3.0-tiny</span><span>past session</span></div>
+      <div class="msg u">What is Ling-3.0-flash-Fin?</div>
+      <div class="msg a"><span class="who">TINY · WRONG</span>Doesn't know the model, so it guesses: reads “Fin” as fine-tuning.<br><span class="ph">[show the original log]</span></div>
+    </div>
+    <div>
+      <p class="pull">The model isn't dumb. <em>This just isn't in what it knows.</em></p>
+      <div class="timeline" aria-label="Knowledge cutoff timeline">
+        <div class="tl-track"></div>
+        <div class="tl-marks">
+          <div>What tiny knows<span class="mono">up to 2026-08-06</span></div>
+          <div>flash-Fin released<span class="mono">after the cutoff · invisible to tiny</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 3 ================= -->
+<section id="s3">
+  <div class="eyebrow"><span class="dot"></span>3 · A DGX Spark + AReno</div>
+  <h2>So we teach it: train a LoRA</h2>
+  <p class="lede">The lightest fix is LoRA SFT. <b>The base weights stay frozen</b> and we train only a rank-16 adapter. If it goes wrong, delete the adapter; the base stays clean.</p>
+
+  <div class="grid2">
+    <figure>
+      <div class="photo"><img src="assets/dgx-spark.jpg" alt="Front of an NVIDIA DGX Spark with a metal foam panel"></div>
+      <figcaption><span>DGX Spark</span><span>128 GB unified memory</span></figcaption>
+    </figure>
+    <div>
+      <div class="plate">
+        <div class="plate-row"><span>Unified memory</span><span class="v">128<small>GB</small></span></div>
+        <div class="plate-row"><span>Ling-3.0-flash on it, per the deck</span><span class="v">345<small>tokens/s</small></span><span class="s">124B total / 5.1B active</span></div>
+        <div class="plate-row"><span>This training run</span><span class="v">500<small>steps</small></span><span class="s">99 Q&amp;A pairs × 10 epochs, about ten minutes</span></div>
+      </div>
+
+      <div style="margin-top:32px">
+        <span class="label">LoRA: change one small piece</span>
+        <div class="lora" style="margin-top:10px">
+          <div class="base"><span class="t">Ling-3.0-tiny base</span><span class="mono">7.9B · frozen</span></div>
+          <div class="plus">+</div>
+          <div class="ad"><span class="t">adapter</span><span class="mono">rank 16<br>trained</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cli">
+    <div class="verb">
+      <div class="cmd"><span>areno</span> train</div>
+      <p>Training: one command, switch algorithms with <code>--algo</code></p>
+      <div class="tags"><span class="tag on">SFT</span><span class="tag">DPO</span><span class="tag">GSPO</span><span class="tag">GRPO</span><span class="tag">PPO</span></div>
+    </div>
+    <div class="verb">
+      <div class="cmd"><span>areno</span> serve</div>
+      <p>Inference: an OpenAI-compatible <code>/v1/chat/completions</code>, served right after training</p>
+      <div class="tags"><span class="tag">base</span><span class="tag on">base + LoRA adapter</span></div>
+    </div>
+    <div class="verb">
+      <div class="cmd">No cloud</div>
+      <p>Training and inference share one CLI, so there's no separate inference stack to set up. Any OpenAI client can connect.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 4 ================= -->
+<section id="s4">
+  <div class="eyebrow"><span class="dot"></span>4 · Where the data comes from</div>
+  <h2>Mining bad cases from Hermes logs</h2>
+  <p class="lede">This is the Dream RSI idea: <b>real usage → logs → failed samples → training data → train it back</b>. We're doing the minimal version.</p>
+
+  <div class="pipe" aria-label="Bad case analysis flow">
+    <div class="node"><span class="label">Session store</span><div class="t">~/.hermes/state.db</div><div class="d">every session is recorded</div></div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="node"><span class="label">Read-only analysis</span><div class="t">LLM</div><div class="d">reads full trajectories and finds the ones with problems</div></div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="node bad"><span class="label">Output</span><div class="t">bad_cases.jsonl</div><div class="d">one bad case per line, with the original text and what went wrong</div></div>
+  </div>
+
+  <div class="cats">
+    <div><span class="tag">intent</span><div class="t">Intent errors</div><div class="d">misunderstood what the user wanted</div></div>
+    <div class="hit"><span class="tag on">hallucination</span><div class="t">Hallucination</div><div class="d">wrong or invented facts; the flash-Fin case lands here</div></div>
+    <div><span class="tag">tool_error</span><div class="t">Tool errors</div><div class="d">missed, wrong tool, or wrong arguments</div></div>
+    <div><span class="tag">incomplete</span><div class="t">Incomplete</div><div class="d">stopped midway, no final answer</div></div>
+  </div>
+
+  <div class="warn">
+    <span class="label">Why an LLM</span>
+    <p>The flash-Fin session ran to completion, so its structure looks normal. Only <b>an LLM reading the content</b> can tell that the answer was wrong.</p>
+  </div>
+
+  <div class="grid2">
+    <div>
+      <p class="pull">A wrong answer contains no correct answer. Knowledge injection needs <em>reference answers</em>, so the dataset is built from public material, and every row cites its sources.</p>
+      <p class="lede" style="font-size:16px">bad_cases.jsonl tells us which knowledge the model is missing. We don't train on the logs this round; the bad cases can later serve as the rejected side for DPO / GSPO.</p>
+    </div>
+    <div>
+      <span class="label">examples/sft/ling_flash_fin</span>
+      <div class="data">
+        <div><div class="v">21</div><div class="t">Facts</div><div class="d">compiled from public material</div></div>
+        <div><div class="v acc">99</div><div class="t">train · Q&amp;A</div><div class="d">zh 51 / en 48</div><div class="langbar"><i class="zh" style="width:51.5%"></i><i class="en" style="width:48.5%"></i></div></div>
+        <div><div class="v">42</div><div class="t">eval · holdout</div><div class="d">zh 21 / en 21, rephrased, never in training</div><div class="langbar"><i class="zh" style="width:50%"></i><i class="en" style="width:50%"></i></div></div>
+        <div><div class="v">0</div><div class="t">train ∩ eval</div><div class="d">no shared prompts</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 5 ================= -->
+<section id="s5">
+  <div class="eyebrow"><span class="dot"></span>5 · LoRA SFT</div>
+  <h2>Teaching it 21 facts takes one command</h2>
+
+  <div style="margin-top:clamp(32px,4vw,44px)">
+<pre class="code"><span class="k">areno train --algo sft</span> --ckpt inclusionai/ling-3.0-tiny --model-hub modelscope \
+  --dataset-path examples/sft/ling_flash_fin/data/train.jsonl \
+  --dataset-loader-fn examples/sft/ling_flash_fin/dataset_loader.py \
+  --batch-size 2 --epochs 10 \
+  --max-prompt-tokens 128 --max-new-tokens 512 \
+  <span class="k">--disable-thinking</span> --attn-backend flash \
+  --activation-checkpointing --adam-4bit \
+  --lr 1e-4 --min-lr 1e-5 <span class="k">--lora-rank 16</span> \
+  --save-path ~/fin_sft_lora --save-interval 50</pre>
+    <div class="code-cap"><span>DGX Spark · repo root · single GPU</span><span>plus --world-size 1 --tp-size 1 --mini-bs 1; full command in the runbook, section 5</span></div>
+  </div>
+
+  <div class="grid2">
+    <div>
+      <span class="label">Where the step count comes from</span>
+      <div class="math" style="margin-top:14px">
+        <span class="n">99<small>rows</small></span><span class="op">÷</span>
+        <span class="n">2<small>batch</small></span><span class="op">=</span>
+        <span class="n">50<small>steps / epoch</small></span>
+      </div>
+      <div class="math" style="margin-top:18px">
+        <span class="op">×</span><span class="n">10<small>epochs</small></span><span class="op">=</span>
+        <span class="n acc">500<small>steps · 10 checkpoints</small></span>
+      </div>
+    </div>
+    <div>
+      <span class="label">Three hard rules</span>
+      <ol class="rules" style="margin-top:10px">
+        <li><div><b>No final checkpoint</b><span>Saves happen only when the step is a multiple of 50. Nothing extra is saved at the end.</span></div></li>
+        <li><div><b>Use --disable-thinking for both training and serving</b><span>Otherwise the template renders a thinking block the model never saw in training.</span></div></li>
+        <li><div><b>New data or hyperparameters means a new --save-path</b><span>Old and new checkpoints in one directory are easy to mix up during a demo.</span></div></li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="ruler-wrap" style="margin-top:clamp(40px,5vw,56px)">
+    <span class="label">~/fin_sft_lora/step_000XXX</span>
+    <div class="ruler" style="margin-top:14px">
+      <div>50</div><div>100</div><div>150</div>
+      <div class="mk">200<span class="note">fall back here if it overfits</span></div>
+      <div>250</div><div>300</div><div>350</div><div>400</div><div>450</div>
+      <div class="mk">500<span class="note">try first</span></div>
+    </div>
+  </div>
+  <p class="ruler-legend">One checkpoint every 50 steps; earlier ones are less trained. If every answer opens with the same boilerplate, the model has overfit. Switch to an earlier step.</p>
+</section>
+
+<!-- ================= 6 ================= -->
+<section id="s6">
+  <div class="eyebrow"><span class="dot"></span>6 · Results</div>
+  <h2>Same base, same question, two ports</h2>
+
+  <div class="qline"><span class="label">Q</span><span class="q">What is Ling-3.0-flash-Fin?</span></div>
+
+  <div class="ab">
+    <div class="port before">
+      <div class="port-head"><span class="t">Before</span><span class="mono">:8001 · base</span></div>
+      <div class="out"><span class="ph">[live output]</span></div>
+    </div>
+    <div class="port after">
+      <div class="port-head"><span class="t">After</span><span class="mono">:8000 · base + adapter step_000500</span></div>
+      <div class="out"><span class="ph">[live output]</span></div>
+    </div>
+  </div>
+
+  <div class="checks">
+    <span class="label">Check facts, not wording · did the adapter say these?</span>
+    <div class="checks-row">
+      <button class="chk" type="button" id="chk-params" aria-pressed="false"><span class="box" aria-hidden="true"></span><span class="num">124B / 5.1B</span>total / active</button>
+      <button class="chk" type="button" id="chk-ctx" aria-pressed="false"><span class="box" aria-hidden="true"></span><span class="num">256K</span>context</button>
+      <button class="chk" type="button" id="chk-license" aria-pressed="false"><span class="box" aria-hidden="true"></span><span class="num">MIT</span>license</button>
+      <button class="chk" type="button" id="chk-bench" aria-pressed="false"><span class="box" aria-hidden="true"></span><span class="num">7</span>benchmarks, incl. FinFIRST</button>
+    </div>
+    <p class="hint">Click to tick each one off against the adapter's answer.</p>
+  </div>
+
+  <div class="ctrl">
+    <div><span class="label">Holdout spot check</span><div class="t">6 of the 21 English holdout questions</div><div class="d">None of these phrasings were in training. They test whether it learned, not whether it memorized.</div></div>
+    <div><span class="label">Control group</span><div class="t">15 × 13 = ?　What is carbon dioxide?</div><div class="d">One math and one general-knowledge question, to check general ability wasn't lost.</div></div>
+    <div><span class="label">Overfitting signal</span><div class="t">Every answer opens the same way</div><div class="d">If you see it, switch to an earlier step_*, such as step_000200.</div></div>
+  </div>
+</section>
+
+<!-- ================= 7 ================= -->
+<section id="s7" class="close">
+  <div class="eyebrow"><span class="dot"></span>7 · A good start</div>
+  <h2>Start with one wrong answer, and go one step at a time</h2>
+  <p class="pull">Today was the simplest kind of model improvement: a new model ships, our model doesn't know it, we find the wrong answer in the logs, build a dataset, run LoRA SFT, and <em>it's fixed on the spot</em>.</p>
+
+  <div class="next">
+    <div class="now"><span class="label">Today</span><div class="t">Knowledge injection</div><p>99 Q&amp;A pairs, one adapter, about ten minutes of training, and a before/after you can see at a glance.</p></div>
+    <div><span class="label">Next</span><div class="t">Office and industry domains</div><p>These need a much richer eval set and mocked environments, to make sure the model actually got better instead of memorizing a few hundred sentences.</p></div>
+    <div><span class="label">Why this pairing</span><div class="t">AReno + tiny</div><p>The model is small enough to retrain locally, again and again. Training and serving share one CLI. Real usage → logs → dataset is already a working path.</p></div>
+  </div>
+
+</section>
+
+<footer>
+  <span>Source · scripts/dgx_spark/dgx_spark_sft_runbook.md</span>
+  <span>Ling-3.0-tiny · DGX Spark · AReno</span>
+</footer>
+</main>
+
+<script>
+(function(){
+  var ids=["s0","s1","s2","s3","s4","s5","s6","s7"];
+  var secs=ids.map(function(id){return document.getElementById(id)});
+  var links=Array.prototype.slice.call(document.querySelectorAll(".bar a"));
+
+  function current(){
+    var y=window.innerHeight*0.35, idx=0;
+    secs.forEach(function(s,i){ if(s.getBoundingClientRect().top<=y) idx=i; });
+    return idx;
+  }
+  function mark(){
+    var id=ids[current()];
+    links.forEach(function(a){ a.setAttribute("aria-current", a.getAttribute("href")==="#"+id ? "true":"false"); });
+  }
+  window.addEventListener("scroll", mark, {passive:true});
+  mark();
+
+  document.addEventListener("keydown", function(e){
+    if(e.target.closest && e.target.closest("input,textarea")) return;
+    if(e.metaKey||e.ctrlKey||e.altKey) return;
+    var d=0;
+    if(e.key==="ArrowRight"||e.key==="j"||e.key==="PageDown") d=1;
+    if(e.key==="ArrowLeft"||e.key==="k"||e.key==="PageUp") d=-1;
+    if(!d) return;
+    e.preventDefault();
+    var i=Math.max(0,Math.min(secs.length-1,current()+d));
+    secs[i].scrollIntoView({block:"start"});
+  });
+
+  document.querySelectorAll(".chk").forEach(function(b){
+    b.addEventListener("click", function(){
+      b.setAttribute("aria-pressed", b.getAttribute("aria-pressed")==="true" ? "false":"true");
+    });
+  });
+})();
+</script>

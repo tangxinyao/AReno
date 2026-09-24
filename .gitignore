@@ -73,3 +73,6 @@ Thumbs.db
 # Environment / secrets
 .env
 .env.*
+
+# OPC SFT example: split_phases.py default output
+examples/sft/opc/split/

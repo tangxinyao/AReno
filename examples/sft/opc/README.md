@@ -1,0 +1,375 @@
+# OPC-benchmark SFT Example (Ling-3.0-tiny)
+
+Turns **passed** agent trajectories from the [OPC benchmark](https://github.com/opc-benchmark)
+into SFT rows for [Ling-3.0-tiny](https://modelscope.cn/models/inclusionAI/Ling-3.0-tiny).
+OPC simulates a one-person company: an agent gets a natural-language task
+(reconcile revenue, release a website, triage customer email, ...) and must
+plan, run tools, verify, and hand over an artifact. Each trial ships a full
+Hermes session (`hermes-session.jsonl`) plus a verifier verdict (`result.json`).
+
+## What the loader emits
+
+| | alpaca | opc |
+|---|---|---|
+| Data | static instruction/answer pairs | multi-turn tool-calling rollouts |
+| Loader | one row per sample | **one row per assistant turn** (or one packed row per rollout in C mode) |
+| Structure | `prompt` = instruction, `response` = answer | pre-encoded `tokens` + `prompt_mask` + `loss_mask` (B rows also keep `prompt`/`response` text for reading) |
+| Source | HF dataset | local `hermes-session.jsonl` files |
+
+Both modes render rows with the Ling tokenizer's own `chat_template.jinja`
+(`tokenizer.apply_chat_template`): the loader converts Hermes messages to
+OpenAI-style `messages` (`reasoning_content`, `tool_calls` with dict
+arguments, `tool` results) and never hand-writes role, thinking or tool-call
+tags, so training rows match what the template produces at inference. Each
+target is the text the template emits after the generation prompt for that
+turn. **Reasoning is a training target by default**; set
+`ARENO_OPC_DROP_REASONING=1` to strip it from both prompt and response.
+
+Assistant spans are found by rendering growing message prefixes, so the
+template must be prefix-stable (rendering more messages must not rewrite
+earlier text). C mode raises if it is not; B mode only needs each turn to
+extend its own generation prompt.
+
+**Tool schemas.** At inference Hermes sends an OpenAI-style `tools` array and
+Ling's template renders it into the leading `<role>SYSTEM</role>` block
+(`# Tools ... <tools>...</tools>`). Hermes sessions do not record that array,
+so the example bundles it as `hermes_tools.json` and the loader always
+renders it (as context, never supervised). It is the exact array the
+bundled trials sent: 15 tools from the `hermes-cli` toolset of Hermes
+`4b8a813400` (reports v0.21.3; one-shot `-q` runs drop `skill_manage`),
+captured by running `hermes --yolo chat -q` in the trials' image with OPC's
+`config.yaml` against a recording stub endpoint. That build's system prompt
+matched the trial sessions' byte for byte apart from the host and working
+directory lines. Trajectories from another Hermes version or toolset need a
+re-captured file.
+
+Only trials whose `result.json` verifier reward is `1.0` are kept; a
+`result.json` without a reward (e.g. the verifier crashed) counts as a
+failure. Standalone `hermes-session.jsonl` files with no `result.json` are
+kept as-is. Messages Hermes marks `active: 0` or `compacted` are skipped.
+
+> **Hardware note**: `areno train` needs a Linux + NVIDIA CUDA host. On a
+> laptop (no GPU) you can build and validate the dataset with the loader, but
+> the training command below must run on a GPU box.
+
+## Inspecting a row
+
+The exact markup comes from the template, so print a row rather than trusting
+a hand-written example (needs the tokenizer, not a GPU):
+
+```bash
+ARENO_OPC_TOKENIZER=/path/to/Ling-3.0-tiny python - <<'PY'
+import importlib.util
+spec = importlib.util.spec_from_file_location("opc", "examples/sft/opc/dataset_loader.py")
+opc = importlib.util.module_from_spec(spec); spec.loader.exec_module(opc)
+row = opc.load_training_dataset("examples/sft/opc/data", default_loader=None)[1]
+print(row["prompt"][-600:]); print("=== response ==="); print(row["response"])
+PY
+```
+
+The prompt ends with the template's generation prompt; the response is the
+turn's reasoning, content and tool calls (shown without the closing EOS).
+These two text fields are for reading only: every row, B or C, is also
+pre-encoded as `tokens` + `prompt_mask` + `loss_mask` (target = the response
+plus EOS), and the trainer's encoded-row branch uses those, so it never
+re-applies a chat template or re-tokenizes the text.
+
+## Running — one task first
+
+The bundled `examples/sft/opc/data/` holds one task, `five-step-pipeline`
+(its three passed trials, 29 rows), so you can validate the whole loop cheaply
+before scaling. From the AReno repo root on your GPU host:
+
+```bash
+areno train \
+  --algo sft \
+  --ckpt inclusionAI/Ling-3.0-tiny \
+  --dataset-path examples/sft/opc/data \
+  --dataset-loader-fn examples/sft/opc/dataset_loader.py \
+  --model-hub modelscope \
+  --tp-size 1 \
+  --world-size 1 \
+  --batch-size 2 \
+  --mini-bs 1 \
+  --max-prompt-tokens 24576 \
+  --max-new-tokens 4096 \
+  --epochs 2
+```
+
+Mind the prompt budget: it is the trainer, not Ling's 128 K context, that
+decides what survives. These 29 rows have a prompt p50 of 15.3 K and a max of
+**22.1 K**, so `--max-prompt-tokens 16384` keeps only 17 of them; 24576 keeps
+all 29. Dropped rows are silent apart from a
+`stage=sft_dataset_filter skipped_long_or_empty=N` log line — check it, or you
+may be training on less than you think.
+
+Ling's context is 128 K, so nearly every trajectory fits with the full history —
+keep the window knobs off (0) in B mode and raise `--max-prompt-tokens` instead
+(measure your set first; the table under [the settlement
+pair](#running--the-settlement-pair) has numbers for a larger one). Once the
+one-task run behaves (loss drops, generations look sane), expand to every passed
+task in a real job run (all 30 passed trials of `opc-deepseek-all`, 652 rows):
+
+```bash
+areno train \
+  --algo sft \
+  --ckpt inclusionAI/Ling-3.0-tiny \
+  --dataset-path /path/to/opc-benchmark/jobs/opc-deepseek-all \
+  --dataset-loader-fn examples/sft/opc/dataset_loader.py \
+  --model-hub modelscope \
+  ...
+```
+
+`--dataset-path` may be a job run directory (scans `*/agent/hermes-session.jsonl`
+with a sibling `*/result.json`), a single trial directory, a flat directory
+of `hermes-session.jsonl` files, a single session file, or a `split_phases.py`
+output file. The verdict is looked up next to any `agent/hermes-session.jsonl`
+in every layout, so failed trials are filtered however deep the path points.
+Discovery is **one level deep**, so a curated set must be flat: put every trial
+directory directly inside the dataset directory.
+
+## Running — the settlement pair
+
+`examples/sft/opc/data-settlement/` holds two more tasks from the same job, as a
+matched pair: `finance/settlement/expired-session` and
+`finance/settlement/platform-fee-change`, three passed trials each (126 rows).
+They are the benchmark's own polarity pair — same DingTalk corpus, same
+deliverable (`/app/settlement.json`), differing only in whether the
+pre-provisioned credential still works — so **train them together**. One side
+alone teaches either "credentials are always broken" or "just start computing".
+
+| group | task | trials | rows | what the targets contain |
+|---|---|---|---|---|
+| 1 | `expired-session` | 3 | 74 | takes a real HTTP 401, finds the rotated token in `/app/ops-notes.md`, re-authenticates with `dws auth login --token`, refetches with `--page-all` |
+| 2 | `platform-fee-change` | 3 | 52 | same fetch on a working credential: no suspicion, but still `--page-all` past page 1 to reach the 2026-07-01 rule |
+
+Both sides must land on gross 1 800 000 / developer cut 5 % / net 90 000 while
+ignoring the boss's stale "one-point-eight million, 50/40/2" recollection, which
+computes to a very plausible 144 000. Verified against the emitted rows:
+`auth login` is a supervised target in 13 rows across the three group-1 trials
+and in none of group-2's, `--page-all` in 22 rows across all six, `90000` in 20
+rows across all six; the 401 text is never a target (tool results are context).
+Group 1 reads the rotated token from `/app/ops-notes.md` in turn 1 (0-based) of
+all three trials, before anything else — the recovery is genuinely sourced from
+the task's own corpus. Neither group uses a tool outside `hermes_tools.json`, and neither
+has a malformed tool call (see [Caveats](#caveats): both defects exist elsewhere
+in the job).
+
+### Four trials read the harness (7 turns)
+
+The ground-truth files are locked down (`/opt/opc/data/dingtalk.json` and
+`data/valid_token` are `opcsvc`/root `0700`; `platform-fee-change` is graded
+partly on a `dws` event existing server-side, so the numbers were earned), but
+the mock's *source* and the verifier's *evidence log* are world-readable, and
+four of the six trials look at them:
+
+| trial | turn(s) | what it reads |
+|---|---|---|
+| `expired-session__8o84af3` | 23, 24 | `/var/lib/opc/server-log.jsonl` |
+| `expired-session__PoSCM4d` | 5, 15 | `/opt/opc/lib/dws_fixture_server.py`, then the server log |
+| `expired-session__VTn7WcQ` | 9, 11 | the fixture source, then the server log |
+| `platform-fee-change__B3X4a82` | 13 | the fixture source — pointless here, its credential is fine |
+
+None of them is load-bearing for the answer: in all three group-1 trials the
+token comes from `ops-notes.md` at turn 1, so the two that peek at the fixture
+source first (`PoSCM4d` turn 5, `VTn7WcQ` turn 9) had already found it. The
+model's own reasoning frames the reads as self-verification ("Let me read the
+server log to confirm the audit trail"). That is 7 contaminated turns of 126,
+and they matter because they are supervised targets: you are training the student
+to go read `/opt/opc/lib/*.py` and `/var/lib/opc/server-log.jsonl` at inference,
+where neither exists.
+
+They are **not** safely removable. Deleting a turn and its tool result leaves
+the *next* turn's reasoning dangling — `8o84af3` turn 25 reasons about `Line 6:
+list_group_notices returned ok:true` from the log it just read, `PoSCM4d`'s
+concludes "the log confirms the precondition collapsed … then my calls succeeded
+after the login", and `B3X4a82`'s concludes "the fixture data is … 0700, agent
+can't read … so I rely on the CLI". Cut them and you get incoherent targets;
+cut everything after and you lose the deliverable. So keep them and read this
+note, or regenerate the trials against an image where those paths are `0700`.
+
+Full-history B mode needs a bigger prompt budget than the one-task command:
+
+| setup | rows | prompt p50 | prompt max | kept at `--max-prompt-tokens 16384` |
+|---|---|---|---|---|
+| B, full history | 126 | 24.0 K | 50.8 K | **39** |
+| B + `ARENO_OPC_MAX_HISTORY_MESSAGES=8` + `ARENO_OPC_MAX_TOOL_CHARS=2000` | 126 | 9.6 K | 13.8 K | 126 |
+| C, packed | 10 | 23.3 K | 29.3 K | 4 (use 32768) |
+
+So either pass `--max-prompt-tokens 65536` (keeps all 126 with the full
+history), or set the two window knobs and stay at 16384. Windowing does not
+throw away the lesson: 11 of the windowed rows still carry the 401 in their
+context and all 13 `auth login` targets survive.
+
+```bash
+areno train \
+  --algo sft \
+  --ckpt inclusionAI/Ling-3.0-tiny \
+  --dataset-path examples/sft/opc/data-settlement \
+  --dataset-loader-fn examples/sft/opc/dataset_loader.py \
+  --model-hub modelscope \
+  --tp-size 1 \
+  --world-size 1 \
+  --batch-size 2 \
+  --mini-bs 1 \
+  --max-prompt-tokens 65536 \
+  --max-new-tokens 4096 \
+  --epochs 2
+```
+
+A single group is trainable too, at trial granularity: `--dataset-path
+examples/sft/opc/data-settlement/expired-session__8o84af3`. Grouping the two
+tasks into separate directories would defeat the one-level discovery above, so
+the six trials sit side by side and the groups are told apart by task name.
+
+## Whole-rollout C mode (packed loss)
+
+The default text rows re-encode the history prefix once per turn — measured
+**~15×** the forward tokens of a single packed sequence on the full 652-row
+set (2.6× with the window knobs; measured with the earlier hand-written
+markup, so treat as approximate). C mode avoids that by packing each
+trajectory (or, when it exceeds `ARENO_OPC_MAX_SEQ_TOKENS`, a chunk of it)
+into **one encoded row**: `tokens` + `prompt_mask` + `loss_mask`, with loss
+enabled only on assistant-produced spans — everything the template emits for
+the turn after its generation prompt (reasoning, content, tool calls) plus the
+closing EOS `<|role_end|>`.
+
+```bash
+ARENO_OPC_C_MODE=1 \
+areno train \
+  --algo sft \
+  --ckpt inclusionAI/Ling-3.0-tiny \
+  --dataset-path examples/sft/opc/data \
+  --dataset-loader-fn examples/sft/opc/dataset_loader.py \
+  --model-hub modelscope \
+  --tp-size 1 --world-size 1 --batch-size 2 --mini-bs 1 \
+  --max-prompt-tokens 32768 \
+  --max-new-tokens 32768 \
+  --epochs 2
+```
+
+Requirements and knobs:
+
+- Both modes need the real tokenizer (for its chat template; C mode also
+  tokenizes): set `ARENO_OPC_TOKENIZER=/path/to/tokenizer` (offline,
+  deterministic), or leave it unset to auto-download the Ling-3.0-tiny
+  tokenizer files (not weights) from ModelScope. `transformers` is required —
+  it is already a runtime dependency of AReno.
+- `ARENO_OPC_MAX_SEQ_TOKENS` bounds each chunk (default 32768). For packed
+  rows the trainer checks `--max-prompt-tokens` against *all* context tokens
+  and `--max-new-tokens` against *all* target tokens of the row (not one
+  generation), so set **both** to at least `ARENO_OPC_MAX_SEQ_TOKENS`, or rows
+  are dropped with only a `stage=sft_dataset_filter skipped_long_or_empty=N`
+  log line.
+- Chunks are cut at assistant-turn boundaries; a single oversized turn is
+  hard-split. Every chunk starts with the system + task preamble as masked
+  context, so later chunks still see the task (the turns in between are
+  skipped, like a sliding window).
+- `ARENO_OPC_MAX_HISTORY_MESSAGES` and `ARENO_OPC_PHASES` do not apply to
+  packed rows and are ignored with a warning; `ARENO_OPC_INCLUDE_SYSTEM_PROMPT`,
+  `ARENO_OPC_DROP_REASONING` and `ARENO_OPC_MAX_TOOL_CHARS` (tool results only
+  — assistant targets stay verbatim) do apply.
+- Packed rows carry no `prompt`/`response` text, only the encoded fields.
+
+## Splitting one long task into subtasks
+
+The per-turn rows already give fine-grained supervision, but you can also cut a
+long trajectory into **phases** and treat each phase as its own subtask. Set
+`ARENO_OPC_PHASES=1` and every record gets `phase_genre` + `phase_index`; genre
+is derived from the turn's tool names only (no command parsing, so it stays
+robust across trials — which also means every `terminal` call counts as `run`,
+even `ls` or `cat`). When a turn calls several tools, the first matching row
+below wins:
+
+| genre | meaning | tools |
+|---|---|---|
+| `explore` | find what exists | `search_files` |
+| `read` | consume content | `read_file` |
+| `implement` | produce / fix a file | `write_file`, `patch` |
+| `run` | execute & verify | anything else (`execute_code`, `terminal`, ...) |
+| `report` | final deliverable (no tool) | — |
+
+For the bundled `five-step-pipeline`, the three trials all follow
+explore → read → implement → run → report (some trials interleave extra
+implement/run steps when they patch and re-run). Export the sub-datasets:
+
+```bash
+python examples/sft/opc/split_phases.py \
+  --dataset examples/sft/opc/data \
+  --out examples/sft/opc/split
+```
+
+which writes `split/{explore,read,implement,run,report}.jsonl` — here:
+explore 3 rows, read 6, implement 5, run 12, report 3 (all from 3 trials).
+Each JsonL holds ready encoded rows (plus their text), which the loader
+passes through unchanged; train a stage alone with `--dataset-path
+examples/sft/opc/split/run.jsonl --dataset-loader-fn
+examples/sft/opc/dataset_loader.py` (or use it for curriculum / per-stage
+weighting). The split counts above were measured before the loader switched to
+the tokenizer's template; row counts per genre do not depend on the markup.
+
+## Knobs
+
+| Env var | Effect |
+|---|---|
+| `ARENO_OPC_DROP_REASONING` | set to anything ⇒ reasoning is stripped from both prompt and response (target becomes ` response{content}`) |
+| `ARENO_OPC_INCLUDE_SYSTEM_PROMPT` | set to anything ⇒ the 15 KB Hermes `system_prompt` is prepended as a `<role>SYSTEM</role>` block (off by default to keep rows small) |
+| `ARENO_OPC_MAX_HISTORY_MESSAGES` | int ⇒ keep only the **system + task preamble + the last N messages** as context (sliding window, B mode only). Default 0 = full history |
+| `ARENO_OPC_MAX_TOOL_CHARS` | int ⇒ truncate oversized tool results / tool-call arguments **in the prompt** to N chars (the target turn stays verbatim). Default 0 = no cap |
+| `ARENO_OPC_PHASES` | set to anything ⇒ tag every row with `phase_genre` + `phase_index` (the subtask split described above; B mode only) |
+| `ARENO_OPC_C_MODE` | set to anything ⇒ emit packed `tokens`/`prompt_mask`/`loss_mask` rows (whole-rollout, see above) |
+| `ARENO_OPC_TOKENIZER` | local tokenizer dir, used by both modes for the chat template (else the tokenizer files are auto-downloaded from ModelScope) |
+| `ARENO_OPC_MAX_SEQ_TOKENS` | C mode: max tokens per packed chunk (default 32768) |
+
+## Feeding everything
+
+The loader emits all 652 passing rows out of the box — nothing is sampled. The
+trade-off is how much history each row re-encodes:
+
+| setup | prompt p50 (full 652) | total forward (full 652) |
+|---|---|---|
+| B, full history | 58.0 K | ~15× C |
+| B, + `MAX_HISTORY_MESSAGES=8` + `MAX_TOOL_CHARS=2000` | 10.2 K | ~2.6× C |
+| C, packed | — | 1.0× |
+
+With Ling's 128 K context every trajectory fits whole in B, so nothing is
+dropped — you just pay the prefix-reencoding cost (the 15× column). If those
+GPU-hours matter, use C mode instead; it is the same learning signal at ~1/15
+the forward tokens.
+
+## Caveats
+
+- Histories are long (a tool result can be a whole file). The SFT trainer drops
+  rows over `--max-prompt-tokens` / `--max-new-tokens`, so keep the budgets
+  generous; default is 1024/3071.
+- This is distillation from another model: the bundled trajectories were
+  produced by `deepseek/deepseek-flash` (see `config.agent.model_name` in
+  each `result.json`), not by Ling itself. Passes reached
+  with luck (a task that only passed 1/3 attempts) are still included here —
+  dedup by task or eyeball `verifier/ctrf.json` before baking them in.
+- `reward == 1.0` is the *only* filter, and the verifiers do not police the
+  trajectory's manners, so a passing rollout can still teach something bad.
+  Two such defects are known to exist in `opc-deepseek-all` (neither affects
+  `data/` or `data-settlement/`):
+  - **A tool outside `hermes_tools.json`.** `oss-ok__GwRYcuN` calls
+    `todo_list` once; the bundled array has 15 tools and `todo_list` is not
+    among them. `_load_tools` validates the array, not the calls, so the row
+    is emitted silently and would teach a tool the model is not offered at
+    inference. Drop that trial, or re-capture the array (which would also
+    settle whether Hermes exposes `todo_list` per run).
+  - **A malformed `clarify` call, then a retry.** The model tends to send
+    `{"questions": [{"question": …, "choices": […]}]}` where the tool wants a
+    flat `question` string, gets back `"Question text is required."`, and
+    sometimes repeats the identical call until Hermes emits a tool-loop
+    warning. Six passing trials carry 10 such turns between them —
+    `ambiguous-period` ×3, `ambiguous-source` ×2, `batch-partial` ×1 — i.e.
+    1.5 % of the 652 rows. Unlike a non-zero `ls` exit or a `read_file` on an
+    ELF binary, which are healthy recoveries worth keeping, this is a wrong
+    tool-call schema sitting in a *target* span. Edit the `tool_calls`
+    arguments in a copy (the next turn's fix is usually already correct) or
+    drop those trials; `batch-partial__knZxRNj` is the worst offender and also
+    asks about a mailbox its own task statement had already pinned.
+- Rows use the tokenizer's `chat_template.jinja`, the same template serving
+  uses, so train and inference formats match. The loader hard-codes no role or
+  thinking markup, and because rows are pre-encoded the trainer needs no
+  model-specific knowledge to avoid wrapping them a second time.
