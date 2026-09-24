@@ -39,7 +39,7 @@ The whole story is the loop you see here. A new model ships, and our model gets 
 
 *On screen: the Mac Mini photo, "1.3B / 7.9B" with the six-cell bar, then the four setup steps.*
 
-This is a Mac Mini, and tiny runs on it. tiny is an open-source MoE model from the Ant Ling team, and it has two numbers worth reading separately. 7.9B is the total parameter count, and that's what sets how capable it is, because the knowledge lives in the experts. 1.3B is how many parameters are active for each token, about one sixth of the total, which is this one lit cell. That's what sets the cost of inference. So you get the knowledge of a 7.9B model at the inference cost of a 1.3B one.
+This is a Mac Mini, and tiny runs on it. tiny is an open-source MoE model from the Ant Ling team: 7.9B parameters in total, but only 1.3B active per token, about one sixth, which is this lit cell. So it knows as much as a 7.9B model and runs as cheaply as a 1.3B one.
 
 It has a 128K context window, and the deck lists 168 tokens per second, a figure from Artificial Analysis. A Mac Mini with 16 GB of memory or more runs the whole thing.
 
