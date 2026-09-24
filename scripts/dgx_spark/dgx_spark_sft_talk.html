@@ -219,12 +219,13 @@ figcaption{display:flex; justify-content:space-between; gap:12px; margin-top:10p
 .node .t{font-family:var(--mono); font-weight:600; font-size:14.5px; overflow-wrap:anywhere}
 .node .d{font-size:13px; color:var(--muted); margin-top:4px}
 .arrow{flex:0 0 36px; display:grid; place-items:center; color:var(--muted); font-family:var(--mono)}
-.split{flex:1 1 220px; display:grid; gap:8px}
-.split .node{flex:none}
-.split .good{border-color:var(--good); background:var(--good-soft)}
-.split .bad{border-color:var(--bad); background:var(--bad-soft)}
-.split .good .label{color:var(--good)}
-.split .bad .label{color:var(--bad)}
+.node.bad{border-color:var(--bad); background:var(--bad-soft)}
+.node.bad .label{color:var(--bad)}
+.cats{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr)); gap:0; margin-top:24px; border-top:2px solid var(--ink)}
+.cats > div{padding:14px 16px 14px 0; border-bottom:1px solid var(--rule); display:grid; gap:4px; align-content:start}
+.cats .t{font-weight:700; margin-top:6px}
+.cats .d{font-size:13.5px; color:var(--muted)}
+.cats .tag{justify-self:start}
 @media (max-width:760px){.pipe{flex-direction:column}.arrow{flex-basis:28px; transform:rotate(90deg)}}
 
 .warn{margin-top:28px; display:grid; grid-template-columns:auto 1fr; gap:14px; align-items:start; padding:16px 18px; border-radius:8px; background:var(--accent-soft)}
@@ -469,30 +470,30 @@ footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:va
   <h2>从 hermes 日志里洗出 bad case</h2>
   <p class="lede">这就是 Dream RSI 的路子：<b>真实使用 → 日志 → 洗出失败样本 → 训练数据 → 训回去</b>。我们做它的最小版。</p>
 
-  <div class="pipe" aria-label="日志导出流程">
+  <div class="pipe" aria-label="bad case 分析流程">
     <div class="node"><span class="label">会话落盘</span><div class="t">~/.hermes/state.db</div><div class="d">每次会话自动记录</div></div>
     <div class="arrow" aria-hidden="true">→</div>
-    <div class="node"><span class="label">只读导出</span><div class="t">export_sharegpt.py</div><div class="d">真实轨迹转 ShareGPT</div></div>
+    <div class="node"><span class="label">只读分析</span><div class="t">LLM</div><div class="d">读完整轨迹，找出有问题的对话</div></div>
     <div class="arrow" aria-hidden="true">→</div>
-    <div class="node"><span class="label">全部轨迹</span><div class="t">all.jsonl</div><div class="d">ShareGPT 格式</div></div>
-    <div class="arrow" aria-hidden="true">→</div>
-    <div class="node"><span class="label">逐条分析</span><div class="t">LLM</div><div class="d">读懂内容，判断答得对不对</div></div>
-    <div class="arrow" aria-hidden="true">→</div>
-    <div class="split">
-      <div class="node good"><span class="label">happy case</span><div class="d">回答正确，完成了请求 · 将来的 SFT 正样本</div></div>
-      <div class="node bad"><span class="label">bad case</span><div class="d">答错、编造、没完成请求 · flash-Fin 那次就在这里</div></div>
-    </div>
+    <div class="node bad"><span class="label">输出</span><div class="t">bad_cases.jsonl</div><div class="d">每行一个 bad case，带原话和问题说明</div></div>
+  </div>
+
+  <div class="cats">
+    <div><span class="tag">intent</span><div class="t">意图识别错误</div><div class="d">没理解用户要什么</div></div>
+    <div class="hit"><span class="tag on">hallucination</span><div class="t">幻觉</div><div class="d">事实错误、编造；flash-Fin 那次在这里</div></div>
+    <div><span class="tag">tool_error</span><div class="t">工具调用错误</div><div class="d">该调没调、调错、参数错</div></div>
+    <div><span class="tag">incomplete</span><div class="t">任务未完成</div><div class="d">中途中断，没有最终回答</div></div>
   </div>
 
   <div class="warn">
     <span class="label">为什么用 LLM</span>
-    <p>flash-Fin 那次对话是完整跑完的，只看结构分不出对错。所以 happy / bad 交给 <b>LLM 读内容来判断</b>。</p>
+    <p>flash-Fin 那次对话是完整跑完的，只看结构分不出对错。要让 <b>LLM 读懂轨迹内容</b>，才能找出答错的那一条。</p>
   </div>
 
   <div class="grid2">
     <div>
       <p class="pull">乱答里没有标准答案。知识注入要的是<em>规范答案</em>，所以训练集来自公开材料，每一行都带 sources。</p>
-      <p class="lede" style="font-size:16px">bad case 告诉我们模型缺哪块知识；这一轮不直接拿日志训，bad case 以后还可以做 DPO / GSPO 的 rejected 侧。</p>
+      <p class="lede" style="font-size:16px">bad_cases.jsonl 告诉我们模型缺哪块知识；这一轮不直接拿日志训，这些 bad case 以后还可以做 DPO / GSPO 的 rejected 侧。</p>
     </div>
     <div>
       <span class="label">examples/sft/ling_flash_fin</span>

@@ -89,56 +89,60 @@ modelscope download --model inclusionAI/Ling-3.0-tiny --local_dir /home/tangxiny
 
 **Dream RSI** 的思路是：真实使用 → 日志 → 洗出失败样本 → 变成训练数据 → 训回去；我们这里做的就是它的最小版。
 
-hermes 每次会话都落在 `$HERMES_HOME/state.db`（默认 `~/.hermes`）。`export_sharegpt.py` 对它是**只读**的，把真实轨迹导成 ShareGPT：
+hermes 每次会话都落在 `$HERMES_HOME/state.db`（默认 `~/.hermes`）。这一步**直接让 LLM 读这个数据库里的轨迹**，找出有问题的对话，整理成一个 jsonl。判断的是「答得对不对」，而不只是「跑完了没有」：第 2 节那次乱答，对话本身是完整跑完的，只有读懂内容才能看出它答错了。
 
-```bash
-mkdir -p outputs/hermes-collect
-# TODO(agent): 本仓库里没有 export_sharegpt.py，路径和参数沿用原 runbook，未验证
-python3 .agents/skills/areno-collect-hermes-history/scripts/export_sharegpt.py \
-  --out outputs/hermes-collect/all.jsonl \
-  --min-turns 1 --summary
-```
+LLM 按下面几类找 bad case：
 
-### 用 LLM 分析 happy / bad case
+| 类别 | 说明 |
+| ---- | ---- |
+| **意图识别错误** `intent` | 没理解用户要什么，答非所问 |
+| **幻觉** `hallucination` | 事实错误、编造细节；把知识截止之后的新东西说成不存在 |
+| **工具调用错误** `tool_error` | 该调工具没调、调错工具、参数错，或者忽略了工具返回的结果 |
+| **任务未完成** `incomplete` | 中途中断、停在工具调用上，没有给出最终回答 |
 
-导出的轨迹**直接交给 LLM 逐条分析**，由它判断每段对话是 happy 还是 bad。判断的是「答得对不对」，而不只是「跑完了没有」：第 2 节那次乱答，对话本身是完整跑完的，只有读懂内容才能看出它答错了。
-
-| 分类 | LLM 的判定 | 用途 |
-| ---- | ---- | ---- |
-| **happy case** | 回答正确，完成了用户的请求 | 将来 SFT 正样本候选 |
-| **bad case** | 答错、编造，或没完成用户的请求 | 这一轮用来定位模型缺哪块知识；将来可做 DPO / GSPO 的 rejected 侧 |
-
-第 2 节 flash-Fin 那次对话，就是这一步里被判成 bad case 的那一条。
-
-判定用的 prompt 如下。把 `all.jsonl` 的每一行填进 `{conversation}`，逐条调用 LLM：
+把下面这段 prompt 交给一个能读本地文件、执行命令的 LLM agent，在有 hermes 历史的机器上运行：
 
 ```text
-你是对话质量审核员。下面是一段用户与 AI 助手的真实对话（ShareGPT 格式）。
-助手是 Ling-3.0-tiny，知识截止在 2026-08-06。请判断这段对话是 happy case 还是 bad case。
+你的任务是分析 hermes 的历史会话轨迹，找出其中有问题的对话（bad case），整理成一个 jsonl 文件。
 
-判定标准：
-- happy：助手的回答事实正确，并且完成了用户的请求。
-- bad：满足下面任意一条。
-  1. 回答里有事实错误。
-  2. 编造信息：给出了具体的数字、价格、日期、参数或链接，但这些内容无法核实，助手也没有说明自己不确定。
-  3. 用户问到的模型、产品或事件可能出现在助手的知识截止之后，助手却断言它不存在，或者编造了它的细节。
-  4. 没有完成用户的请求：答非所问、中途中断，或者停在工具调用上，没有给出最终回答。
+数据来源：
+- hermes 的会话记录在 $HERMES_HOME/state.db（默认 ~/.hermes/state.db），是一个 SQLite 数据库。
+- 只能以只读方式打开它，例如 sqlite3 -readonly ~/.hermes/state.db。不要修改、删除或写入任何数据。
+- 先查看表结构（.tables、.schema），弄清楚会话、消息、工具调用分别存在哪里，再按会话把完整轨迹读出来。
 
-注意：
-- 只根据对话内容判断。回答流畅、语气自信，不代表它是对的。
-- 你自己也无法核实的事实，如果助手给出了确定的具体说法，按「编造」处理。
-- 助手明确说了「我不确定」或「我的知识可能过时」，并建议用户去查证，不算 bad。
+背景：
+- 这些会话里的助手是 Ling-3.0-tiny，知识截止在 2026-08-06。
 
-只输出一行 JSON，不要输出其他内容：
-{"label": "happy 或 bad", "reason": "一句话说明原因，引用助手的原话", "topic": "对话涉及的对象或主题"}
+逐个会话阅读完整轨迹，按下面四类判断是否有问题。一个会话可能属于多类，每类各输出一行。
+1. intent（意图识别错误）：助手没理解用户要什么，答非所问，或者只回答了问题的一部分。
+2. hallucination（幻觉）：回答里有事实错误；给出了无法核实的具体数字、日期、参数或链接，又没有说明不确定；用户问到的模型、产品或事件可能出现在知识截止之后，助手却断言它不存在，或者编造了它的细节。
+3. tool_error（工具调用错误）：该调用工具时没有调用，调错了工具，参数错误，或者没有使用工具返回的结果。
+4. incomplete（任务未完成）：对话中途中断，停在工具调用或用户消息上，没有给出最终回答。
 
-对话：
-{conversation}
+判断时注意：
+- 只根据轨迹内容判断。回答流畅、语气自信，不代表它是对的。
+- 你自己也无法核实的事实，如果助手给出了确定的具体说法，按 hallucination 处理，并在 problem 里写明「无法核实」。
+- 助手明确说了「我不确定」或「我的知识可能过时」，并建议用户去查证，不算 bad case。
+- 所有引用必须来自轨迹原文，不要改写或补全。
+
+输出：
+- 写入 outputs/hermes-collect/bad_cases.jsonl，每个 bad case 一行 JSON，字段如下：
+  {"session_id": "会话 id", "category": "intent | hallucination | tool_error | incomplete", "user_message": "出问题那一轮的用户原话", "assistant_message": "出问题那一轮的助手原话", "problem": "一句话说明问题出在哪", "topic": "对话涉及的对象或主题", "expected": "正确的做法应该是什么；需要具体事实而你无法确定时写 null"}
+- 没有问题的会话不输出。
+- 最后汇报：一共分析了多少个会话，每一类各有多少条，bad case 最集中的 topic 有哪些。
 ```
 
-输出里的 `topic` 字段用来汇总：bad case 集中在哪些主题上，就说明模型缺的是哪块知识。
+跑完看一眼结果：
 
-> ⚠️ **这一步在哪台机器跑**：hermes 历史只在**运行过 hermes 的机器**上。Spark 上跑过就直接跑（必要时给 `--search-root`，多个就重复该参数）；历史在你的 Mac，就在 Mac 上跑同一条命令，把 `all.jsonl` `scp` 过来。
+```bash
+wc -l outputs/hermes-collect/bad_cases.jsonl
+jq -r '.category' outputs/hermes-collect/bad_cases.jsonl | sort | uniq -c
+jq -r '.topic' outputs/hermes-collect/bad_cases.jsonl | sort | uniq -c | sort -rn | head
+```
+
+第 2 节 flash-Fin 那次对话，应该出现在 `hallucination` 这一类里。`topic` 汇总起来，就能看出模型缺的是哪块知识。
+
+> ⚠️ **这一步在哪台机器跑**：hermes 历史只在**运行过 hermes 的机器**上。历史在哪台机器，就在哪台机器上跑这段 prompt；或者把 `state.db` 复制一份 `scp` 过来再分析。
 
 ### 这份训练集长什么样
 
