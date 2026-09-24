@@ -55,7 +55,7 @@ Suggested length: about 18 minutes, plus 5 minutes of Q&A.
 
 > This is a Mac Mini, and tiny runs on it.
 >
-> tiny is an open-source model from inclusionAI with a MoE architecture. There are two numbers here, and you need to read them separately.
+> tiny is an open-source model from the Ant Ling team with a MoE architecture. There are two numbers here, and you need to read them separately.
 >
 > The first is **7.9B total parameters**. That decides how capable the model is, because the knowledge lives in the experts.
 >
