@@ -339,7 +339,7 @@ footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:va
   <ol class="loop" aria-label="闭环流程">
     <li><span class="k">01</span><span class="t">新模型发布</span><span class="d">flash-Fin 在 tiny 截止之后</span></li>
     <li><span class="k">02</span><span class="t">发现乱答</span><span class="d">在 hermes 里答错</span></li>
-    <li><span class="k">03</span><span class="t">洗日志</span><span class="d">从 state.db 找出这条记录</span></li>
+    <li><span class="k">03</span><span class="t">洗日志</span><span class="d">LLM 分析，挑出 bad case</span></li>
     <li><span class="k">04</span><span class="t">整理训练集</span><span class="d">21 个知识点 / 99 条</span></li>
     <li class="hot"><span class="k">05</span><span class="t">LoRA SFT</span><span class="d">500 步，十分钟级</span></li>
     <li><span class="k">06</span><span class="t">当场变好</span><span class="d">同一问题，前后对比</span></li>
@@ -474,23 +474,25 @@ footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:va
     <div class="arrow" aria-hidden="true">→</div>
     <div class="node"><span class="label">只读导出</span><div class="t">export_sharegpt.py</div><div class="d">真实轨迹转 ShareGPT</div></div>
     <div class="arrow" aria-hidden="true">→</div>
-    <div class="node"><span class="label">全部</span><div class="t">all.jsonl</div><div class="d">按结构分流</div></div>
+    <div class="node"><span class="label">全部轨迹</span><div class="t">all.jsonl</div><div class="d">ShareGPT 格式</div></div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="node"><span class="label">逐条分析</span><div class="t">LLM</div><div class="d">读懂内容，判断答得对不对</div></div>
     <div class="arrow" aria-hidden="true">→</div>
     <div class="split">
-      <div class="node good"><span class="label">happy case</span><div class="d">跑完了，收敛在最终回答上 · 将来的 SFT 正样本</div></div>
-      <div class="node bad"><span class="label">bad case</span><div class="d">被打断、悬在 tool_call、abort · 将来 DPO / GSPO 的 rejected 侧</div></div>
+      <div class="node good"><span class="label">happy case</span><div class="d">回答正确，完成了请求 · 将来的 SFT 正样本</div></div>
+      <div class="node bad"><span class="label">bad case</span><div class="d">答错、编造、没完成请求 · flash-Fin 那次就在这里</div></div>
     </div>
   </div>
 
   <div class="warn">
-    <span class="label">注意</span>
-    <p>happy / bad 只看<b>「跑完了没」</b>，不看「答得对不对」。flash-Fin 那次乱答，要再用一条 <code>jq</code> 按关键词从 all.jsonl 里找出来。</p>
+    <span class="label">为什么用 LLM</span>
+    <p>flash-Fin 那次对话是完整跑完的，只看结构分不出对错。所以 happy / bad 交给 <b>LLM 读内容来判断</b>。</p>
   </div>
 
   <div class="grid2">
     <div>
       <p class="pull">乱答里没有标准答案。知识注入要的是<em>规范答案</em>，所以训练集来自公开材料，每一行都带 sources。</p>
-      <p class="lede" style="font-size:16px">日志负责证明「哪里错了」；这一轮不直接拿日志训。bad case 留给以后治行为问题。</p>
+      <p class="lede" style="font-size:16px">bad case 告诉我们模型缺哪块知识；这一轮不直接拿日志训，bad case 以后还可以做 DPO / GSPO 的 rejected 侧。</p>
     </div>
     <div>
       <span class="label">examples/sft/ling_flash_fin</span>

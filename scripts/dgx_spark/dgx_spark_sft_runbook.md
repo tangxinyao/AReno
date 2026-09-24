@@ -89,40 +89,34 @@ modelscope download --model inclusionAI/Ling-3.0-tiny --local_dir /home/tangxiny
 
 **Dream RSI** 的思路是：真实使用 → 日志 → 洗出失败样本 → 变成训练数据 → 训回去；我们这里做的就是它的最小版。
 
-hermes 每次会话都落在 `$HERMES_HOME/state.db`（默认 `~/.hermes`）。仓库里的 `export_sharegpt.py` 对它是**只读**的，把真实轨迹导成 ShareGPT，按 happy / bad 分流：
+hermes 每次会话都落在 `$HERMES_HOME/state.db`（默认 `~/.hermes`）。`export_sharegpt.py` 对它是**只读**的，把真实轨迹导成 ShareGPT：
 
 ```bash
 mkdir -p outputs/hermes-collect
+# TODO(agent): 本仓库里没有 export_sharegpt.py，路径和参数沿用原 runbook，未验证
 python3 .agents/skills/areno-collect-hermes-history/scripts/export_sharegpt.py \
-  --split-outcome outputs/hermes-collect \
   --out outputs/hermes-collect/all.jsonl \
   --min-turns 1 --summary
 ```
 
-| 分流 | 判定（结构性的，不看答得对不对） | 用途 |
+### 用 LLM 分析 happy / bad case
+
+导出的轨迹**直接交给 LLM 逐条分析**，由它判断每段对话是 happy 还是 bad。判断的是「答得对不对」，而不只是「跑完了没有」：第 2 节那次乱答，对话本身是完整跑完的，只有读懂内容才能看出它答错了。
+
+| 分类 | LLM 的判定 | 用途 |
 | ---- | ---- | ---- |
-| **happy case** | 收敛在最终 assistant 回答上；无中断痕迹；`end_reason` 健康 | 将来 SFT 正样本候选 |
-| **bad case** | 被打断、悬在 tool_call / 用户消息、运行时 abort、被轮转 | 将来 DPO / GSPO 的 rejected 侧 |
+| **happy case** | 回答正确，完成了用户的请求 | 将来 SFT 正样本候选 |
+| **bad case** | 答错、编造，或没完成用户的请求 | 这一轮用来定位模型缺哪块知识；将来可做 DPO / GSPO 的 rejected 侧 |
 
-⚠️ happy / bad 只是**结构粗筛**（「跑完了没」），不看「答得对不对」。而「答得不对」这件事——第 2 节那个乱答——要用下面这条命令按关键词从日志里找出来：
+第 2 节 flash-Fin 那次对话，就是这一步里被判成 bad case 的那一条。
 
-```bash
-jq -r 'select(any(.conversations[]?; .from == "human" and (.value | test("flash[- _]?fin|ling-?3[.]?0"; "i")))) |
-       "==== \(.session_id) [\(.outcome // "?")]\nQ: \([.conversations[] | select(.from=="human")][0].value // "")\nA: \([.conversations[] | select(.from=="gpt")][0].value // "")"' \
-  outputs/hermes-collect/all.jsonl
-```
+<!-- TODO(agent): 补上实际使用的 LLM 分析脚本、模型和判定 prompt，以及跑出来的 happy / bad 条数 -->
 
-数一数收了多少：
-
-```bash
-for f in all happy bad; do printf '%-6s ' "$f"; wc -l < "outputs/hermes-collect/$f.jsonl"; done
-```
-
-> ⚠️ **这一步在哪台机器跑**：hermes 历史只在**运行过 hermes 的机器**上。Spark 上跑过就直接跑（必要时给 `--search-root`，多个就重复该参数）；历史在你的 Mac，就在 Mac 上跑同一条命令，把三个 jsonl `scp` 过来。
+> ⚠️ **这一步在哪台机器跑**：hermes 历史只在**运行过 hermes 的机器**上。Spark 上跑过就直接跑（必要时给 `--search-root`，多个就重复该参数）；历史在你的 Mac，就在 Mac 上跑同一条命令，把 `all.jsonl` `scp` 过来。
 
 ### 这份训练集长什么样
 
-**训练数据不是 hermes 轨迹本身**：乱答里没有标准答案。知识注入要的是规范答案，所以把公开材料整理成 **21 个知识点 / 99 条问答**（`examples/sft/ling_flash_fin`，每行带 `sources`）。hermes 的 bad case 是治「行为问题」的原料（DPO / GSPO 的 rejected 侧），这轮先不上。
+**训练数据不是 hermes 轨迹本身**：乱答里没有标准答案。知识注入要的是规范答案，所以把公开材料整理成 **21 个知识点 / 99 条问答**（`examples/sft/ling_flash_fin`，每行带 `sources`）。LLM 挑出的 bad case 告诉我们模型缺的是哪块知识，规范答案则要从公开材料里整理。
 
 ```bash
 wc -l examples/sft/ling_flash_fin/data/train.jsonl examples/sft/ling_flash_fin/data/eval.jsonl
