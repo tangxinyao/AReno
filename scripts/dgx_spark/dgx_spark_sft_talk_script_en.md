@@ -81,7 +81,7 @@ We train with AReno, our own training and serving framework. It has one CLI with
 
 *On screen: state.db → LLM → bad_cases.jsonl, the four categories, the orange callout, then 21 / 99 / 42 / 0.*
 
-The idea behind Dream RSI is that real usage produces logs, the logs contain failures, and those failures become training data that goes back into the model. We're doing the smallest version of that.
+Hermes already improves itself in its own way: it turns what it learns from past sessions into memory and reusable skills. That makes the agent better, but the model underneath stays exactly the same. What we want is for the model itself to improve, and that's the idea behind Dream RSI: real usage produces logs, the logs contain failures, and those failures become training data that goes back into the model. We're doing the smallest version of that.
 
 Hermes records every session in a local SQLite file called `state.db`. We hand that file to an LLM, read-only, and ask it to read every session from start to finish and pull out the ones where something went wrong. It writes them to `bad_cases.jsonl`, one per line, with the exact words from the turn that failed and a short note on what the problem was. It looks for four kinds of problems: the model misunderstood what the user wanted, it hallucinated wrong or invented facts, it used tools badly, or it stopped before giving a final answer. Our flash-Fin answer lands in hallucination.
 
