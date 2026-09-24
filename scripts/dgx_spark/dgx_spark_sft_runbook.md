@@ -251,7 +251,7 @@ nohup areno serve --model-path /home/tangxinyao/Ling-3.0-tiny \
 
 > ⚠️ **三件必须对齐**：base 模型同一个；`--disable-thinking` 训练 / 服务**都带**；`--lora-adapter-path` 给了就别再给 `--lora-rank`（形状以 `adapter_config.json` 为准）。另外 `--lora-adapter-path` 只收**一个**值，写成 `/home/tangxinyao/fin_sft_lora/step_000500` 这种单路径。
 
-等端口起来，然后就是全场开场那一屏——同一个问题，加训前 vs 加训后：
+等端口起来，然后就是全场开场那一屏——同一个问题，加训前 vs 加训后。演示统一用英文提问：
 
 ```bash
 ss -ltnp | grep -E ':(8000|8001)'
@@ -260,16 +260,16 @@ curl -s http://127.0.0.1:8000/v1/models | head -c 300
 for p in 8001 8000; do
   echo "---- :$p"
   curl -s http://127.0.0.1:$p/v1/chat/completions -H 'Content-Type: application/json' \
-    -d '{"model":"areno","messages":[{"role":"user","content":"什么是 Ling-3.0-flash-Fin？"}],"max_tokens":512}' \
+    -d '{"model":"areno","messages":[{"role":"user","content":"What is Ling-3.0-flash-Fin?"}],"max_tokens":512}' \
     | jq -r '.choices[0].message.content' | head -c 600
   echo
 done
 ```
 
-**eval holdout 抽查**（42 条里看前 6 条；`head -n 6` 改数字看更多）：
+**eval holdout 抽查**（42 条里只取 21 条英文提问，看前 6 条；`head -n 6` 改数字看更多）：
 
 ```bash
-jq -r '.prompt' examples/sft/ling_flash_fin/data/eval.jsonl | head -n 6 | while read -r q; do
+jq -r 'select(.lang == "en") | .prompt' examples/sft/ling_flash_fin/data/eval.jsonl | head -n 6 | while read -r q; do
   echo "==== $q"
   for p in 8001 8000; do
     echo "--- :$p"
@@ -290,7 +290,7 @@ for p in 8001 8000; do
     -d '{"model":"areno","messages":[{"role":"user","content":"What is 15*13? Reply with the number and one line of check."}],"max_tokens":160}' \
     | jq -r '.choices[0].message.content'
   curl -s http://127.0.0.1:$p/v1/chat/completions -H 'Content-Type: application/json' \
-    -d '{"model":"areno","messages":[{"role":"user","content":"二氧化碳是什么？用一句话回答。"}],"max_tokens":160}' \
+    -d '{"model":"areno","messages":[{"role":"user","content":"What is carbon dioxide? Answer in one sentence."}],"max_tokens":160}' \
     | jq -r '.choices[0].message.content'
 done
 ```

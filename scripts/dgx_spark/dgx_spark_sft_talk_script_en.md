@@ -6,7 +6,7 @@ Chinese version: `dgx_spark_sft_talk_script.md`
 
 > **One thing to settle before you speak**: the `areno` commands in the runbook **have not been run on a real machine yet**. Everything marked **[LIVE]** below must be replaced with real output or real numbers once the run works. Never present an unrun result as "here's what we got."
 
-> **Language note**: the Hermes question and the demo prompts in the runbook are in Chinese (for example `什么是 Ling-3.0-flash-Fin？`). The page shows English translations. When you show the terminal, say the English meaning out loud.
+> **Language note**: all live demo prompts are in English: the before/after question, the English half of the holdout set, and the control group.
 
 Suggested length: about 18 minutes, plus 5 minutes of Q&A.
 
@@ -266,7 +266,7 @@ Suggested length: about 18 minutes, plus 5 minutes of Q&A.
 
 **Say: holdout and control group**
 
-> Getting the training questions right isn't enough. We pick 6 of the 42 eval questions, phrased in ways it never saw in training. If it answers those correctly, it learned; it didn't just memorize.
+> Getting the training questions right isn't enough. We pick 6 of the 21 English eval questions, phrased in ways it never saw in training. If it answers those correctly, it learned; it didn't just memorize.
 >
 > We also have a control group: one math question, 15 times 13, and one general-knowledge question, what is carbon dioxide. This checks that the training didn't wipe out what it already knew.
 
