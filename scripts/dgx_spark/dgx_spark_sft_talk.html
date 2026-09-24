@@ -1,8 +1,8 @@
-<title>教 tiny 认识 flash-Fin</title>
-<meta name="description" content="从一台 Mac Mini 到一台 DGX Spark：用 AReno 给 Ling-3.0-tiny 做 LoRA SFT，补上知识截止之后的新模型。">
+<title>Teaching tiny flash-Fin</title>
+<meta name="description" content="From a Mac Mini to a DGX Spark: LoRA SFT on Ling-3.0-tiny with AReno to teach it a model released after its knowledge cutoff.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
 :root{
   --paper: oklch(0.955 0.006 85);
@@ -22,8 +22,8 @@
   --code-ink: oklch(0.93 0.006 85);
   --code-dim: oklch(0.66 0.01 80);
   --code-key: oklch(0.78 0.13 58);
-  --display: "Archivo", "Noto Sans SC", "Helvetica Neue", Arial, sans-serif;
-  --sans: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark){
@@ -68,7 +68,7 @@ html{scroll-behavior:smooth}
 @media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
 body{
   background:var(--paper); color:var(--ink);
-  font-family:var(--sans); font-size:18px; line-height:1.7;
+  font-family:var(--sans); font-size:18px; line-height:1.6;
   padding-inline:clamp(16px,4vw,48px);
   -webkit-font-smoothing:antialiased;
 }
@@ -120,7 +120,7 @@ h2{font-weight:900; font-size:clamp(30px,4.2vw,54px); letter-spacing:-.01em; max
 .pull em{font-style:normal; color:var(--accent)}
 
 /* ---- hero ---- */
-.hero h1{font-weight:900; font-size:clamp(40px,7vw,92px); letter-spacing:-.02em; line-height:1.08; max-width:11em}
+.hero h1{font-weight:900; font-size:clamp(40px,6.4vw,84px); letter-spacing:-.02em; line-height:1.05; max-width:13em}
 .hero h1 .lat{font-stretch:112%; font-weight:850}
 .hero .sub{font-size:clamp(19px,1.9vw,24px); max-width:30em; margin-top:22px; color:var(--muted)}
 .hero .sub b{color:var(--ink)}
@@ -313,19 +313,19 @@ figcaption{display:flex; justify-content:space-between; gap:12px; margin-top:10p
 footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:var(--mono); font-size:12px; color:var(--muted); display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap}
 </style>
 
-<nav class="bar" aria-label="章节">
+<nav class="bar" aria-label="Sections">
   <div class="bar-in">
     <span class="brand">AReno × Ling-3.0-tiny</span>
     <ol>
-      <li><a href="#s1"><span class="n">一</span>Mac Mini</a></li>
-      <li><a href="#s2"><span class="n">二</span>乱答</a></li>
-      <li><a href="#s3"><span class="n">三</span>DGX Spark</a></li>
-      <li><a href="#s4"><span class="n">四</span>数据</a></li>
-      <li><a href="#s5"><span class="n">五</span>LoRA SFT</a></li>
-      <li><a href="#s6"><span class="n">六</span>看效果</a></li>
-      <li><a href="#s7"><span class="n">七</span>下一步</a></li>
+      <li><a href="#s1"><span class="n">1</span>Mac Mini</a></li>
+      <li><a href="#s2"><span class="n">2</span>Wrong answer</a></li>
+      <li><a href="#s3"><span class="n">3</span>DGX Spark</a></li>
+      <li><a href="#s4"><span class="n">4</span>Data</a></li>
+      <li><a href="#s5"><span class="n">5</span>LoRA SFT</a></li>
+      <li><a href="#s6"><span class="n">6</span>Results</a></li>
+      <li><a href="#s7"><span class="n">7</span>Next</a></li>
     </ol>
-    <span class="keys"><kbd>←</kbd> <kbd>→</kbd> 翻节</span>
+    <span class="keys"><kbd>←</kbd> <kbd>→</kbd> to navigate</span>
   </div>
 </nav>
 
@@ -333,84 +333,84 @@ footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:va
 
 <!-- ================= HERO ================= -->
 <section class="hero" id="s0">
-  <div class="eyebrow"><span class="dot"></span>RSI 闭环 · 最小版</div>
-  <h1>从一台 <span class="lat">Mac Mini</span> 开始，教模型学会它不知道的事</h1>
-  <p class="sub">Ling-3.0-tiny 的知识截止在 <b class="mono">2026-08-06</b>。之后发布的 <b>Ling-3.0-flash-Fin</b>，它没见过，只能乱答。今天用一台 Mac Mini、一台 DGX Spark 和 AReno，把这件事修好。</p>
+  <div class="eyebrow"><span class="dot"></span>A minimal RSI loop</div>
+  <h1>Start with a <span class="lat">Mac Mini</span>. Teach the model what it doesn't know.</h1>
+  <p class="sub">Ling-3.0-tiny's knowledge cutoff is <b class="mono">2026-08-06</b>. <b>Ling-3.0-flash-Fin</b> was released after that, so tiny has never seen it and answers wrong. Today we fix that with a Mac Mini, a DGX Spark, and AReno.</p>
 
-  <ol class="loop" aria-label="闭环流程">
-    <li><span class="k">01</span><span class="t">新模型发布</span><span class="d">flash-Fin 在 tiny 截止之后</span></li>
-    <li><span class="k">02</span><span class="t">发现乱答</span><span class="d">在 hermes 里答错</span></li>
-    <li><span class="k">03</span><span class="t">洗日志</span><span class="d">LLM 分析，挑出 bad case</span></li>
-    <li><span class="k">04</span><span class="t">整理训练集</span><span class="d">21 个知识点 / 99 条</span></li>
-    <li class="hot"><span class="k">05</span><span class="t">LoRA SFT</span><span class="d">500 步，十分钟级</span></li>
-    <li><span class="k">06</span><span class="t">当场变好</span><span class="d">同一问题，前后对比</span></li>
+  <ol class="loop" aria-label="The loop">
+    <li><span class="k">01</span><span class="t">New model ships</span><span class="d">flash-Fin, after tiny's cutoff</span></li>
+    <li><span class="k">02</span><span class="t">Wrong answer</span><span class="d">tiny gets it wrong in hermes</span></li>
+    <li><span class="k">03</span><span class="t">Mine the logs</span><span class="d">an LLM finds the bad cases</span></li>
+    <li><span class="k">04</span><span class="t">Build a dataset</span><span class="d">21 facts / 99 Q&amp;A pairs</span></li>
+    <li class="hot"><span class="k">05</span><span class="t">LoRA SFT</span><span class="d">500 steps, about ten minutes</span></li>
+    <li><span class="k">06</span><span class="t">Fixed, live</span><span class="d">same question, before and after</span></li>
   </ol>
-  <div class="loop-foot"><span>真实使用 → 日志 → 训练集 → 训回去</span><span>下一轮从 06 回到 02</span></div>
+  <div class="loop-foot"><span>real usage → logs → dataset → train it back</span><span>the next round goes from 06 back to 02</span></div>
 </section>
 
 <!-- ================= 1 ================= -->
 <section id="s1">
-  <div class="eyebrow"><span class="dot"></span>一 · 这是一台 Mac Mini</div>
-  <h2>tiny 就住在里面</h2>
-  <p class="lede">Ling-3.0-tiny 是 inclusionAI 开源的 MoE 模型。<b>1.3B 的推理开销，跑出 7.9B 的知识面</b>，一台 Mac Mini 整机就能跑。</p>
+  <div class="eyebrow"><span class="dot"></span>1 · This is a Mac Mini</div>
+  <h2>tiny runs on it</h2>
+  <p class="lede">Ling-3.0-tiny is an open-source MoE model from inclusionAI. <b>It has the inference cost of 1.3B and the knowledge of 7.9B</b>, and it runs on a single Mac Mini.</p>
 
   <div class="grid2">
     <figure>
-      <div class="photo"><img src="assets/mac-mini.png" alt="桌上的一台银色 Mac Mini"></div>
-      <figcaption><span>Mac Mini</span><span>¥6,999 · 16G 起步</span></figcaption>
+      <div class="photo"><img src="assets/mac-mini.png" alt="A silver Mac Mini on a wooden desk"></div>
+      <figcaption><span>Mac Mini</span><span>from ¥6,999 · 16 GB and up</span></figcaption>
     </figure>
 
     <div>
       <div class="ratio">
-        <span class="label">激活 / 总参</span>
+        <span class="label">Active / total parameters</span>
         <div class="ratio-big"><span class="a">1.3B</span><span class="b">/ 7.9B</span></div>
-        <div class="cells" aria-label="每次前向约激活六分之一的参数"><span class="on"></span><span></span><span></span><span></span><span></span><span></span></div>
-        <p><b>总参 7.9B 决定智能水平</b>，知识装在专家里。<b>激活 1.3B 决定推理开销</b>，每次前向只算约六分之一。</p>
+        <div class="cells" aria-label="About one sixth of the parameters are active per forward pass"><span class="on"></span><span></span><span></span><span></span><span></span><span></span></div>
+        <p><b>7.9B total sets how capable it is</b>: the knowledge lives in the experts. <b>1.3B active sets the inference cost</b>: each forward pass computes only about one sixth of it.</p>
       </div>
 
       <div class="plate" style="margin-top:32px">
-        <div class="plate-row"><span>上下文</span><span class="v">128<small>K</small></span></div>
-        <div class="plate-row"><span>推理速度</span><span class="v">168<small>tokens/s</small></span><span class="s">deck 标注，来源 Artificial Analysis</span></div>
-        <div class="plate-row"><span>知识截止</span><span class="v mono" style="font-family:var(--mono);font-size:22px">2026-08-06</span></div>
+        <div class="plate-row"><span>Context</span><span class="v">128<small>K</small></span></div>
+        <div class="plate-row"><span>Inference speed</span><span class="v">168<small>tokens/s</small></span><span class="s">figure from the deck, sourced from Artificial Analysis</span></div>
+        <div class="plate-row"><span>Knowledge cutoff</span><span class="v mono" style="font-family:var(--mono);font-size:22px">2026-08-06</span></div>
       </div>
     </div>
   </div>
 
   <div class="grid2">
     <div>
-      <span class="label">安装 · 四步约 30 分钟</span>
+      <span class="label">Setup · four steps, about 30 minutes</span>
       <ol class="steps" style="margin-top:10px">
-        <li><span class="i">1</span><div><span class="w">下载权重</span><code>snapshot_download('inclusionAI/Ling-3.0-tiny-GGUF')</code></div><span class="tm">≈15 min</span></li>
-        <li><span class="i">2</span><div><span class="w">起推理服务</span><code>brew install llama.cpp &amp;&amp; llama-server -m …gguf</code></div><span class="tm">累计 ≈30 min</span></li>
-        <li><span class="i">3</span><div><span class="w">发第一个请求</span><code>client.chat.completions.create(...)</code></div><span class="tm">≈1 min</span></li>
-        <li><span class="i">4</span><div><span class="w">改一行接入</span><code>base_url = "http://localhost:8080/v1"</code></div><span class="tm">≈1 min</span></li>
+        <li><span class="i">1</span><div><span class="w">Download the weights</span><code>snapshot_download('inclusionAI/Ling-3.0-tiny-GGUF')</code></div><span class="tm">≈15 min</span></li>
+        <li><span class="i">2</span><div><span class="w">Start the server</span><code>brew install llama.cpp &amp;&amp; llama-server -m …gguf</code></div><span class="tm">≈30 min total</span></li>
+        <li><span class="i">3</span><div><span class="w">Send the first request</span><code>client.chat.completions.create(...)</code></div><span class="tm">≈1 min</span></li>
+        <li><span class="i">4</span><div><span class="w">Change one line</span><code>base_url = "http://localhost:8080/v1"</code></div><span class="tm">≈1 min</span></li>
       </ol>
     </div>
     <div>
-      <p class="pull">服务是 OpenAI 协议，现成的客户端<em>改一行</em>就能连。Q8_0 量化最少 16G 显存。</p>
+      <p class="pull">The server speaks the OpenAI protocol, so any existing client connects by <em>changing one line</em>. Q8_0 needs at least 16 GB of memory.</p>
     </div>
   </div>
 </section>
 
 <!-- ================= 2 ================= -->
 <section id="s2">
-  <div class="eyebrow"><span class="dot"></span>二 · 好用的模型也会遇到问题</div>
-  <h2>问它一个它没见过的模型，它会编</h2>
-  <p class="lede">这个例子来自 hermes 的历史日志，第四节会讲怎么把它找出来。</p>
+  <div class="eyebrow"><span class="dot"></span>2 · Good models still hit limits</div>
+  <h2>Ask it about a model it has never seen, and it makes things up</h2>
+  <p class="lede">This example comes from real hermes history. Section 4 shows how we found it.</p>
 
   <div class="grid2">
-    <div class="chat" role="img" aria-label="hermes 对话：用户问 flash-Fin 是什么，tiny 乱答">
-      <div class="chat-head"><span>hermes · Ling-3.0-tiny</span><span>历史会话</span></div>
-      <div class="msg u">Ling-3.0-flash-Fin 是什么？</div>
-      <div class="msg a"><span class="who">TINY · 乱答</span>说没有这个模型，然后开始乱编。<br><span class="ph">[现场展示日志原文]</span></div>
+    <div class="chat" role="img" aria-label="hermes conversation: the user asks what flash-Fin is and tiny answers wrong">
+      <div class="chat-head"><span>hermes · Ling-3.0-tiny</span><span>past session</span></div>
+      <div class="msg u">What is Ling-3.0-flash-Fin?</div>
+      <div class="msg a"><span class="who">TINY · WRONG</span>Says the model doesn't exist, then starts making things up.<br><span class="ph">[show the original log]</span></div>
     </div>
     <div>
-      <p class="pull">模型乱答，不是它笨，<em>是它的知识里没有这个东西。</em></p>
-      <div class="timeline" aria-label="知识截止时间线">
+      <p class="pull">The model isn't dumb. <em>This just isn't in what it knows.</em></p>
+      <div class="timeline" aria-label="Knowledge cutoff timeline">
         <div class="tl-track"></div>
         <div class="tl-marks">
-          <div>tiny 知道的世界<span class="mono">截止 2026-08-06</span></div>
-          <div>flash-Fin 发布<span class="mono">在截止之后 · tiny 看不见</span></div>
+          <div>What tiny knows<span class="mono">up to 2026-08-06</span></div>
+          <div>flash-Fin released<span class="mono">after the cutoff · invisible to tiny</span></div>
         </div>
       </div>
     </div>
@@ -419,28 +419,28 @@ footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:va
 
 <!-- ================= 3 ================= -->
 <section id="s3">
-  <div class="eyebrow"><span class="dot"></span>三 · 一台 DGX Spark + AReno</div>
-  <h2>那就让它学会：加训一个 LoRA</h2>
-  <p class="lede">最轻的改法是 LoRA SFT：<b>base 权重全程冻结</b>，只训一个 rank 16 的 adapter。改坏了就删，base 始终是干净的那一份。</p>
+  <div class="eyebrow"><span class="dot"></span>3 · A DGX Spark + AReno</div>
+  <h2>So we teach it: train a LoRA</h2>
+  <p class="lede">The lightest fix is LoRA SFT. <b>The base weights stay frozen</b> and we train only a rank-16 adapter. If it goes wrong, delete the adapter; the base stays clean.</p>
 
   <div class="grid2">
     <figure>
-      <div class="photo"><img src="assets/dgx-spark.jpg" alt="NVIDIA DGX Spark 正面，金属泡沫面板"></div>
-      <figcaption><span>DGX Spark</span><span>¥32,999 · 128G 统一内存</span></figcaption>
+      <div class="photo"><img src="assets/dgx-spark.jpg" alt="Front of an NVIDIA DGX Spark with a metal foam panel"></div>
+      <figcaption><span>DGX Spark</span><span>¥32,999 · 128 GB unified memory</span></figcaption>
     </figure>
     <div>
       <div class="plate">
-        <div class="plate-row"><span>统一内存</span><span class="v">128<small>G</small></span></div>
-        <div class="plate-row"><span>deck 里它跑 Ling-3.0-flash</span><span class="v">345<small>tokens/s</small></span><span class="s">124B 总参 / 5.1B 激活</span></div>
-        <div class="plate-row"><span>这次的训练量</span><span class="v">500<small>步</small></span><span class="s">99 条问答 × 10 epoch，十分钟级别</span></div>
+        <div class="plate-row"><span>Unified memory</span><span class="v">128<small>GB</small></span></div>
+        <div class="plate-row"><span>Ling-3.0-flash on it, per the deck</span><span class="v">345<small>tokens/s</small></span><span class="s">124B total / 5.1B active</span></div>
+        <div class="plate-row"><span>This training run</span><span class="v">500<small>steps</small></span><span class="s">99 Q&amp;A pairs × 10 epochs, about ten minutes</span></div>
       </div>
 
       <div style="margin-top:32px">
-        <span class="label">LoRA：只动一小块</span>
+        <span class="label">LoRA: change one small piece</span>
         <div class="lora" style="margin-top:10px">
-          <div class="base"><span class="t">Ling-3.0-tiny base</span><span class="mono">7.9B · 冻结，不更新</span></div>
+          <div class="base"><span class="t">Ling-3.0-tiny base</span><span class="mono">7.9B · frozen</span></div>
           <div class="plus">+</div>
-          <div class="ad"><span class="t">adapter</span><span class="mono">rank 16<br>只训这里</span></div>
+          <div class="ad"><span class="t">adapter</span><span class="mono">rank 16<br>trained</span></div>
         </div>
       </div>
     </div>
@@ -449,59 +449,59 @@ footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:va
   <div class="cli">
     <div class="verb">
       <div class="cmd"><span>areno</span> train</div>
-      <p>训练：一条命令，<code>--algo</code> 换算法</p>
+      <p>Training: one command, switch algorithms with <code>--algo</code></p>
       <div class="tags"><span class="tag on">SFT</span><span class="tag">DPO</span><span class="tag">GSPO</span><span class="tag">GRPO</span><span class="tag">PPO</span></div>
     </div>
     <div class="verb">
       <div class="cmd"><span>areno</span> serve</div>
-      <p>推理：OpenAI 兼容的 <code>/v1/chat/completions</code>，训完直接起服务</p>
+      <p>Inference: an OpenAI-compatible <code>/v1/chat/completions</code>, served right after training</p>
       <div class="tags"><span class="tag">base</span><span class="tag on">base + LoRA adapter</span></div>
     </div>
     <div class="verb">
-      <div class="cmd">不上云</div>
-      <p>训练和推理收在同一个 CLI 里，不用另搭推理栈。任何 OpenAI 客户端都能直接连。</p>
+      <div class="cmd">No cloud</div>
+      <p>Training and inference share one CLI, so there's no separate inference stack to set up. Any OpenAI client can connect.</p>
     </div>
   </div>
 </section>
 
 <!-- ================= 4 ================= -->
 <section id="s4">
-  <div class="eyebrow"><span class="dot"></span>四 · 训练数据哪来</div>
-  <h2>从 hermes 日志里洗出 bad case</h2>
-  <p class="lede">这就是 Dream RSI 的路子：<b>真实使用 → 日志 → 洗出失败样本 → 训练数据 → 训回去</b>。我们做它的最小版。</p>
+  <div class="eyebrow"><span class="dot"></span>4 · Where the data comes from</div>
+  <h2>Mining bad cases from hermes logs</h2>
+  <p class="lede">This is the Dream RSI idea: <b>real usage → logs → failed samples → training data → train it back</b>. We're doing the minimal version.</p>
 
-  <div class="pipe" aria-label="bad case 分析流程">
-    <div class="node"><span class="label">会话落盘</span><div class="t">~/.hermes/state.db</div><div class="d">每次会话自动记录</div></div>
+  <div class="pipe" aria-label="Bad case analysis flow">
+    <div class="node"><span class="label">Session store</span><div class="t">~/.hermes/state.db</div><div class="d">every session is recorded</div></div>
     <div class="arrow" aria-hidden="true">→</div>
-    <div class="node"><span class="label">只读分析</span><div class="t">LLM</div><div class="d">读完整轨迹，找出有问题的对话</div></div>
+    <div class="node"><span class="label">Read-only analysis</span><div class="t">LLM</div><div class="d">reads full trajectories and finds the ones with problems</div></div>
     <div class="arrow" aria-hidden="true">→</div>
-    <div class="node bad"><span class="label">输出</span><div class="t">bad_cases.jsonl</div><div class="d">每行一个 bad case，带原话和问题说明</div></div>
+    <div class="node bad"><span class="label">Output</span><div class="t">bad_cases.jsonl</div><div class="d">one bad case per line, with the original text and what went wrong</div></div>
   </div>
 
   <div class="cats">
-    <div><span class="tag">intent</span><div class="t">意图识别错误</div><div class="d">没理解用户要什么</div></div>
-    <div class="hit"><span class="tag on">hallucination</span><div class="t">幻觉</div><div class="d">事实错误、编造；flash-Fin 那次在这里</div></div>
-    <div><span class="tag">tool_error</span><div class="t">工具调用错误</div><div class="d">该调没调、调错、参数错</div></div>
-    <div><span class="tag">incomplete</span><div class="t">任务未完成</div><div class="d">中途中断，没有最终回答</div></div>
+    <div><span class="tag">intent</span><div class="t">Intent errors</div><div class="d">misunderstood what the user wanted</div></div>
+    <div class="hit"><span class="tag on">hallucination</span><div class="t">Hallucination</div><div class="d">wrong or invented facts; the flash-Fin case lands here</div></div>
+    <div><span class="tag">tool_error</span><div class="t">Tool errors</div><div class="d">missed, wrong tool, or wrong arguments</div></div>
+    <div><span class="tag">incomplete</span><div class="t">Incomplete</div><div class="d">stopped midway, no final answer</div></div>
   </div>
 
   <div class="warn">
-    <span class="label">为什么用 LLM</span>
-    <p>flash-Fin 那次对话是完整跑完的，只看结构分不出对错。要让 <b>LLM 读懂轨迹内容</b>，才能找出答错的那一条。</p>
+    <span class="label">Why an LLM</span>
+    <p>The flash-Fin session ran to completion, so its structure looks normal. Only <b>an LLM reading the content</b> can tell that the answer was wrong.</p>
   </div>
 
   <div class="grid2">
     <div>
-      <p class="pull">乱答里没有标准答案。知识注入要的是<em>规范答案</em>，所以训练集来自公开材料，每一行都带 sources。</p>
-      <p class="lede" style="font-size:16px">bad_cases.jsonl 告诉我们模型缺哪块知识；这一轮不直接拿日志训，这些 bad case 以后还可以做 DPO / GSPO 的 rejected 侧。</p>
+      <p class="pull">A wrong answer contains no correct answer. Knowledge injection needs <em>reference answers</em>, so the dataset is built from public material, and every row cites its sources.</p>
+      <p class="lede" style="font-size:16px">bad_cases.jsonl tells us which knowledge the model is missing. We don't train on the logs this round; the bad cases can later serve as the rejected side for DPO / GSPO.</p>
     </div>
     <div>
       <span class="label">examples/sft/ling_flash_fin</span>
       <div class="data">
-        <div><div class="v">21</div><div class="t">知识点</div><div class="d">整理自公开材料</div></div>
-        <div><div class="v acc">99</div><div class="t">train · 问答</div><div class="d">zh 51 / en 48</div><div class="langbar"><i class="zh" style="width:51.5%"></i><i class="en" style="width:48.5%"></i></div></div>
-        <div><div class="v">42</div><div class="t">eval · holdout</div><div class="d">zh 21 / en 21，改写提问，没进训练集</div><div class="langbar"><i class="zh" style="width:50%"></i><i class="en" style="width:50%"></i></div></div>
-        <div><div class="v">0</div><div class="t">train ∩ eval</div><div class="d">两份 prompt 零重叠</div></div>
+        <div><div class="v">21</div><div class="t">Facts</div><div class="d">compiled from public material</div></div>
+        <div><div class="v acc">99</div><div class="t">train · Q&amp;A</div><div class="d">zh 51 / en 48</div><div class="langbar"><i class="zh" style="width:51.5%"></i><i class="en" style="width:48.5%"></i></div></div>
+        <div><div class="v">42</div><div class="t">eval · holdout</div><div class="d">zh 21 / en 21, rephrased, never in training</div><div class="langbar"><i class="zh" style="width:50%"></i><i class="en" style="width:50%"></i></div></div>
+        <div><div class="v">0</div><div class="t">train ∩ eval</div><div class="d">no shared prompts</div></div>
       </div>
     </div>
   </div>
@@ -509,8 +509,8 @@ footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:va
 
 <!-- ================= 5 ================= -->
 <section id="s5">
-  <div class="eyebrow"><span class="dot"></span>五 · LoRA SFT</div>
-  <h2>把 21 个知识点灌回去，只要一条命令</h2>
+  <div class="eyebrow"><span class="dot"></span>5 · LoRA SFT</div>
+  <h2>Teaching it 21 facts takes one command</h2>
 
   <div style="margin-top:clamp(32px,4vw,44px)">
 <pre class="code"><span class="k">areno train --algo sft</span> --ckpt inclusionai/ling-3.0-tiny --model-hub modelscope \
@@ -522,28 +522,28 @@ footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:va
   --activation-checkpointing --adam-4bit \
   --lr 1e-4 --min-lr 1e-5 <span class="k">--lora-rank 16</span> \
   --save-path ~/fin_sft_lora --save-interval 50</pre>
-    <div class="code-cap"><span>DGX Spark · 仓库根目录 · 单卡</span><span>另有 --world-size 1 --tp-size 1 --mini-bs 1，完整命令见 runbook 第五节</span></div>
+    <div class="code-cap"><span>DGX Spark · repo root · single GPU</span><span>plus --world-size 1 --tp-size 1 --mini-bs 1; full command in the runbook, section 5</span></div>
   </div>
 
   <div class="grid2">
     <div>
-      <span class="label">步数怎么来的</span>
+      <span class="label">Where the step count comes from</span>
       <div class="math" style="margin-top:14px">
-        <span class="n">99<small>行</small></span><span class="op">÷</span>
+        <span class="n">99<small>rows</small></span><span class="op">÷</span>
         <span class="n">2<small>batch</small></span><span class="op">=</span>
-        <span class="n">50<small>步 / epoch</small></span>
+        <span class="n">50<small>steps / epoch</small></span>
       </div>
       <div class="math" style="margin-top:18px">
-        <span class="op">×</span><span class="n">10<small>epoch</small></span><span class="op">=</span>
-        <span class="n acc">500<small>步 · 10 个 checkpoint</small></span>
+        <span class="op">×</span><span class="n">10<small>epochs</small></span><span class="op">=</span>
+        <span class="n acc">500<small>steps · 10 checkpoints</small></span>
       </div>
     </div>
     <div>
-      <span class="label">三条硬口径</span>
+      <span class="label">Three hard rules</span>
       <ol class="rules" style="margin-top:10px">
-        <li><div><b>没有 final checkpoint</b><span>只在 step 是 50 的倍数时落盘，跑完不补。</span></div></li>
-        <li><div><b>--disable-thinking 训练和推理都要带</b><span>否则模板会渲染出训练时没见过的 thinking 段。</span></div></li>
-        <li><div><b>换数据、换超参就换 --save-path</b><span>新旧 checkpoint 混在一个目录里，演示时容易拿错。</span></div></li>
+        <li><div><b>No final checkpoint</b><span>Saves happen only when the step is a multiple of 50. Nothing extra is saved at the end.</span></div></li>
+        <li><div><b>Use --disable-thinking for both training and serving</b><span>Otherwise the template renders a thinking block the model never saw in training.</span></div></li>
+        <li><div><b>New data or hyperparameters means a new --save-path</b><span>Old and new checkpoints in one directory are easy to mix up during a demo.</span></div></li>
       </ol>
     </div>
   </div>
@@ -552,66 +552,66 @@ footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:va
     <span class="label">~/fin_sft_lora/step_000XXX</span>
     <div class="ruler" style="margin-top:14px">
       <div>50</div><div>100</div><div>150</div>
-      <div class="mk">200<span class="note">过拟合时退到这里</span></div>
+      <div class="mk">200<span class="note">fall back here if it overfits</span></div>
       <div>250</div><div>300</div><div>350</div><div>400</div><div>450</div>
-      <div class="mk">500<span class="note">默认先试</span></div>
+      <div class="mk">500<span class="note">try first</span></div>
     </div>
   </div>
-  <p class="ruler-legend">每 50 步留一份，越早的越「欠训」。如果每个问题都答成同一段通稿式开头，就是过拟合，换用更早的 step 即可。</p>
+  <p class="ruler-legend">One checkpoint every 50 steps; earlier ones are less trained. If every answer opens with the same boilerplate, the model has overfit. Switch to an earlier step.</p>
 </section>
 
 <!-- ================= 6 ================= -->
 <section id="s6">
-  <div class="eyebrow"><span class="dot"></span>六 · 看效果</div>
-  <h2>同一台基座，同一个问题，两个端口</h2>
+  <div class="eyebrow"><span class="dot"></span>6 · Results</div>
+  <h2>Same base, same question, two ports</h2>
 
-  <div class="qline"><span class="label">问</span><span class="q">什么是 Ling-3.0-flash-Fin？</span></div>
+  <div class="qline"><span class="label">Q</span><span class="q">What is Ling-3.0-flash-Fin?</span></div>
 
   <div class="ab">
     <div class="port before">
-      <div class="port-head"><span class="t">加训前</span><span class="mono">:8001 · base</span></div>
-      <div class="out"><span class="ph">[现场输出]</span></div>
+      <div class="port-head"><span class="t">Before</span><span class="mono">:8001 · base</span></div>
+      <div class="out"><span class="ph">[live output]</span></div>
     </div>
     <div class="port after">
-      <div class="port-head"><span class="t">加训后</span><span class="mono">:8000 · base + adapter step_000500</span></div>
-      <div class="out"><span class="ph">[现场输出]</span></div>
+      <div class="port-head"><span class="t">After</span><span class="mono">:8000 · base + adapter step_000500</span></div>
+      <div class="out"><span class="ph">[live output]</span></div>
     </div>
   </div>
 
   <div class="checks">
-    <span class="label">看事实，不看措辞 · adapter 说出来了吗</span>
+    <span class="label">Check facts, not wording · did the adapter say these?</span>
     <div class="checks-row">
-      <button class="chk" type="button" id="chk-params" aria-pressed="false"><span class="box" aria-hidden="true"></span><span class="num">124B / 5.1B</span>总参 / 激活</button>
-      <button class="chk" type="button" id="chk-ctx" aria-pressed="false"><span class="box" aria-hidden="true"></span><span class="num">256K</span>上下文</button>
-      <button class="chk" type="button" id="chk-license" aria-pressed="false"><span class="box" aria-hidden="true"></span><span class="num">MIT</span>许可</button>
-      <button class="chk" type="button" id="chk-bench" aria-pressed="false"><span class="box" aria-hidden="true"></span><span class="num">7</span>个基准，含 FinFIRST</button>
+      <button class="chk" type="button" id="chk-params" aria-pressed="false"><span class="box" aria-hidden="true"></span><span class="num">124B / 5.1B</span>total / active</button>
+      <button class="chk" type="button" id="chk-ctx" aria-pressed="false"><span class="box" aria-hidden="true"></span><span class="num">256K</span>context</button>
+      <button class="chk" type="button" id="chk-license" aria-pressed="false"><span class="box" aria-hidden="true"></span><span class="num">MIT</span>license</button>
+      <button class="chk" type="button" id="chk-bench" aria-pressed="false"><span class="box" aria-hidden="true"></span><span class="num">7</span>benchmarks, incl. FinFIRST</button>
     </div>
-    <p class="hint">点一下打勾，现场对照 adapter 的回答。</p>
+    <p class="hint">Click to tick each one off against the adapter's answer.</p>
   </div>
 
   <div class="ctrl">
-    <div><span class="label">holdout 抽查</span><div class="t">42 条改写提问里抽 6 条</div><div class="d">这些问法没进过训练集，考的是学会了，不是背下来。</div></div>
-    <div><span class="label">控制组</span><div class="t">15 × 13 = ?　二氧化碳是什么？</div><div class="d">数学和常识各一条，确认通用能力没被冲掉。</div></div>
-    <div><span class="label">过拟合信号</span><div class="t">所有回答同一段开头</div><div class="d">出现就换更早的 step_*，比如 step_000200。</div></div>
+    <div><span class="label">Holdout spot check</span><div class="t">6 of the 42 rephrased questions</div><div class="d">None of these phrasings were in training. They test whether it learned, not whether it memorized.</div></div>
+    <div><span class="label">Control group</span><div class="t">15 × 13 = ?　What is carbon dioxide?</div><div class="d">One math and one general-knowledge question, to check general ability wasn't lost.</div></div>
+    <div><span class="label">Overfitting signal</span><div class="t">Every answer opens the same way</div><div class="d">If you see it, switch to an earlier step_*, such as step_000200.</div></div>
   </div>
 </section>
 
 <!-- ================= 7 ================= -->
 <section id="s7" class="close">
-  <div class="eyebrow"><span class="dot"></span>七 · 这是一个好的开始</div>
-  <h2>从一个「乱答」开始，一步一步走</h2>
-  <p class="pull">今天是最简单的模型进化：新模型发布，我们用的模型不知道，在日志里发现它乱答，整理成训练集，LoRA SFT，<em>当场变好</em>。</p>
+  <div class="eyebrow"><span class="dot"></span>7 · A good start</div>
+  <h2>Start with one wrong answer, and go one step at a time</h2>
+  <p class="pull">Today was the simplest kind of model improvement: a new model ships, our model doesn't know it, we find the wrong answer in the logs, build a dataset, run LoRA SFT, and <em>it's fixed on the spot</em>.</p>
 
   <div class="next">
-    <div class="now"><span class="label">今天</span><div class="t">知识注入</div><p>99 条问答，一个 adapter，十分钟级训练，前后对比一眼可见。</p></div>
-    <div><span class="label">下一步</span><div class="t">办公、行业领域</div><p>要构造足够复杂的评测集，mock 各种环境，确认「变好」是真的变好，而不是背了几百个字。</p></div>
-    <div><span class="label">为什么是这个组合</span><div class="t">AReno + tiny</div><p>模型小到本地反复搓；训练推理一个 CLI；「真实使用 → 日志 → 训练集」是现成的一条路。</p></div>
+    <div class="now"><span class="label">Today</span><div class="t">Knowledge injection</div><p>99 Q&amp;A pairs, one adapter, about ten minutes of training, and a before/after you can see at a glance.</p></div>
+    <div><span class="label">Next</span><div class="t">Office and industry domains</div><p>These need a much richer eval set and mocked environments, to make sure the model actually got better instead of memorizing a few hundred sentences.</p></div>
+    <div><span class="label">Why this pairing</span><div class="t">AReno + tiny</div><p>The model is small enough to retrain locally, again and again. Training and serving share one CLI. Real usage → logs → dataset is already a working path.</p></div>
   </div>
 
 </section>
 
 <footer>
-  <span>出处 · scripts/dgx_spark/dgx_spark_sft_runbook.md</span>
+  <span>Source · scripts/dgx_spark/dgx_spark_sft_runbook.md</span>
   <span>Ling-3.0-tiny · DGX Spark · AReno</span>
 </footer>
 </main>

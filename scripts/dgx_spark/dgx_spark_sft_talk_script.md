@@ -2,6 +2,9 @@
 
 配套网页：`dgx_spark_sft_talk.html`（按 ← / → 或 J / K 翻节）
 依据：`dgx_spark_sft_runbook.md`
+英文版：`dgx_spark_sft_talk_script_en.md`
+
+> 网页是英文的，下面「画面」里引用的是网页上的英文标签。
 
 > **讲之前先对齐一件事**：runbook 里的 `areno` 命令**还没有在机器上实际跑过**。下文凡是标了【现场】的地方，都要等跑通之后换成真实输出或真实数字。没跑过的结果，口播时不要说成「我们跑出来是……」。
 
@@ -109,7 +112,7 @@
 
 ## 三、一台 DGX Spark + AReno
 
-**画面**：DGX Spark 照片，规格表，「base（斜线，冻结）+ adapter（橙色）」示意图；下面三张卡：`areno train`、`areno serve`、不上云。
+**画面**：DGX Spark 照片，规格表，「base（斜线，冻结）+ adapter（橙色）」示意图；下面三张卡：`areno train`、`areno serve`、No cloud。
 
 **口播：为什么用 LoRA**
 
@@ -245,7 +248,7 @@
 
 ## 六、看效果：base vs adapter
 
-**画面**：顶部是问题「什么是 Ling-3.0-flash-Fin？」，下面左右两个框：左边红色「加训前 :8001」，右边绿色「加训后 :8000」，框内是【现场输出】占位。再往下是四个可点的核对项，最后是 holdout / 控制组 / 过拟合信号三栏。
+**画面**：顶部是问题「What is Ling-3.0-flash-Fin?」，下面左右两个框：左边红色「Before :8001」，右边绿色「After :8000」，框内是 [live output] 占位。再往下是四个可点的核对项，最后是 holdout / 控制组 / 过拟合信号三栏。
 
 **口播**：
 
@@ -279,7 +282,7 @@
 
 ## 七、这是一个好的开始
 
-**画面**：三张卡（今天 / 下一步 / 为什么是这个组合）。
+**画面**：三张卡（Today / Next / Why this pairing）。
 
 **口播**：
 
@@ -315,5 +318,5 @@
 - [ ] 记下训练日志里的 `skipped_long_or_empty` 和 loss 走势
 - [ ] 8000 / 8001 两个服务都起来了，**两个都带** `--disable-thinking`
 - [ ] 提前跑过一遍前后对比的 curl，确认 adapter 至少说出核对项里的几条
-- [ ] 网页上的【现场输出】占位按实际情况替换，或者演示时切终端
+- [ ] 网页上的 [live output] 占位按实际情况替换，或者演示时切终端
 - [ ] 演示结束 `pkill -f "areno serve"`，释放端口
