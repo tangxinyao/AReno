@@ -1,6 +1,6 @@
 # 从一台 Mac Mini 开始：给 Ling-3.0-tiny 加训，让模型学会它不知道的新知识
 
-> 一句话场景：Ling-3.0-tiny 的知识截止在 2026-08-06，而 Ling-3.0-flash-Fin 是它**之后**才发布的新模型。我们平时在 hermes 里问它「什么是 Ling-3.0-flash-Fin？」，它一本正经地乱答。本文用一台 Mac Mini + 一台 DGX Spark + AReno，把这个「发现乱答 → 从日志洗出 bad case → 生成训练集 → LoRA SFT → 当场变好」的 RSI 闭环最小版走一遍。
+> 一句话场景：Ling-3.0-tiny 的知识截止在 2026-08-06，而 Ling-3.0-flash-Fin 是它**之后**才发布的新模型。我们平时在 hermes 里问它「什么是 Ling-3.0-flash-Fin？」，它会答错。本文用一台 Mac Mini + 一台 DGX Spark + AReno，把这个「发现乱答 → 从日志洗出 bad case → 生成训练集 → LoRA SFT → 当场变好」的 RSI 闭环最小版走一遍。
 
 > 执行环境：本文档在 Mac 上写，**没有在任何一台机器上实际跑过 `areno` 命令**。文中所有命令都在 **DGX Spark 上的仓库根目录**执行（`--dataset-path` / `--dataset-loader-fn` 是仓库相对路径）；跑通之后，把真实数字填进对应小节。
 
@@ -30,8 +30,6 @@ tiny 就住在里面
 | 3 发第一个请求 | `client.chat.completions.create(...)` | 约 1 分钟 |
 | 4 改一行接入 | `base_url = "http://localhost:8080/v1"` | 约 1 分钟 |
 
-「数据勿出门，蚂蚁百灵来上门」——数据不出内网，就装在这台桌上。
-
 ---
 
 ## 二、但好用的模型也会遇到问题，举个真实例子
@@ -42,15 +40,15 @@ tiny 就住在里面
 
 > **问：Ling-3.0-flash-Fin 是什么？多少钱？**
 
-——tiny 会说没有这个模型，然后一本正经地瞎编（真的能编出一个价格来）。**模型乱答，不是它笨，是它的知识里没有这个东西。**
+——tiny 会说没有这个模型，然后编出一个价格来。**模型乱答，不是它笨，是它的知识里没有这个东西。**
 
-这个例子不是我们虚构的：它就躺在 hermes 的历史日志里，第 4 节会把它收出来给你看。
+这个例子来自 hermes 的历史日志，第 4 节会讲怎么把它找出来。
 
 ---
 
 ## 三、那我们就让它学会：一台 DGX Spark + AReno
 
-要改掉模型的行为，最轻的办法是**加训（LoRA SFT）**：base 权重全程冻结，只训一个 rank 16 的 adapter——几十分钟就能重搓一遍，改坏了就删，base 始终是干净的那一份。
+要改掉模型的行为，最轻的办法是**加训（LoRA SFT）**：base 权重全程冻结，只训一个 rank 16 的 adapter——几十分钟就能重训一遍，改坏了就删，base 始终是干净的那一份。
 
 加训需要一台能训练的机器：
 
@@ -89,7 +87,7 @@ modelscope download --model inclusionAI/Ling-3.0-tiny --local_dir /home/tangxiny
 
 ## 四、训练数据哪来：从 hermes 日志里洗「bad case」
 
-整套流程里最有「梦想」气质的就是这一步。**最近很火的 Dream RSI** 走的路子正是：真实使用 → 日志 → 洗出失败样本 → 变成训练数据 → 训回去；我们这里做的就是它的最小版。
+**Dream RSI** 的思路是：真实使用 → 日志 → 洗出失败样本 → 变成训练数据 → 训回去；我们这里做的就是它的最小版。
 
 hermes 每次会话都落在 `$HERMES_HOME/state.db`（默认 `~/.hermes`）。仓库里的 `export_sharegpt.py` 对它是**只读**的，把真实轨迹导成 ShareGPT，按 happy / bad 分流：
 
@@ -106,7 +104,7 @@ python3 .agents/skills/areno-collect-hermes-history/scripts/export_sharegpt.py \
 | **happy case** | 收敛在最终 assistant 回答上；无中断痕迹；`end_reason` 健康 | 将来 SFT 正样本候选 |
 | **bad case** | 被打断、悬在 tool_call / 用户消息、运行时 abort、被轮转 | 将来 DPO / GSPO 的 rejected 侧 |
 
-⚠️ happy / bad 只是**结构粗筛**（「跑完了没」），不看「答得对不对」。而「答得不对」这件事——第 2 节那个乱答——正好是下面这条命令要从日志里抓出来当**实锤**：
+⚠️ happy / bad 只是**结构粗筛**（「跑完了没」），不看「答得对不对」。而「答得不对」这件事——第 2 节那个乱答——要用下面这条命令按关键词从日志里找出来：
 
 ```bash
 jq -r 'select(any(.conversations[]?; .from == "human" and (.value | test("flash[- _]?fin|ling-?3[.]?0"; "i")))) |
@@ -206,7 +204,7 @@ ls /home/tangxinyao/fin_sft_lora/step_000500/
 head -c 400 /home/tangxinyao/fin_sft_lora/step_000500/adapter_config.json
 ```
 
-目录名 = `step_{step+1:06d}`。妙处在于**步数越多，中间的 checkpoint 越是「欠训」的版本**——知识注入一旦过拟合（每个问题都答成通稿式开头），退到更早的 step 就是退烧药（比如用 `step_000200` 而不是 `step_000500`）。
+目录名 = `step_{step+1:06d}`。越早的 checkpoint 训得越少。如果知识注入过拟合（每个问题都答成通稿式开头），就换用更早的 step，比如用 `step_000200` 而不是 `step_000500`。
 
 ---
 
@@ -292,9 +290,7 @@ nvidia-smi
 
 更复杂一点的，是办公、行业这类领域：那就不能只看 99 条问答，要**构造足够复杂的评测集、mock 各种环境**，才能确认「变好」是真的变好，而不是背了几百个字。那是更大的工程，值得，但要一步步来。
 
-不过 **AReno + tiny 这个组合是一个好的开始**：模型小到本地就能反复搓，训练和推理收在同一个 CLI 里，数据链是「真实使用 → 日志 → 训练集」的现成一条路。**RSI 的实现是一步一步来的，我们不要好高骛远——从最简单的一个「乱答」开始，一步一步走向成功。**
-
-数据勿出门，蚂蚁百灵来上门。这次能让模型学会的，不止是它不知道的新模型——是你想让它在内网里学会的每一件事。
+不过 **AReno + tiny 这个组合是一个好的开始**：模型小到本地就能反复训，训练和推理收在同一个 CLI 里，数据链是「真实使用 → 日志 → 训练集」的现成一条路。**RSI 要一步一步做，这次是从最简单的一个「乱答」开始。**
 
 ---
 

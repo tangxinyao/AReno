@@ -170,8 +170,6 @@ figcaption{display:flex; justify-content:space-between; gap:12px; margin-top:10p
 .steps .w{font-weight:700}
 .steps code{display:block; color:var(--muted); font-size:12.5px; margin-top:2px; overflow-wrap:anywhere}
 .steps .tm{font-family:var(--mono); font-size:13px; white-space:nowrap; font-variant-numeric:tabular-nums}
-.motto{margin-top:28px; font-weight:900; font-size:clamp(22px,2.4vw,30px)}
-.motto span{color:var(--muted); font-weight:500; font-size:.55em; display:block; margin-top:4px}
 
 /* ---- chat ---- */
 .chat{background:var(--panel); border:1px solid var(--rule); border-radius:12px; padding:22px; display:grid; gap:14px}
@@ -311,10 +309,6 @@ figcaption{display:flex; justify-content:space-between; gap:12px; margin-top:10p
 .next .label{color:inherit; opacity:.8}
 .next .t{font-weight:900; font-size:22px; margin-top:6px}
 .next p{font-size:15px; margin-top:8px; opacity:.9}
-.finale{margin-top:clamp(64px,9vw,112px); text-align:left}
-.finale .big{font-weight:900; font-size:clamp(34px,6vw,80px); line-height:1.15; letter-spacing:-.01em}
-.finale .big span{color:var(--accent)}
-.finale p{color:var(--muted); margin-top:18px; max-width:34em; font-size:18px}
 footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:var(--mono); font-size:12px; color:var(--muted); display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap}
 </style>
 
@@ -344,8 +338,8 @@ footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:va
 
   <ol class="loop" aria-label="闭环流程">
     <li><span class="k">01</span><span class="t">新模型发布</span><span class="d">flash-Fin 在 tiny 截止之后</span></li>
-    <li><span class="k">02</span><span class="t">发现乱答</span><span class="d">hermes 里一本正经地编</span></li>
-    <li><span class="k">03</span><span class="t">洗日志</span><span class="d">从 state.db 捞出实锤</span></li>
+    <li><span class="k">02</span><span class="t">发现乱答</span><span class="d">在 hermes 里答错</span></li>
+    <li><span class="k">03</span><span class="t">洗日志</span><span class="d">从 state.db 找出这条记录</span></li>
     <li><span class="k">04</span><span class="t">整理训练集</span><span class="d">21 个知识点 / 99 条</span></li>
     <li class="hot"><span class="k">05</span><span class="t">LoRA SFT</span><span class="d">500 步，十分钟级</span></li>
     <li><span class="k">06</span><span class="t">当场变好</span><span class="d">同一问题，前后对比</span></li>
@@ -393,7 +387,6 @@ footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:va
     </div>
     <div>
       <p class="pull">服务是 OpenAI 协议，现成的客户端<em>改一行</em>就能连。Q8_0 量化最少 16G 显存。</p>
-      <p class="motto">数据勿出门，蚂蚁百灵来上门<span>数据不出内网，模型就装在这台桌上</span></p>
     </div>
   </div>
 </section>
@@ -402,13 +395,13 @@ footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:va
 <section id="s2">
   <div class="eyebrow"><span class="dot"></span>二 · 好用的模型也会遇到问题</div>
   <h2>问它一个它没见过的模型，它会编</h2>
-  <p class="lede">这不是虚构的例子。它就躺在 hermes 的历史日志里，第四节会把它捞出来。</p>
+  <p class="lede">这个例子来自 hermes 的历史日志，第四节会讲怎么把它找出来。</p>
 
   <div class="grid2">
     <div class="chat" role="img" aria-label="hermes 对话：用户问 flash-Fin 是什么，tiny 乱答">
       <div class="chat-head"><span>hermes · Ling-3.0-tiny</span><span>历史会话</span></div>
       <div class="msg u">Ling-3.0-flash-Fin 是什么？多少钱？</div>
-      <div class="msg a"><span class="who">TINY · 乱答</span>说没有这个模型，然后一本正经地编了一个价格。<br><span class="ph">[现场展示日志原文]</span></div>
+      <div class="msg a"><span class="who">TINY · 乱答</span>说没有这个模型，还编了一个价格。<br><span class="ph">[现场展示日志原文]</span></div>
     </div>
     <div>
       <p class="pull">模型乱答，不是它笨，<em>是它的知识里没有这个东西。</em></p>
@@ -491,7 +484,7 @@ footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:va
 
   <div class="warn">
     <span class="label">注意</span>
-    <p>happy / bad 只看<b>「跑完了没」</b>，不看「答得对不对」。flash-Fin 那次乱答，要再用一条 <code>jq</code> 按关键词从 all.jsonl 里捞出来，作为<b>实锤</b>。</p>
+    <p>happy / bad 只看<b>「跑完了没」</b>，不看「答得对不对」。flash-Fin 那次乱答，要再用一条 <code>jq</code> 按关键词从 all.jsonl 里找出来。</p>
   </div>
 
   <div class="grid2">
@@ -561,7 +554,7 @@ footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:va
       <div class="mk">500<span class="note">默认先试</span></div>
     </div>
   </div>
-  <p class="ruler-legend">每 50 步留一份，越早的越「欠训」。如果每个问题都答成同一段通稿式开头，就是过拟合，退回更早的 step 就是退烧药。</p>
+  <p class="ruler-legend">每 50 步留一份，越早的越「欠训」。如果每个问题都答成同一段通稿式开头，就是过拟合，换用更早的 step 即可。</p>
 </section>
 
 <!-- ================= 6 ================= -->
@@ -612,10 +605,6 @@ footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:va
     <div><span class="label">为什么是这个组合</span><div class="t">AReno + tiny</div><p>模型小到本地反复搓；训练推理一个 CLI；「真实使用 → 日志 → 训练集」是现成的一条路。</p></div>
   </div>
 
-  <div class="finale">
-    <div class="big">数据勿出门，<br><span>蚂蚁百灵来上门</span></div>
-    <p>这次让模型学会的是一个它不知道的新模型。换成你想让它在内网里学会的任何一件事，走的是同一条路。</p>
-  </div>
 </section>
 
 <footer>
