@@ -29,7 +29,7 @@ Suggested length: about 18 minutes, plus 5 minutes of Q&A. All live demo prompts
 
 Hi everyone. Today I want to walk you through something small that I find really interesting.
 
-We use a local model called Ling-3.0-tiny every day. Its knowledge stops on August 6, 2026, the day it was released. A little later, the Ant Ling team released a new model called Ling-3.0-flash-Fin, and tiny has never heard of it. So when we asked tiny in Hermes what flash-Fin is, it got it wrong. Today I'll show you how we fixed that, with a Mac Mini, a DGX Spark, and AReno, our own training framework.
+The model at the center of this talk is Ling-3.0-tiny, a small model that runs locally. Its knowledge stops on August 6, 2026, the day it was released. A little later, the Ant Ling team released a new model called Ling-3.0-flash-Fin, and tiny has never heard of it. So when we asked tiny in Hermes what flash-Fin is, it got it wrong. Today I'll show you how we fixed that, with a Mac Mini, a DGX Spark, and AReno, our own training framework.
 
 The whole story is the loop you see here. A new model ships, and our model gets it wrong. We go back into the logs and find that wrong answer, turn the missing knowledge into a dataset, train a LoRA on it, and check the result on the spot. People talk a lot about RSI, recursive self-improvement, and the flywheel it promises. This is the smallest turn of that flywheel we could build. Let's start with where tiny lives.
 
