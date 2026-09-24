@@ -1,16 +1,16 @@
 # 从一台 Mac Mini 开始：给 Ling-3.0-tiny 加训，让模型学会它不知道的新知识
 
-> 一句话场景：Ling-3.0-tiny 的知识截止在 2026-08-06。Ling-3.0-flash-Fin 是它**之后**才发布的新模型。我们平时在 hermes 里问它「什么是 Ling-3.0-flash-Fin？」，它一本正经地乱答。本文用一台 Mac Mini + 一台 DGX Spark + AReno，把 **「发现乱答 → 从日志洗出 bad case → 生成训练集 → LoRA SFT → 当场变好」** 这条最简 RSI 闭环完整跑一遍。
+> 一句话场景：Ling-3.0-tiny 的知识截止在 2026-08-06，而 Ling-3.0-flash-Fin 是它**之后**才发布的新模型。我们平时在 hermes 里问它「什么是 Ling-3.0-flash-Fin？」，它一本正经地乱答。本文用一台 Mac Mini + 一台 DGX Spark + AReno，把这个「发现乱答 → 从日志洗出 bad case → 生成训练集 → LoRA SFT → 当场变好」的 RSI 闭环最小版走一遍。
 
 > 执行环境：本文档在 Mac 上写，**没有在任何一台机器上实际跑过 `areno` 命令**。文中所有命令都在 **DGX Spark 上的仓库根目录**执行（`--dataset-path` / `--dataset-loader-fn` 是仓库相对路径）；跑通之后，把真实数字填进对应小节。
 
 ---
 
-## 一、这是一台 Mac Mini——tiny 就住在里面
+## 一、这是一台 Mac Mini
 
 ![Mac Mini 48G](assets/mac-mini.png)
 
-这是外滩大会 deck（`slides/waitan/slides/ling-agentic-delivery/index.tsx`，P4 规格表 / P8 案例一）里那台 Mac Mini。我们从它讲起。
+tiny 就住在里面
 
 **Ling-3.0-tiny 是 inclusionAI 开源的模型，MoE 架构：总参 7.9B，推理时只激活 1.3B，上下文 128K。** 两个数字要分开看：
 
@@ -21,7 +21,7 @@
 
 ### 安装非常方便：四步约 30 分钟
 
-按 deck 的部署路线图（`RoadmapOverview` / `StepDownload` / `StepServe` / `StepVerify` / `StepWire` 五页）做，服务是 OpenAI 协议的，现有客户端直接连：
+照着 deck 的部署路线图那五页（`RoadmapOverview` / `StepDownload` / `StepServe` / `StepVerify` / `StepWire`）来就行，服务是 OpenAI 协议的，现成的客户端直接就能连：
 
 | 步骤 | 动作 | 耗时 |
 | -- | ---- | ---- |
@@ -64,7 +64,7 @@
 
 ### AReno：训练和推理收在同一个 CLI 里
 
-AReno 是我们自己的训练 / 服务框架：一个 CLI 里同时有 `areno train`（SFT / DPO / GSPO / GRPO / PPO）和 `areno serve`（OpenAI 兼容 `/v1/chat/completions`）。**训完直接起服务**，给任何 OpenAI 客户端用，不上云、不另搭推理栈。
+AReno 是我们自己的训练和服务框架，一个 CLI 里同时有 `areno train`（SFT / DPO / GSPO / GRPO / PPO）和 `areno serve`（OpenAI 兼容的 `/v1/chat/completions`）。**训完直接起服务**，接任何 OpenAI 客户端就行——不上云，也不用再搭推理栈。
 
 ```bash
 git clone git@github.com:tangxinyao/AReno.git ~/AReno
@@ -89,7 +89,7 @@ modelscope download --model inclusionAI/Ling-3.0-tiny --local_dir /home/tangxiny
 
 ## 四、训练数据哪来：从 hermes 日志里洗「bad case」
 
-这可能是最像"梦想"的一步。**最近很火的 Dream RSI** 的流程是：真实使用 → 日志 → 洗出失败样本 → 变成训练数据 → 训回去。我们这里是它的最小版。
+整套流程里最有「梦想」气质的就是这一步。**最近很火的 Dream RSI** 走的路子正是：真实使用 → 日志 → 洗出失败样本 → 变成训练数据 → 训回去；我们这里做的就是它的最小版。
 
 hermes 每次会话都落在 `$HERMES_HOME/state.db`（默认 `~/.hermes`）。仓库里的 `export_sharegpt.py` 对它是**只读**的，把真实轨迹导成 ShareGPT，按 happy / bad 分流：
 
@@ -106,7 +106,7 @@ python3 .agents/skills/areno-collect-hermes-history/scripts/export_sharegpt.py \
 | **happy case** | 收敛在最终 assistant 回答上；无中断痕迹；`end_reason` 健康 | 将来 SFT 正样本候选 |
 | **bad case** | 被打断、悬在 tool_call / 用户消息、运行时 abort、被轮转 | 将来 DPO / GSPO 的 rejected 侧 |
 
-⚠️ happy / bad 只是**结构粗筛**（"跑完了没"），不看"答得对不对"。而"答得不对"这件事——第 2 节那个乱答——正好是下面这条命令要从日志里抓出来当**实锤**：
+⚠️ happy / bad 只是**结构粗筛**（「跑完了没」），不看「答得对不对」。而「答得不对」这件事——第 2 节那个乱答——正好是下面这条命令要从日志里抓出来当**实锤**：
 
 ```bash
 jq -r 'select(any(.conversations[]?; .from == "human" and (.value | test("flash[- _]?fin|ling-?3[.]?0"; "i")))) |
@@ -124,7 +124,7 @@ for f in all happy bad; do printf '%-6s ' "$f"; wc -l < "outputs/hermes-collect/
 
 ### 这份训练集长什么样
 
-**训练数据不是 hermes 轨迹本身** —— 乱答里没有标准答案。知识注入要的是规范答案，所以把公开材料整理成 **21 个知识点 / 99 条问答**（`examples/sft/ling_flash_fin`，每行带 `sources`）；hermes 的 bad case 是治"行为问题"的原料（DPO / GSPO 的 rejected 侧），这次先不上。
+**训练数据不是 hermes 轨迹本身**：乱答里没有标准答案。知识注入要的是规范答案，所以把公开材料整理成 **21 个知识点 / 99 条问答**（`examples/sft/ling_flash_fin`，每行带 `sources`）。hermes 的 bad case 是治「行为问题」的原料（DPO / GSPO 的 rejected 侧），这轮先不上。
 
 ```bash
 wc -l examples/sft/ling_flash_fin/data/train.jsonl examples/sft/ling_flash_fin/data/eval.jsonl
@@ -273,7 +273,7 @@ for p in 8001 8000; do
 done
 ```
 
-这一屏是全部说服力：看 **adapter 是否说出 124B/5.1B、256K、MIT、含 FinFIRST 在内的 7 个基准** 这几个硬数字，而不是看它措辞是否更顺；控制组确认通用能力没崩。若每个问题都答成同一段通稿式开头 → 过拟合，回第 5 节换更早的 `step_*`。
+重点看这几个数：**adapter 有没有说出 124B/5.1B、256K、MIT、含 FinFIRST 在内的 7 个基准**，而不是措辞是不是更顺；控制组没崩，说明通用能力没被冲掉。若每个问题都答成同一段通稿式开头 → 过拟合，回第 5 节换更早的 `step_*`。
 
 收尾：
 
@@ -292,7 +292,7 @@ nvidia-smi
 
 更复杂一点的，是办公、行业这类领域：那就不能只看 99 条问答，要**构造足够复杂的评测集、mock 各种环境**，才能确认「变好」是真的变好，而不是背了几百个字。那是更大的工程，值得，但要一步步来。
 
-不过 **AReno + tiny 这个组合是一个好的开始**：模型小到本地就能反复搓，训练和推理收在同一个 CLI 里，数据链是"真实使用 → 日志 → 训练集"的现成一条路。**RSI 的实现是一步一步来的，我们不要好高骛远——从最简单的一个"乱答"开始，一步一步走向成功。**
+不过 **AReno + tiny 这个组合是一个好的开始**：模型小到本地就能反复搓，训练和推理收在同一个 CLI 里，数据链是「真实使用 → 日志 → 训练集」的现成一条路。**RSI 的实现是一步一步来的，我们不要好高骛远——从最简单的一个「乱答」开始，一步一步走向成功。**
 
 数据勿出门，蚂蚁百灵来上门。这次能让模型学会的，不止是它不知道的新模型——是你想让它在内网里学会的每一件事。
 
