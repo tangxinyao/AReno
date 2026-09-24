@@ -65,7 +65,7 @@ Suggested length: about 18 minutes, plus 5 minutes of Q&A.
 
 **Say: specs**
 
-> 128K context. For speed, the deck lists 168 tokens per second, a figure from Artificial Analysis. On price, the Mac Mini starts at 6,999 yuan with 16 GB of memory, and the whole thing runs on it.
+> 128K context. For speed, the deck lists 168 tokens per second, a figure from Artificial Analysis. A Mac Mini with 16 GB of memory or more runs the whole thing.
 
 (Note: 168 tokens/s is a third-party figure quoted in the deck, not something we measured. Present it that way.)
 
@@ -124,7 +124,7 @@ Suggested length: about 18 minutes, plus 5 minutes of Q&A.
 
 **Say: the machine**
 
-> Training needs a machine that can train. That's the DGX Spark: 32,999 yuan, 128 GB of unified memory.
+> Training needs a machine that can train. That's the DGX Spark, with 128 GB of unified memory.
 >
 > In the deck it runs the bigger Ling-3.0-flash, 124B total and 5.1B active, at 345 tokens per second. Today we use it to train a LoRA for tiny, and a single unit's unified memory is more than enough.
 >
