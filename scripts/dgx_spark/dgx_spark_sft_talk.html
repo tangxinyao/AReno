@@ -1,4 +1,4 @@
-<title>Teaching tiny flash-Fin</title>
+<title>Ling-3.0-tiny × AReno: From Hermes Traces Toward an RSI Flywheel</title>
 <meta name="description" content="From a Mac Mini to a DGX Spark: LoRA SFT on Ling-3.0-tiny with AReno to teach it a model released after its knowledge cutoff.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -334,12 +334,12 @@ footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:va
 <!-- ================= HERO ================= -->
 <section class="hero" id="s0">
   <div class="eyebrow"><span class="dot"></span>A minimal RSI loop</div>
-  <h1>Start with a <span class="lat">Mac Mini</span>. Teach the model what it doesn't know.</h1>
+  <h1><span class="lat">Ling-3.0-tiny × AReno</span>: From Hermes Traces Toward an RSI Flywheel</h1>
   <p class="sub">Ling-3.0-tiny's knowledge cutoff is <b class="mono">2026-08-06</b>. <b>Ling-3.0-flash-Fin</b> was released after that, so tiny has never seen it and answers wrong. Today we fix that with a Mac Mini, a DGX Spark, and AReno.</p>
 
   <ol class="loop" aria-label="The loop">
     <li><span class="k">01</span><span class="t">New model ships</span><span class="d">flash-Fin, after tiny's cutoff</span></li>
-    <li><span class="k">02</span><span class="t">Wrong answer</span><span class="d">tiny gets it wrong in hermes</span></li>
+    <li><span class="k">02</span><span class="t">Wrong answer</span><span class="d">tiny gets it wrong in Hermes</span></li>
     <li><span class="k">03</span><span class="t">Mine the logs</span><span class="d">an LLM finds the bad cases</span></li>
     <li><span class="k">04</span><span class="t">Build a dataset</span><span class="d">21 facts / 99 Q&amp;A pairs</span></li>
     <li class="hot"><span class="k">05</span><span class="t">LoRA SFT</span><span class="d">500 steps, about ten minutes</span></li>
@@ -395,14 +395,14 @@ footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:va
 <!-- ================= 2 ================= -->
 <section id="s2">
   <div class="eyebrow"><span class="dot"></span>2 · Good models still hit limits</div>
-  <h2>Ask it about a model it has never seen, and it makes things up</h2>
-  <p class="lede">This example comes from real hermes history. Section 4 shows how we found it.</p>
+  <h2>Ask it about a model it has never seen, and it guesses wrong</h2>
+  <p class="lede">This example comes from real Hermes history. Section 4 shows how we found it.</p>
 
   <div class="grid2">
-    <div class="chat" role="img" aria-label="hermes conversation: the user asks what flash-Fin is and tiny answers wrong">
-      <div class="chat-head"><span>hermes · Ling-3.0-tiny</span><span>past session</span></div>
+    <div class="chat" role="img" aria-label="Hermes conversation: the user asks what flash-Fin is and tiny answers wrong">
+      <div class="chat-head"><span>Hermes · Ling-3.0-tiny</span><span>past session</span></div>
       <div class="msg u">What is Ling-3.0-flash-Fin?</div>
-      <div class="msg a"><span class="who">TINY · WRONG</span>Says the model doesn't exist, then starts making things up.<br><span class="ph">[show the original log]</span></div>
+      <div class="msg a"><span class="who">TINY · WRONG</span>Doesn't know the model, so it guesses: reads “Fin” as fine-tuning.<br><span class="ph">[show the original log]</span></div>
     </div>
     <div>
       <p class="pull">The model isn't dumb. <em>This just isn't in what it knows.</em></p>
@@ -467,7 +467,7 @@ footer{border-top:1px solid var(--rule); padding-block:24px 40px; font-family:va
 <!-- ================= 4 ================= -->
 <section id="s4">
   <div class="eyebrow"><span class="dot"></span>4 · Where the data comes from</div>
-  <h2>Mining bad cases from hermes logs</h2>
+  <h2>Mining bad cases from Hermes logs</h2>
   <p class="lede">This is the Dream RSI idea: <b>real usage → logs → failed samples → training data → train it back</b>. We're doing the minimal version.</p>
 
   <div class="pipe" aria-label="Bad case analysis flow">

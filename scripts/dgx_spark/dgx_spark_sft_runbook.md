@@ -1,6 +1,6 @@
 # 从一台 Mac Mini 开始：给 Ling-3.0-tiny 加训，让模型学会它不知道的新知识
 
-> 一句话场景：Ling-3.0-tiny 的知识截止在 2026-08-06，而 Ling-3.0-flash-Fin 是它**之后**才发布的新模型。我们平时在 hermes 里问它「什么是 Ling-3.0-flash-Fin？」，它会答错。本文用一台 Mac Mini + 一台 DGX Spark + AReno，把这个「发现乱答 → 从日志洗出 bad case → 生成训练集 → LoRA SFT → 当场变好」的 RSI 闭环最小版走一遍。
+> 一句话场景：Ling-3.0-tiny 的知识截止在 2026-08-06，而 Ling-3.0-flash-Fin 是它**之后**才发布的新模型。我们平时在 Hermes 里问它「什么是 Ling-3.0-flash-Fin？」，它会答错。本文用一台 Mac Mini + 一台 DGX Spark + AReno，把这个「发现乱答 → 从日志洗出 bad case → 生成训练集 → LoRA SFT → 当场变好」的 RSI 闭环最小版走一遍。
 
 > 执行环境：本文档在 Mac 上写，**没有在任何一台机器上实际跑过 `areno` 命令**。文中所有命令都在 **DGX Spark 上的仓库根目录**执行（`--dataset-path` / `--dataset-loader-fn` 是仓库相对路径）；跑通之后，把真实数字填进对应小节。
 
@@ -36,13 +36,13 @@ tiny 就住在里面
 
 模型再小再方便，也有一个硬边界：**知识截止**。tiny 的知识截止在它发布那天（2026-08-06），它不知道之后的世界。
 
-所以当你平时在 hermes 里问——
+所以当你平时在 Hermes 里问——
 
 > **问：Ling-3.0-flash-Fin 是什么？**
 
-——tiny 会说没有这个模型，然后开始乱编。**模型乱答，不是它笨，是它的知识里没有这个东西。**
+——tiny 不知道这个模型，只能去猜：它把名字里的「Fin」理解成了 fine-tuning，给出了一个错误的解释。**模型乱答，不是它笨，是它的知识里没有这个东西。**
 
-这个例子来自 hermes 的历史日志，第 4 节会讲怎么把它找出来。
+这个例子来自 Hermes 的历史日志，第 4 节会讲怎么把它找出来。
 
 ---
 
@@ -85,11 +85,11 @@ modelscope download --model inclusionAI/Ling-3.0-tiny --local_dir /home/tangxiny
 
 ---
 
-## 四、训练数据哪来：从 hermes 日志里洗「bad case」
+## 四、训练数据哪来：从 Hermes 日志里洗「bad case」
 
 **Dream RSI** 的思路是：真实使用 → 日志 → 洗出失败样本 → 变成训练数据 → 训回去；我们这里做的就是它的最小版。
 
-hermes 每次会话都落在 `$HERMES_HOME/state.db`（默认 `~/.hermes`）。这一步**直接让 LLM 读这个数据库里的轨迹**，找出有问题的对话，整理成一个 jsonl。判断的是「答得对不对」，而不只是「跑完了没有」：第 2 节那次乱答，对话本身是完整跑完的，只有读懂内容才能看出它答错了。
+Hermes 每次会话都落在 `$HERMES_HOME/state.db`（默认 `~/.hermes`）。这一步**直接让 LLM 读这个数据库里的轨迹**，找出有问题的对话，整理成一个 jsonl。判断的是「答得对不对」，而不只是「跑完了没有」：第 2 节那次乱答，对话本身是完整跑完的，只有读懂内容才能看出它答错了。
 
 LLM 按下面几类找 bad case：
 
@@ -100,13 +100,13 @@ LLM 按下面几类找 bad case：
 | **工具调用错误** `tool_error` | 该调工具没调、调错工具、参数错，或者忽略了工具返回的结果 |
 | **任务未完成** `incomplete` | 中途中断、停在工具调用上，没有给出最终回答 |
 
-把下面这段 prompt 交给一个能读本地文件、执行命令的 LLM agent，在有 hermes 历史的机器上运行：
+把下面这段 prompt 交给一个能读本地文件、执行命令的 LLM agent，在有 Hermes 历史的机器上运行：
 
 ```text
-你的任务是分析 hermes 的历史会话轨迹，找出其中有问题的对话（bad case），整理成一个 jsonl 文件。
+你的任务是分析 Hermes 的历史会话轨迹，找出其中有问题的对话（bad case），整理成一个 jsonl 文件。
 
 数据来源：
-- hermes 的会话记录在 $HERMES_HOME/state.db（默认 ~/.hermes/state.db），是一个 SQLite 数据库。
+- Hermes 的会话记录在 $HERMES_HOME/state.db（默认 ~/.hermes/state.db），是一个 SQLite 数据库。
 - 只能以只读方式打开它，例如 sqlite3 -readonly ~/.hermes/state.db。不要修改、删除或写入任何数据。
 - 先查看表结构（.tables、.schema），弄清楚会话、消息、工具调用分别存在哪里，再按会话把完整轨迹读出来。
 
@@ -142,11 +142,11 @@ jq -r '.topic' outputs/hermes-collect/bad_cases.jsonl | sort | uniq -c | sort -r
 
 第 2 节 flash-Fin 那次对话，应该出现在 `hallucination` 这一类里。`topic` 汇总起来，就能看出模型缺的是哪块知识。
 
-> ⚠️ **这一步在哪台机器跑**：hermes 历史只在**运行过 hermes 的机器**上。历史在哪台机器，就在哪台机器上跑这段 prompt；或者把 `state.db` 复制一份 `scp` 过来再分析。
+> ⚠️ **这一步在哪台机器跑**：Hermes 历史只在**运行过 Hermes 的机器**上。历史在哪台机器，就在哪台机器上跑这段 prompt；或者把 `state.db` 复制一份 `scp` 过来再分析。
 
 ### 这份训练集长什么样
 
-**训练数据不是 hermes 轨迹本身**：乱答里没有标准答案。知识注入要的是规范答案，所以把公开材料整理成 **21 个知识点 / 99 条问答**（`examples/sft/ling_flash_fin`，每行带 `sources`）。LLM 挑出的 bad case 告诉我们模型缺的是哪块知识，规范答案则要从公开材料里整理。
+**训练数据不是 Hermes 轨迹本身**：乱答里没有标准答案。知识注入要的是规范答案，所以把公开材料整理成 **21 个知识点 / 99 条问答**（`examples/sft/ling_flash_fin`，每行带 `sources`）。LLM 挑出的 bad case 告诉我们模型缺的是哪块知识，规范答案则要从公开材料里整理。
 
 ```bash
 wc -l examples/sft/ling_flash_fin/data/train.jsonl examples/sft/ling_flash_fin/data/eval.jsonl

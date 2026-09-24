@@ -1,4 +1,4 @@
-# Talk script: Start with a Mac Mini, teach tiny about flash-Fin
+# Talk script: Ling-3.0-tiny × AReno: From Hermes Traces Toward an RSI Flywheel
 
 Companion page: `dgx_spark_sft_talk.html` (← / → or J / K to move between sections)
 Based on: `dgx_spark_sft_runbook.md`
@@ -6,7 +6,7 @@ Chinese version: `dgx_spark_sft_talk_script.md`
 
 > **One thing to settle before you speak**: the `areno` commands in the runbook **have not been run on a real machine yet**. Everything marked **[LIVE]** below must be replaced with real output or real numbers once the run works. Never present an unrun result as "here's what we got."
 
-> **Language note**: the hermes question and the demo prompts in the runbook are in Chinese (for example `什么是 Ling-3.0-flash-Fin？`). The page shows English translations. When you show the terminal, say the English meaning out loud.
+> **Language note**: the Hermes question and the demo prompts in the runbook are in Chinese (for example `什么是 Ling-3.0-flash-Fin？`). The page shows English translations. When you show the terminal, say the English meaning out loud.
 
 Suggested length: about 18 minutes, plus 5 minutes of Q&A.
 
@@ -33,7 +33,7 @@ Suggested length: about 18 minutes, plus 5 minutes of Q&A.
 >
 > We use a local model called Ling-3.0-tiny. Its knowledge cutoff is August 6, 2026, the day it was released. After that, Ling released a new model called Ling-3.0-flash-Fin. tiny doesn't know it exists.
 >
-> So when you ask tiny in hermes "what is flash-Fin?", it gets it wrong.
+> So when you ask tiny in Hermes "what is flash-Fin?", it gets it wrong.
 >
 > Today we'll fix that with a Mac Mini, a DGX Spark, and AReno, our own training framework.
 
@@ -88,21 +88,21 @@ Suggested length: about 18 minutes, plus 5 minutes of Q&A.
 
 ## 2. Good models still hit limits
 
-**On screen**: the hermes chat on the left; on the right, the knowledge-cutoff timeline (the solid part is what tiny knows, the hatched part is what it can't see).
+**On screen**: the Hermes chat on the left; on the right, the knowledge-cutoff timeline (the solid part is what tiny knows, the hatched part is what it can't see).
 
 **Say**:
 
 > That boundary is the **knowledge cutoff**. tiny's knowledge stops on August 6, 2026. It knows nothing about what happened after.
 >
-> We asked it in hermes: "What is Ling-3.0-flash-Fin?"
+> We asked it in Hermes: "What is Ling-3.0-flash-Fin?"
 >
-> It first tells you the model doesn't exist, then starts making things up.
+> It doesn't know the model, so it guesses. It reads the "Fin" in the name as fine-tuning, and builds a wrong explanation on top of that.
 
-**[LIVE]** Switch to the original hermes log, or to that entry in `bad_cases.jsonl` from section 4, and read tiny's actual words to the audience. The page only has a placeholder here; don't invent its answer.
+**[LIVE]** Switch to the original Hermes log, or to that entry in `bad_cases.jsonl` from section 4, and read tiny's actual words to the audience. The page only has a placeholder here; don't invent its answer.
 
 > I want to stress one thing: **the model isn't wrong because it's dumb. It's wrong because this simply isn't in what it knows.**
 >
-> And we didn't make this example up for the demo. It's in the real hermes history. In section 4 I'll show how we found it in the logs.
+> And we didn't make this example up for the demo. It's in the real Hermes history. In section 4 I'll show how we found it in the logs.
 
 **Transition**:
 
@@ -151,7 +151,7 @@ Suggested length: about 18 minutes, plus 5 minutes of Q&A.
 
 ---
 
-## 4. Where the data comes from: mining bad cases from hermes logs
+## 4. Where the data comes from: mining bad cases from Hermes logs
 
 **On screen**: a pipeline, `state.db` → read-only LLM analysis → `bad_cases.jsonl`; below it the four bad-case categories (hallucination highlighted), then the orange callout, then the four numbers 21 / 99 / 42 / 0.
 
@@ -159,7 +159,7 @@ Suggested length: about 18 minutes, plus 5 minutes of Q&A.
 
 > The Dream RSI idea goes like this: real usage produces logs, you mine the failures from the logs, turn them into training data, and train them back into the model. Today we do the smallest version.
 >
-> hermes stores every session in a local `state.db`. In this step we have an LLM read the trajectories in that database directly, read-only, without changing anything. It reads each session in full, finds the conversations with problems, and writes them to `bad_cases.jsonl`, one per line, with the original text of the turn that went wrong and a note on what the problem was.
+> Hermes stores every session in a local `state.db`. In this step we have an LLM read the trajectories in that database directly, read-only, without changing anything. It reads each session in full, finds the conversations with problems, and writes them to `bad_cases.jsonl`, one per line, with the original text of the turn that went wrong and a note on what the problem was.
 
 **Say: the four categories (point at them)**
 
@@ -313,7 +313,7 @@ Suggested length: about 18 minutes, plus 5 minutes of Q&A.
 
 ## Appendix: pre-demo checklist
 
-- [ ] The original hermes log of the flash-Fin wrong answer is found: screenshotted, or present in `bad_cases.jsonl`
+- [ ] The original Hermes log of the flash-Fin wrong answer is found: screenshotted, or present in `bad_cases.jsonl`
 - [ ] Training has finished, and `step_000500` (plus the fallback `step_000200`) contains `adapter_config.json`
 - [ ] Note `skipped_long_or_empty` and the loss trend from the training log
 - [ ] Both servers on 8000 and 8001 are up, **both** with `--disable-thinking`
