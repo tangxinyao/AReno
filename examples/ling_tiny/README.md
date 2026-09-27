@@ -20,11 +20,11 @@ Ling-3.0-tiny 的 `model_type` 是 `bailing_hybrid`，由 AReno 的 Bailing-MoE 
 | 全参 SFT | ⚠️ 代码路径通用，没有 Ling 的例子 | 未在 Ling 上验证 |
 | DPO（LoRA，基座兼做 reference） | ⚠️ 代码路径通用，没有 Ling 的例子 | 未在 Ling 上验证 |
 | PPO（带 critic） | ⚠️ 代码路径通用 | critic 从 Ling checkpoint 构建，value head 零初始化；未在 Ling 上验证 |
-| 分类 / 打分（`classify`，JevForge 式） | ⚠️ 本次提交新增 | Bailing V3 的 forward 已支持 `defer_lm_head`；未在 GPU 上跑过 |
+| 分类 / 打分（`classify`，JevForge 式） | ✅ 已在 DGX Spark 上训练、评测并提供服务 | 推荐配方与实测结果见 `examples/classify/jev/README.md` |
 | serve（OpenAI 兼容接口，可挂 LoRA） | ✅ | `areno serve --lora-adapter-path` |
 | MLX（Apple Silicon） | ❓ | 取决于已安装的 `mlx-lm` 是否支持 `bailing_hybrid`；未验证 |
 
-一句话：**RL 和 LoRA SFT 可以直接用。全参 SFT、DPO、PPO、classify 的代码路径是通的，
+一句话：**RL、LoRA SFT 和 classify 可以直接用（classify 已在 DGX Spark 上实测）。全参 SFT、DPO、PPO 的代码路径是通的，
 但还没有在 Ling-3.0-tiny 上实际跑过**，第一次跑建议先用 `--max-steps 2` 做冒烟测试。
 
 ## 2. 模型结构对训练的影响
@@ -130,16 +130,19 @@ DATASET=/data/train.jsonl LOADER=my/dataset_loader.py REWARD=my/reward.py AGENT=
 - rollout 显存主要由 `--max-running-prompts` 和 `--max-new-tokens` 决定。单卡紧张时加 `--drop-rollout-state`。
 - 想用 GRPO，改成 `--algo grpo` 即可（追加的参数会覆盖默认值）。
 
-### 5.5 分类 / 打分（classify，未在 Ling 上验证）
+### 5.5 分类 / 打分（classify，已实测）
 
 ```bash
-RECORDS=/data/jevforge/web_full bash examples/ling_tiny/train.sh classify --max-steps 600
+bash examples/classify/jev/data/fetch_open_jev.sh ~/data/open-jev-v1.1 ~/data/jev-records/open-jev-v1.1
+RECORDS=~/data/jev-records/open-jev-v1.1 SAVE_PATH=runs/ling-jev bash examples/ling_tiny/train.sh classify
 ```
 
-做法是在最后一个 token 上接一个打分头，同一道题的所有候选放进一个 softmax，损失是 CE + Brier。
-只支持全参训练，不支持 LoRA。jev-forge 用 `trust_remote_code=False` 加载模型，所以除非你装的
-transformers 自带 `bailing_hybrid`，否则 `export_jevforge.py` 导不出 Ling 的 checkpoint。
-这种情况下可以直接读 AReno 存下的 HF 目录加 `score_head.safetensors`。
+- 在每条候选路径的最后一个 token 上接一个打分头，同一道题的候选共用一个 softmax，损失是 CE + 0.5 × Brier。只支持全参训练，不支持 LoRA。
+- 默认就是实测推荐配方：400 步 × 每步 32 题、每 100 步存档、`--max-seq-len 1536`、`--adam-4bit`。单卡 GB10 约 37 秒/步，共约 4 小时。
+- 按 Open-Jev dev 的准确率挑 checkpoint，不要按 typed-decisions 挑。
+- 实测：typed-decisions（零样本）准确率 0.585，和未训练的基座（0.567）基本一样，但 KL / Brier 明显改善；Open-Jev 同分布准确率 0.557 → 0.799。
+  训练改善的是校准，零样本准确率受基座能力限制；有自己的业务数据时，按同一配方训练收益最大。
+- 评测、零样本基线、`/api/alpha/decisions` 服务的用法见 `examples/classify/jev/README.md`。Ling 的 checkpoint 不能用 `export_jevforge.py` 导出到 jev-forge（其远程代码不兼容当前 transformers），请用 `serve_decisions.py` 提供服务。
 
 ## 6. 服务与评测
 

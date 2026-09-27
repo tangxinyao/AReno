@@ -1,5 +1,9 @@
 """Convert an AReno classify checkpoint into JevForge's checkpoint layout.
 
+Only for backbones that transformers loads without remote code; Ling-3.0
+(`bailing_hybrid`) is not one of them, so serve Ling checkpoints with
+serve_decisions.py instead.
+
 Input:  `<ckpt>/` = HF backbone saved by AReno + `score_head.safetensors`.
 Output: `<out>/best.safetensors` (`backbone.*` + `head.*`), `<out>/config.json`,
 and `<out>/backbone/` (HF config + tokenizer, no weights), which is what
@@ -9,7 +13,7 @@ Backbone keys are produced by `transformers.AutoModel.from_pretrained`, so they
 match `JevForgeModel.from_backbone_config` for plain and multimodal configs.
 
     python examples/classify/jev/export_jevforge.py \
-        --ckpt runs/jev_qwen35_08b/step_000600 --out runs/jev_qwen35_08b/jevforge
+        --ckpt runs/jev/step_000400 --out runs/jev/jevforge
 """
 
 from __future__ import annotations

@@ -1,14 +1,16 @@
-"""Train a JevForge-style decision scorer with AReno.
+"""Train a JevForge-style decision scorer on Ling-3.0-tiny with AReno.
 
-Example (8 GPUs, TP=1 so DP=8):
+Recommended recipe (one DGX Spark GB10, ~37 s/step, ~4 h; see README.md):
 
     python examples/classify/jev/train.py \
-        --records /path/to/jevforge/records --ckpt Qwen/Qwen3.5-0.8B \
-        --save-path runs/jev_qwen35_08b --world-size 8 --tp-size 1
+        --records ~/data/jev-records/open-jev-v1.1 --ckpt inclusionai/ling-3.0-tiny \
+        --save-path runs/ling-jev --adam-4bit
 
+Defaults are that recipe: 1 GPU, 400 steps x 32 questions, a checkpoint every
+100 steps, 8000-token microbatches, candidate paths up to 1536 tokens.
 Checkpoints land in `<save-path>/step_XXXXXX/` as an HF backbone plus
-`score_head.safetensors`; convert one with `export_jevforge.py` to evaluate
-or serve it with JevForge.
+`score_head.safetensors`; pick one by Open-Jev dev accuracy (evaluate.py) and
+serve it with serve_decisions.py.
 """
 
 from __future__ import annotations
@@ -31,13 +33,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model-hub", default="modelscope", choices=["modelscope", "hf"])
     parser.add_argument("--save-path", required=True)
     parser.add_argument("--save-interval", type=int, default=100)
-    parser.add_argument("--world-size", type=int, default=8)
+    parser.add_argument("--world-size", type=int, default=1)
     parser.add_argument("--tp-size", type=int, default=1)
     parser.add_argument("--epochs", type=int, default=1)
-    parser.add_argument("--max-steps", type=int, default=600)
-    parser.add_argument("--questions-per-step", type=int, default=12)
-    parser.add_argument("--microbatch-tokens", type=int, default=24000)
-    parser.add_argument("--max-seq-len", type=int, default=512)
+    parser.add_argument("--max-steps", type=int, default=400)
+    parser.add_argument("--questions-per-step", type=int, default=32)
+    parser.add_argument("--microbatch-tokens", type=int, default=8000)
+    parser.add_argument("--max-seq-len", type=int, default=1536)
     parser.add_argument("--backbone-lr", type=float, default=2e-5)
     parser.add_argument("--head-lr", type=float, default=2e-4)
     parser.add_argument("--head-warmup-steps", type=int, default=12)
@@ -51,7 +53,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--optimizer-state-offload-dir", default=None)
     parser.add_argument("--attn-backend", default="flash", choices=["flash", "native"])
     parser.add_argument(
-        "--metrics-log-dir", default="/tmp/areno/tfevent", help="TensorBoard dir read by `areno dashboard` (same default as `areno train`)"
+        "--metrics-log-dir",
+        default="/tmp/areno/tfevent",
+        help="TensorBoard dir read by `areno dashboard` (same default as `areno train`)",
     )
     parser.add_argument("--seed", type=int, default=17)
     return parser.parse_args()

@@ -94,12 +94,15 @@ case "${RECIPE}" in
       "$@"
     ;;
   classify)
-    # Grouped-softmax scorer (JevForge records); full-parameter, no LoRA.
+    # Grouped-softmax scorer (JevForge records, e.g. Open-Jev v1.1 from
+    # examples/classify/jev/data/fetch_open_jev.sh); full-parameter, no LoRA.
+    # train.py defaults are the measured recipe: 400 steps x 32 questions,
+    # a checkpoint every 100 steps, --max-seq-len 1536.
     require RECORDS
     exec python examples/classify/jev/train.py \
       --records "${RECORDS}" --ckpt "${MODEL}" --model-hub "${MODEL_HUB}" \
-      --save-path "${SAVE_PATH}" --save-interval "${SAVE_INTERVAL}" \
-      --world-size "${WORLD_SIZE}" --tp-size "${TP_SIZE}" \
+      --save-path "${SAVE_PATH}" \
+      --world-size "${WORLD_SIZE}" --tp-size "${TP_SIZE}" --adam-4bit \
       "$@"
     ;;
   serve)
