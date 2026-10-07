@@ -8,6 +8,7 @@ for attribution against the three reference sims.
 
 from __future__ import annotations
 
+from .combat import CombatContext, CombatError
 from .effects import Effect, EffectQueue
 from .enums import ALL_CHARACTERS, Character, CombatPhase, DecisionPoint, Outcome, Screen
 from .hooks import HookBus, HookHandler
@@ -30,6 +31,8 @@ __all__ = [
     "ALL_CHARACTERS",
     "Character",
     "CardSchema",
+    "CombatContext",
+    "CombatError",
     "CombatPhase",
     "CombatState",
     "DATA_ROOT",

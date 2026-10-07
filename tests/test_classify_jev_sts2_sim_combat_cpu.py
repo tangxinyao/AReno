@@ -1,0 +1,418 @@
+"""Phase 1 combat engine CPU tests.
+
+Covers verb dispatch (damage/block/power/draw/copy), scaling rules
+(strength/dex/weak/vulnerable/frail), AoE and multi-hit semantics,
+dead-target noops, draw-pile reshuffle, enemy move resolution,
+Ritual's turn-after-apply tick, block reset timing, victory/defeat
+detection, and the error surface for illegal card plays.
+
+Tests build combat state directly (via start_combat + a planted hand) so
+engine behavior can be exercised without a full RunLoop. The combat
+engine is the Phase 1 deliverable; RunLoop integration is Phase 1
+closure, tested separately.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import sys
+import unittest
+from pathlib import Path
+
+
+def _import_sim():
+    mod_name = "classify_jev_sts2_sim_for_tests"
+    if mod_name in sys.modules:
+        return sys.modules[mod_name]
+    root = Path(__file__).resolve().parents[1] / "examples" / "classify" / "jev" / "sts2_sim"
+    init = root / "__init__.py"
+    spec = importlib.util.spec_from_file_location(
+        mod_name, init, submodule_search_locations=[str(root)]
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[mod_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _make_ctx(sim, *, seed: int = 42, player_max_hp: int = 80):
+    powers, cards, enemies = sim.load_all()
+    player = sim.PlayerState(hp=player_max_hp, max_hp=player_max_hp, gold=99, max_energy=3)
+    run = sim.RunState(character="ironclad", ascension=0, seed=seed, player=player)
+    rng = sim.Rng(seed)
+    ctx = sim.CombatContext(
+        run=run,
+        cards=cards,
+        enemies=enemies,
+        powers=powers,
+        rng=rng,
+        hooks=sim.HookBus(),
+        effects=sim.EffectQueue(),
+    )
+    return ctx, powers, cards, enemies
+
+
+def _plant_hand(ctx, hand: list[str], *, energy: int | None = None) -> None:
+    """Force a specific hand regardless of what start_combat drew."""
+
+    # Return current hand to draw pile so counts stay sane in tests that care.
+    ctx.player.draw_pile.extend(ctx.player.hand)
+    ctx.player.hand = list(hand)
+    if energy is not None:
+        ctx.player.energy = energy
+
+
+class StartCombatTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.sim = _import_sim()
+
+    def test_rolls_enemy_hp_deterministically(self) -> None:
+        ctx1, *_ = _make_ctx(self.sim, seed=7)
+        ctx2, *_ = _make_ctx(self.sim, seed=7)
+        ctx1.start_combat(["jaw_worm"], ["strike"] * 10)
+        ctx2.start_combat(["jaw_worm"], ["strike"] * 10)
+        self.assertEqual(ctx1.combat.monsters[0].hp, ctx2.combat.monsters[0].hp)
+        self.assertTrue(40 <= ctx1.combat.monsters[0].hp <= 44)
+
+    def test_shuffles_draw_pile_deterministically(self) -> None:
+        deck = ["strike", "strike", "defend", "defend", "bash", "anger", "cleave"]
+        ctx1, *_ = _make_ctx(self.sim, seed=99)
+        ctx2, *_ = _make_ctx(self.sim, seed=99)
+        ctx1.start_combat(["jaw_worm"], deck)
+        ctx2.start_combat(["jaw_worm"], deck)
+        self.assertEqual(ctx1.player.draw_pile, ctx2.player.draw_pile)
+
+    def test_draws_initial_hand_size(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["strike"] * 10)
+        self.assertEqual(len(ctx.player.hand), 5)
+        self.assertEqual(len(ctx.player.draw_pile), 5)
+
+    def test_rejects_unknown_enemy(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        with self.assertRaisesRegex(self.sim.CombatError, "unknown enemy_id"):
+            ctx.start_combat(["ghost_worm"], ["strike"] * 10)
+
+
+class DamageAndBlockTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.sim = _import_sim()
+        self.ctx, *_ = _make_ctx(self.sim)
+        self.ctx.start_combat(["jaw_worm"], ["strike"] * 10)
+        self.worm = self.ctx.combat.monsters[0]
+
+    def test_strike_deals_six_damage(self) -> None:
+        _plant_hand(self.ctx, ["strike"], energy=3)
+        hp0 = self.worm.hp
+        self.ctx.play_card("strike", target_slot=0)
+        self.assertEqual(self.worm.hp, hp0 - 6)
+
+    def test_strike_plus_deals_nine(self) -> None:
+        _plant_hand(self.ctx, ["strike+1"], energy=3)
+        hp0 = self.worm.hp
+        self.ctx.play_card("strike+1", target_slot=0)
+        self.assertEqual(self.worm.hp, hp0 - 9)
+
+    def test_strike_vulnerable_bonus(self) -> None:
+        self.worm.powers["vulnerable"] = 2
+        self.worm.powers_applied_on_turn["vulnerable"] = 1
+        self.worm.powers_applied_phase["vulnerable"] = "player"
+        _plant_hand(self.ctx, ["strike"], energy=3)
+        hp0 = self.worm.hp
+        self.ctx.play_card("strike", target_slot=0)
+        # floor(6 * 1.5) = 9
+        self.assertEqual(self.worm.hp, hp0 - 9)
+
+    def test_strike_strength_adds_flat(self) -> None:
+        self.ctx.player.powers["strength"] = 3
+        _plant_hand(self.ctx, ["strike"], energy=3)
+        hp0 = self.worm.hp
+        self.ctx.play_card("strike", target_slot=0)
+        self.assertEqual(self.worm.hp, hp0 - 9)  # 6 + 3
+
+    def test_strike_weak_reduces(self) -> None:
+        self.ctx.player.powers["weak"] = 1
+        self.ctx.player.powers_applied_on_turn["weak"] = 1
+        self.ctx.player.powers_applied_phase["weak"] = "enemy"
+        _plant_hand(self.ctx, ["strike"], energy=3)
+        hp0 = self.worm.hp
+        self.ctx.play_card("strike", target_slot=0)
+        # floor(6 * 0.75) = 4
+        self.assertEqual(self.worm.hp, hp0 - 4)
+
+    def test_defend_adds_five_block(self) -> None:
+        _plant_hand(self.ctx, ["defend"], energy=3)
+        self.ctx.play_card("defend")
+        self.assertEqual(self.ctx.player.block, 5)
+
+    def test_defend_dex_bonus(self) -> None:
+        self.ctx.player.powers["dexterity"] = 2
+        _plant_hand(self.ctx, ["defend"], energy=3)
+        self.ctx.play_card("defend")
+        self.assertEqual(self.ctx.player.block, 7)
+
+    def test_defend_frail_reduces(self) -> None:
+        self.ctx.player.powers["frail"] = 1
+        self.ctx.player.powers_applied_on_turn["frail"] = 1
+        self.ctx.player.powers_applied_phase["frail"] = "enemy"
+        _plant_hand(self.ctx, ["defend"], energy=3)
+        self.ctx.play_card("defend")
+        # floor(5 * 0.75) = 3
+        self.assertEqual(self.ctx.player.block, 3)
+
+    def test_block_absorbs_damage_before_hp(self) -> None:
+        self.worm.block = 10
+        _plant_hand(self.ctx, ["strike"], energy=3)
+        hp0 = self.worm.hp
+        self.ctx.play_card("strike", target_slot=0)
+        self.assertEqual(self.worm.hp, hp0)      # all 6 absorbed
+        self.assertEqual(self.worm.block, 4)
+
+
+class VerbCombinationsTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.sim = _import_sim()
+        self.ctx, *_ = _make_ctx(self.sim)
+
+    def test_bash_damages_then_vulnerable(self) -> None:
+        self.ctx.start_combat(["jaw_worm"], ["bash"] * 10)
+        worm = self.ctx.combat.monsters[0]
+        _plant_hand(self.ctx, ["bash"], energy=3)
+        hp0 = worm.hp
+        self.ctx.play_card("bash", target_slot=0)
+        self.assertEqual(worm.hp, hp0 - 8)
+        self.assertEqual(worm.powers["vulnerable"], 2)
+
+    def test_bash_dead_target_subsequent_effect_noops(self) -> None:
+        self.ctx.start_combat(["red_louse"], ["bash"] * 10)
+        louse = self.ctx.combat.monsters[0]
+        louse.hp = 1  # Bash's 8 damage will kill
+        _plant_hand(self.ctx, ["bash"], energy=3)
+        self.ctx.play_card("bash", target_slot=0)
+        self.assertEqual(louse.hp, 0)
+        # vulnerable step must silently no-op on the dead target.
+        self.assertNotIn("vulnerable", louse.powers)
+
+    def test_cleave_hits_all_enemies(self) -> None:
+        self.ctx.start_combat(["red_louse", "green_louse"], ["cleave"] * 5)
+        a, b = self.ctx.combat.monsters
+        _plant_hand(self.ctx, ["cleave"], energy=3)
+        a0, b0 = a.hp, b.hp
+        self.ctx.play_card("cleave")
+        self.assertEqual(a.hp, a0 - 8)
+        self.assertEqual(b.hp, b0 - 8)
+
+    def test_cleave_skips_dead_enemies(self) -> None:
+        self.ctx.start_combat(["red_louse", "green_louse"], ["cleave"] * 5)
+        a, b = self.ctx.combat.monsters
+        b.hp = 0
+        _plant_hand(self.ctx, ["cleave"], energy=3)
+        a0 = a.hp
+        self.ctx.play_card("cleave")
+        self.assertEqual(a.hp, a0 - 8)
+        self.assertEqual(b.hp, 0)
+
+    def test_pommel_strike_damages_and_draws(self) -> None:
+        self.ctx.start_combat(["jaw_worm"], ["pommel_strike", "strike", "strike", "strike", "strike", "defend", "defend", "defend", "defend", "defend"])
+        worm = self.ctx.combat.monsters[0]
+        _plant_hand(self.ctx, ["pommel_strike"], energy=3)
+        pre_hand = len(self.ctx.player.hand)
+        pre_draw = len(self.ctx.player.draw_pile)
+        hp0 = worm.hp
+        self.ctx.play_card("pommel_strike", target_slot=0)
+        self.assertEqual(worm.hp, hp0 - 9)
+        self.assertEqual(len(self.ctx.player.hand), pre_hand - 1 + 1)  # played 1, drew 1
+        self.assertEqual(len(self.ctx.player.draw_pile), pre_draw - 1)
+
+    def test_draw_reshuffles_discard_when_draw_empty(self) -> None:
+        self.ctx.start_combat(["jaw_worm"], ["pommel_strike"])
+        self.ctx.player.hand = []
+        self.ctx.player.draw_pile = []
+        self.ctx.player.discard_pile = ["strike", "defend"]
+        self.ctx.player.hand = ["pommel_strike"]
+        self.ctx.player.energy = 3
+        self.ctx.play_card("pommel_strike", target_slot=0)
+        # Draw pulled 1 from the reshuffled pile; discard now has 1 card
+        # (the remaining one from the pre-shuffle pair) plus pommel strike itself.
+        self.assertEqual(len(self.ctx.player.hand), 1)
+        self.assertEqual(len(self.ctx.player.draw_pile), 1)
+
+    def test_anger_copies_to_discard(self) -> None:
+        self.ctx.start_combat(["jaw_worm"], ["anger"] * 10)
+        worm = self.ctx.combat.monsters[0]
+        _plant_hand(self.ctx, ["anger"], energy=3)
+        pre_discard = len(self.ctx.player.discard_pile)
+        self.ctx.play_card("anger", target_slot=0)
+        # Discard gains: anger (just played) + anger (copy) = +2
+        self.assertEqual(len(self.ctx.player.discard_pile), pre_discard + 2)
+        self.assertEqual(self.ctx.player.discard_pile.count("anger"), 2)
+
+    def test_twin_strike_two_separate_hits(self) -> None:
+        self.ctx.start_combat(["jaw_worm"], ["twin_strike"] * 5)
+        worm = self.ctx.combat.monsters[0]
+        _plant_hand(self.ctx, ["twin_strike"], energy=3)
+        hp0 = worm.hp
+        self.ctx.play_card("twin_strike", target_slot=0)
+        self.assertEqual(worm.hp, hp0 - 10)  # 5 + 5
+
+    def test_twin_strike_vulnerable_reapplied_per_hit(self) -> None:
+        self.ctx.start_combat(["jaw_worm"], ["twin_strike"] * 5)
+        worm = self.ctx.combat.monsters[0]
+        worm.powers["vulnerable"] = 2
+        worm.powers_applied_on_turn["vulnerable"] = 1
+        worm.powers_applied_phase["vulnerable"] = "player"
+        _plant_hand(self.ctx, ["twin_strike"], energy=3)
+        hp0 = worm.hp
+        self.ctx.play_card("twin_strike", target_slot=0)
+        # Each hit: floor(5*1.5) = 7, two hits = 14
+        self.assertEqual(worm.hp, hp0 - 14)
+
+    def test_shrug_it_off_block_and_draw(self) -> None:
+        self.ctx.start_combat(
+            ["jaw_worm"],
+            ["shrug_it_off", "strike", "strike", "strike", "strike", "defend", "defend", "defend", "defend", "defend"],
+        )
+        _plant_hand(self.ctx, ["shrug_it_off"], energy=3)
+        pre_hand = len(self.ctx.player.hand)
+        self.ctx.play_card("shrug_it_off")
+        self.assertEqual(self.ctx.player.block, 8)
+        self.assertEqual(len(self.ctx.player.hand), pre_hand - 1 + 1)
+
+    def test_thunderclap_aoe_damage_and_vulnerable(self) -> None:
+        self.ctx.start_combat(["red_louse", "green_louse"], ["thunderclap"] * 5)
+        a, b = self.ctx.combat.monsters
+        _plant_hand(self.ctx, ["thunderclap"], energy=3)
+        a0, b0 = a.hp, b.hp
+        self.ctx.play_card("thunderclap")
+        self.assertEqual(a.hp, a0 - 4)
+        self.assertEqual(b.hp, b0 - 4)
+        self.assertEqual(a.powers.get("vulnerable", 0), 1)
+        self.assertEqual(b.powers.get("vulnerable", 0), 1)
+
+
+class TurnFlowTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.sim = _import_sim()
+
+    def test_jaw_worm_first_turn_is_chomp(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["defend"] * 10)
+        self.assertEqual(ctx.combat.monsters[0].queued_move, "chomp")
+
+    def test_end_turn_runs_enemy_phase_and_returns_to_player(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["defend"] * 10)
+        hp0 = ctx.player.hp
+        ctx.end_turn()
+        self.assertEqual(ctx.combat.phase, "player")
+        self.assertEqual(ctx.combat.turn, 2)
+        # Jaw Worm Chomp dealt 11, no block so hp dropped by 11.
+        self.assertEqual(ctx.player.hp, hp0 - 11)
+        # Player energy refilled.
+        self.assertEqual(ctx.player.energy, ctx.player.max_energy)
+
+    def test_block_resets_at_start_of_player_turn(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["red_louse"], ["defend"] * 10)
+        _plant_hand(ctx, ["defend"], energy=3)
+        ctx.play_card("defend")
+        self.assertEqual(ctx.player.block, 5)
+        ctx.end_turn()
+        # Red Louse bite is 5 damage; defend 5 fully absorbs.
+        self.assertEqual(ctx.player.block, 0)
+
+    def test_cultist_ritual_tick_delays_one_turn(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["cultist"], ["defend"] * 20)
+        cultist = ctx.combat.monsters[0]
+        # Turn 1 end: cultist incants ritual 3.
+        ctx.end_turn()
+        self.assertEqual(cultist.powers.get("ritual"), 3)
+        self.assertEqual(cultist.powers.get("strength", 0), 0)  # not yet ticked
+        # Turn 2: cultist dark_strike (base 6); end-of-turn ritual tick grants 3 str.
+        ctx.end_turn()
+        self.assertEqual(cultist.powers.get("strength"), 3)
+        # Turn 3: dark_strike 6 + 3 str = 9 damage.
+        hp_before_turn3 = ctx.player.hp
+        ctx.end_turn()
+        self.assertEqual(ctx.player.hp, hp_before_turn3 - 9)
+
+    def test_player_vulnerable_from_enemy_decays_next_player_turn(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["acid_slime_m"], ["defend"] * 20)
+        slime = ctx.combat.monsters[0]
+        # Force slime's queued move to apply weak.
+        slime.queued_move = "lick"
+        ctx.end_turn()
+        self.assertEqual(ctx.player.powers.get("weak"), 1)
+        # Next player turn: still weak during attacks. End of player turn: decrement to 0.
+        slime.queued_move = "tackle"  # prevent re-applying weak
+        ctx.end_turn()
+        self.assertNotIn("weak", ctx.player.powers)
+
+
+class VictoryAndDefeatTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.sim = _import_sim()
+
+    def test_kill_only_enemy_ends_combat_victory(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["red_louse"], ["strike"] * 10)
+        louse = ctx.combat.monsters[0]
+        louse.hp = 1
+        _plant_hand(ctx, ["strike"], energy=3)
+        ctx.play_card("strike", target_slot=0)
+        self.assertEqual(ctx.combat.outcome, "victory")
+
+    def test_player_death_ends_combat_defeat(self) -> None:
+        ctx, *_ = _make_ctx(self.sim, player_max_hp=5)
+        ctx.player.hp = 5
+        ctx.start_combat(["jaw_worm"], ["strike"] * 10)
+        # Jaw Worm Chomp 11 vs 5 hp = death
+        ctx.end_turn()
+        self.assertEqual(ctx.combat.outcome, "defeat")
+        self.assertFalse(ctx.player.alive)
+
+
+class ErrorSurfaceTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.sim = _import_sim()
+        self.ctx, *_ = _make_ctx(self.sim)
+        self.ctx.start_combat(["jaw_worm"], ["strike"] * 10)
+
+    def test_insufficient_energy_rejects(self) -> None:
+        _plant_hand(self.ctx, ["bash"], energy=1)  # Bash costs 2
+        with self.assertRaisesRegex(self.sim.CombatError, "insufficient energy"):
+            self.ctx.play_card("bash", target_slot=0)
+
+    def test_card_not_in_hand_rejects(self) -> None:
+        _plant_hand(self.ctx, ["strike"], energy=3)
+        with self.assertRaisesRegex(self.sim.CombatError, "not in hand"):
+            self.ctx.play_card("defend")
+
+    def test_single_enemy_card_requires_target(self) -> None:
+        _plant_hand(self.ctx, ["strike"], energy=3)
+        with self.assertRaisesRegex(self.sim.CombatError, "requires target_slot"):
+            self.ctx.play_card("strike")
+
+    def test_target_slot_out_of_range(self) -> None:
+        _plant_hand(self.ctx, ["strike"], energy=3)
+        with self.assertRaisesRegex(self.sim.CombatError, "out of range"):
+            self.ctx.play_card("strike", target_slot=5)
+
+    def test_dead_target_rejects(self) -> None:
+        self.ctx.combat.monsters[0].hp = 0
+        _plant_hand(self.ctx, ["strike"], energy=3)
+        with self.assertRaisesRegex(self.sim.CombatError, "is dead"):
+            self.ctx.play_card("strike", target_slot=0)
+
+    def test_play_in_wrong_phase_rejects(self) -> None:
+        _plant_hand(self.ctx, ["strike"], energy=3)
+        self.ctx.combat.phase = "enemy"
+        with self.assertRaisesRegex(self.sim.CombatError, "phase"):
+            self.ctx.play_card("strike", target_slot=0)
+
+
+if __name__ == "__main__":
+    unittest.main()
