@@ -159,6 +159,48 @@ class LoadAllTest(unittest.TestCase):
         # No cross-ref error means every apply_power verb points to a real power.
 
 
+class EngineContractDocsTest(unittest.TestCase):
+    """Guards the engine-development contract — each verb/rule must have
+    a non-trivial doc, and the doc keys must track EFFECT_VERBS / MOVE_RULES
+    exactly. If someone adds a verb without a doc the Phase 1 engine
+    author would silently miss semantics; this test fails loudly instead.
+    """
+
+    def setUp(self) -> None:
+        self.sim = _import_sim()
+        from classify_jev_sts2_sim_for_tests import schemas  # type: ignore
+        self.schemas = schemas
+
+    def test_verb_docs_cover_every_effect_verb(self) -> None:
+        self.assertEqual(set(self.schemas.VERB_DOCS.keys()), set(self.schemas.EFFECT_VERBS.keys()))
+
+    def test_move_rule_docs_cover_every_move_rule(self) -> None:
+        self.assertEqual(set(self.schemas.MOVE_RULE_DOCS.keys()), set(self.schemas.MOVE_RULES))
+
+    def test_each_verb_doc_names_hooks_and_pipeline(self) -> None:
+        """Soft content-check: every verb doc must mention 'pipeline' and
+        hook names so the engine author has something to grep for."""
+
+        for verb, doc in self.schemas.VERB_DOCS.items():
+            self.assertGreater(len(doc), 200, f"{verb} doc looks like a stub")
+            self.assertIn("pipeline", doc.lower(), f"{verb} doc missing resolution pipeline")
+
+    def test_deal_damage_doc_covers_all_scaling_terms(self) -> None:
+        doc = self.schemas.VERB_DOCS["deal_damage"].lower()
+        for term in ("strength", "weak", "vulnerable", "block"):
+            self.assertIn(term, doc, f"deal_damage doc missing {term!r}")
+
+    def test_apply_power_doc_covers_ritual_tick_delay(self) -> None:
+        doc = self.schemas.VERB_DOCS["apply_power"].lower()
+        self.assertIn("ritual", doc)
+        self.assertIn("applied_on_turn", doc, "ritual tick-delay rule missing")
+
+    def test_module_docstring_covers_dead_target_rule(self) -> None:
+        flat = " ".join((self.schemas.__doc__ or "").split())
+        self.assertIn("Dead-target", flat)
+        self.assertIn("no-ops silently", flat)
+
+
 class LoaderValidationTest(unittest.TestCase):
     """Each case writes a bad JSON blob to a temp dir and asserts the loader rejects it."""
 

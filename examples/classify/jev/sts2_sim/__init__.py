@@ -18,9 +18,11 @@ from .schemas import (
     CardSchema,
     EffectStep,
     EnemySchema,
+    MOVE_RULE_DOCS,
     MoveSchema,
     PowerSchema,
     SelectorEntry,
+    VERB_DOCS,
 )
 from .state import CombatState, MonsterState, PlayerState, RunState
 
@@ -39,8 +41,10 @@ __all__ = [
     "EnemySchema",
     "HookBus",
     "HookHandler",
+    "MOVE_RULE_DOCS",
     "MonsterState",
     "MoveSchema",
+    "VERB_DOCS",
     "Outcome",
     "PlayerState",
     "PowerSchema",
