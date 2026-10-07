@@ -1,10 +1,17 @@
-"""RunLoop skeleton.
+"""RunLoop with Phase 1 combat wired in.
 
-Phase 0 ties together Rng + state + EffectQueue + HookBus and exposes the
-narrowest `reset` / `step` surface the later phases will extend. Right now
-`reset` yields a Neow screen and the only legal move is `skip`, which drops
-the run straight into game_over. Phase 1 replaces the Neow stub with the real
-screen, maps map/combat/etc. in subsequent phases.
+Phase 0 shipped a Neow -> game_over stub; Phase 1 closes that loop by
+promoting the Neow `skip` action into "start the first combat", driving
+CombatContext for every player decision, and transitioning to game_over
+when combat ends. Later phases replace the hard-coded Jaw Worm fight with
+map/event-driven combat encounters.
+
+Action id vocabulary (per decision point):
+  neow:        "skip"
+  combat:      "play:{card_id}"               for non-targeted cards
+               "play:{card_id}:{enemy_slot}"  for single_enemy cards
+               "end_turn"
+  game_over:   "terminal"
 """
 
 from __future__ import annotations
@@ -12,10 +19,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from .combat import CombatContext, CombatError
 from .effects import EffectQueue
-from .enums import Character, DecisionPoint, Outcome, Screen
+from .enums import Character, CombatPhase, DecisionPoint, Outcome, Screen
 from .hooks import HookBus
+from .loader import load_all
 from .rng import Rng
+from .schemas import CardSchema, EnemySchema, PowerSchema
 from .state import PlayerState, RunState
 
 
@@ -23,11 +33,18 @@ _IRONCLAD_START_HP = 80
 _IRONCLAD_START_GOLD = 99
 _START_ENERGY = 3
 
+# Phase 1 scaffold: fixed starting deck and first encounter. Phase 3 will
+# replace this with map-driven selection.
+IRONCLAD_STARTING_DECK: tuple[str, ...] = (
+    "strike", "strike", "strike", "strike", "strike",
+    "defend", "defend", "defend", "defend",
+    "bash",
+)
+PHASE1_FIRST_COMBAT: tuple[str, ...] = ("jaw_worm",)
+
 
 @dataclass
 class Decision:
-    """One legal action at the current screen."""
-
     id: str
     text: str
 
@@ -37,8 +54,15 @@ class RunLoopError(Exception):
 
 
 class RunLoop:
-    """Owns one run's state. Not thread-safe; mirror parallel rollouts by
-    spinning up one RunLoop per worker."""
+    """Owns one run's state. Not thread-safe; one RunLoop per worker.
+
+    Phase 1 behavior:
+      reset()            -> Neow screen, candidate ["skip"].
+      step("skip")       -> transitions to combat (Jaw Worm) and reports
+                            the player's combat_play candidates for turn 1.
+      step(play/end_turn) -> delegates to CombatContext.
+      combat ends        -> screen = game_over, outcome = victory/death.
+    """
 
     def __init__(
         self,
@@ -49,7 +73,7 @@ class RunLoop:
         max_steps: int = 400,
     ) -> None:
         if character != Character.IRONCLAD:
-            raise RunLoopError(f"character {character!r} not supported in Phase 0")
+            raise RunLoopError(f"character {character!r} not supported in Phase 1")
         if not 0 <= ascension <= 20:
             raise RunLoopError("ascension must be in 0..20")
 
@@ -62,6 +86,10 @@ class RunLoop:
         self._state: RunState | None = None
         self._effects: EffectQueue | None = None
         self._hooks: HookBus | None = None
+        self._combat_ctx: CombatContext | None = None
+        self._cards: dict[str, CardSchema] | None = None
+        self._enemies: dict[str, EnemySchema] | None = None
+        self._powers: dict[str, PowerSchema] | None = None
 
     # ------------------------------------------------------------------
     # Public surface
@@ -90,6 +118,12 @@ class RunLoop:
         assert self._effects is not None
         return self._effects
 
+    @property
+    def combat_ctx(self) -> CombatContext:
+        self._require_started()
+        assert self._combat_ctx is not None
+        return self._combat_ctx
+
     def reset(self) -> dict[str, Any]:
         self._rng = Rng(self._master_seed)
         self._effects = EffectQueue()
@@ -102,14 +136,27 @@ class RunLoop:
                 hp=_IRONCLAD_START_HP,
                 max_hp=_IRONCLAD_START_HP,
                 gold=_IRONCLAD_START_GOLD,
+                max_energy=_START_ENERGY,
                 energy=_START_ENERGY,
             ),
+        )
+        if self._cards is None:
+            self._powers, self._cards, self._enemies = load_all()
+        assert self._cards is not None and self._enemies is not None and self._powers is not None
+        self._combat_ctx = CombatContext(
+            run=self._state,
+            cards=self._cards,
+            enemies=self._enemies,
+            powers=self._powers,
+            rng=self._rng,
+            hooks=self._hooks,
+            effects=self._effects,
         )
         return self._packet()
 
     def step(self, action_id: str) -> dict[str, Any]:
         self._require_started()
-        assert self._state is not None
+        assert self._state is not None and self._combat_ctx is not None
         if self._state.is_terminal():
             raise RunLoopError("run already terminal; call reset()")
         if self._state.steps >= self._max_steps:
@@ -119,12 +166,16 @@ class RunLoop:
         if action_id not in legal:
             raise RunLoopError(f"illegal action {action_id!r} at screen {self._state.screen!r}")
 
-        if self._state.screen == Screen.NEOW and action_id == "skip":
-            # Phase 0 stub: skipping Neow ends the run immediately. Phase 1
-            # replaces this with the real Neow -> map transition.
-            self._state.screen = Screen.GAME_OVER
-            self._state.outcome = Outcome.DEATH
-        else:  # pragma: no cover — gated by legal set, kept defensively
+        if self._state.screen == Screen.NEOW:
+            self._state.screen = Screen.COMBAT
+            self._combat_ctx.start_combat(
+                list(PHASE1_FIRST_COMBAT),
+                list(IRONCLAD_STARTING_DECK),
+            )
+        elif self._state.screen == Screen.COMBAT:
+            self._handle_combat_action(action_id)
+            self._maybe_finalize_combat()
+        else:  # pragma: no cover — gated by legal set
             raise RunLoopError(f"unhandled action {action_id!r} at screen {self._state.screen!r}")
 
         self._state.steps += 1
@@ -135,6 +186,7 @@ class RunLoop:
         self._state = None
         self._effects = None
         self._hooks = None
+        self._combat_ctx = None
 
     # ------------------------------------------------------------------
     # Internals
@@ -143,13 +195,85 @@ class RunLoop:
         if self._state is None:
             raise RunLoopError("RunLoop not started; call reset() first")
 
+    def _handle_combat_action(self, action_id: str) -> None:
+        assert self._combat_ctx is not None
+        try:
+            if action_id == "end_turn":
+                self._combat_ctx.end_turn()
+                return
+            if not action_id.startswith("play:"):
+                raise RunLoopError(f"unknown combat action {action_id!r}")
+            parts = action_id.split(":")
+            if len(parts) == 2:
+                self._combat_ctx.play_card(parts[1])
+            elif len(parts) == 3:
+                self._combat_ctx.play_card(parts[1], target_slot=int(parts[2]))
+            else:
+                raise RunLoopError(f"malformed combat action {action_id!r}")
+        except CombatError as exc:
+            # Legal-set check should have caught these, so a CombatError here
+            # means a bug in the enumerator. Surface it as a RunLoopError so
+            # the test suite flags the mismatch rather than silently losing it.
+            raise RunLoopError(f"combat engine rejected {action_id!r}: {exc}") from exc
+
+    def _maybe_finalize_combat(self) -> None:
+        assert self._state is not None and self._state.combat is not None
+        combat = self._state.combat
+        if combat.outcome is None:
+            return
+        self._state.screen = Screen.GAME_OVER
+        self._state.outcome = (
+            Outcome.VICTORY if combat.outcome == "victory" else Outcome.DEATH
+        )
+
     def _decisions(self) -> list[Decision]:
         assert self._state is not None
         if self._state.screen == Screen.NEOW:
-            return [Decision(id="skip", text="skip Neow (Phase 0 stub)")]
+            return [Decision(id="skip", text="skip Neow (Phase 1 stub)")]
+        if self._state.screen == Screen.COMBAT:
+            return self._combat_decisions()
         if self._state.screen == Screen.GAME_OVER:
             return [Decision(id="terminal", text="<game_over>")]
         raise RunLoopError(f"no decision table for screen {self._state.screen!r}")
+
+    def _combat_decisions(self) -> list[Decision]:
+        assert self._state is not None and self._state.combat is not None and self._cards is not None
+        combat = self._state.combat
+        player = self._state.player
+        assert player is not None
+        if combat.phase != CombatPhase.PLAYER or combat.outcome is not None:
+            # Enemy phase runs synchronously inside CombatContext.end_turn, so
+            # from the outside we only ever observe the player phase or a
+            # finalized combat. If we land here the engine has a bug — raise
+            # loudly instead of returning an empty candidate list.
+            raise RunLoopError(
+                f"combat_decisions requested in phase {combat.phase!r} "
+                f"(outcome={combat.outcome!r})"
+            )
+
+        decisions: list[Decision] = []
+        seen_card_ids: set[str] = set()
+        for card_id in player.hand:
+            if card_id in seen_card_ids:
+                continue
+            seen_card_ids.add(card_id)
+            card = self._cards[card_id]
+            if card.cost > player.energy:
+                continue
+            if card.target == "single_enemy":
+                for monster in combat.monsters:
+                    if monster.alive:
+                        decisions.append(Decision(
+                            id=f"play:{card_id}:{monster.slot}",
+                            text=f"play {card.name} vs {monster.name}#{monster.slot}",
+                        ))
+            else:
+                decisions.append(Decision(
+                    id=f"play:{card_id}",
+                    text=f"play {card.name}",
+                ))
+        decisions.append(Decision(id="end_turn", text="end turn"))
+        return decisions
 
     def _packet(self) -> dict[str, Any]:
         assert self._state is not None

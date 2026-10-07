@@ -178,28 +178,25 @@ class RunLoopTest(unittest.TestCase):
         self.assertEqual(packet["step"], 0)
         self.assertEqual([c["id"] for c in packet["candidates"]], ["skip"])
 
-    def test_skip_terminates_to_game_over(self) -> None:
+    def test_skip_transitions_to_combat(self) -> None:
+        """Phase 1 behavior: skip Neow now enters a Jaw Worm combat."""
+
         loop = self._loop()
         loop.reset()
         packet = loop.step("skip")
-        self.assertTrue(packet["done"])
-        self.assertEqual(packet["screen"], self.sim.Screen.GAME_OVER)
-        self.assertEqual(packet["decision_point"], self.sim.DecisionPoint.GAME_OVER)
-        self.assertEqual(packet["outcome"], self.sim.Outcome.DEATH)
-        self.assertEqual(packet["step"], 1)
+        self.assertFalse(packet["done"])
+        self.assertEqual(packet["screen"], self.sim.Screen.COMBAT)
+        self.assertEqual(packet["decision_point"], self.sim.DecisionPoint.COMBAT_PLAY)
+        # Candidates must include at least one play:* and end_turn.
+        ids = {c["id"] for c in packet["candidates"]}
+        self.assertTrue(any(i.startswith("play:") for i in ids))
+        self.assertIn("end_turn", ids)
 
     def test_illegal_action_rejected(self) -> None:
         loop = self._loop()
         loop.reset()
         with self.assertRaisesRegex(self.sim.RunLoopError, "illegal action"):
             loop.step("not-a-real-move")
-
-    def test_cannot_step_after_terminal(self) -> None:
-        loop = self._loop()
-        loop.reset()
-        loop.step("skip")
-        with self.assertRaisesRegex(self.sim.RunLoopError, "terminal"):
-            loop.step("skip")
 
     def test_close_resets_run(self) -> None:
         loop = self._loop()
