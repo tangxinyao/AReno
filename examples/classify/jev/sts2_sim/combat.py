@@ -102,13 +102,22 @@ class CombatContext:
         for slot, eid in enumerate(enemy_ids):
             edef = self._enemy_defs[eid]
             hp = hp_stream.randint(edef.hp_min, edef.hp_max)
-            monsters.append(MonsterState(
+            monster = MonsterState(
                 monster_id=eid,
                 name=edef.name,
                 hp=hp,
                 max_hp=hp,
                 slot=slot,
-            ))
+            )
+            # Apply any pre-combat powers (Lagavulin's starting Metallicize 8,
+            # Guardian's starting Mode Shift buff etc.). applied_on_turn=0 is
+            # strictly less than any live turn, so decay / tick logic treats
+            # these as if they'd been on the monster forever.
+            for pid, stacks in edef.starting_powers:
+                monster.powers[pid] = stacks
+                monster.powers_applied_on_turn[pid] = 0
+                monster.powers_applied_phase[pid] = CombatPhase.START
+            monsters.append(monster)
 
         combat = CombatState(turn=0, phase=CombatPhase.START, monsters=monsters, outcome=None)
         self._run.combat = combat
@@ -588,7 +597,21 @@ class CombatContext:
         combat = self.combat
         for pid, stacks in list(owner.powers.items()):
             pdef = self._power_defs.get(pid)
-            if pdef is None or pdef.duration != "end_of_turn_tick":
+            if pdef is None:
+                continue
+            # Enemy-side Metallicize tick (Lagavulin's starting 8).
+            # The player side fires via on_player_turn_end hook; monsters
+            # don't ride that hook, so handle them inline here. Permanent
+            # duration means no applied-this-turn skip is needed.
+            if pid == "metallicize" and isinstance(owner, MonsterState):
+                owner.block += stacks
+                self._hooks.dispatch("on_block_gained", {
+                    "actor": "enemy",
+                    "source_move_id": None,
+                    "amount": stacks,
+                })
+                continue
+            if pdef.duration != "end_of_turn_tick":
                 continue
             applied_on = owner.powers_applied_on_turn.get(pid, combat.turn)
             applied_phase = owner.powers_applied_phase.get(pid)
@@ -617,6 +640,10 @@ class CombatContext:
         self._hooks.register("on_player_turn_end", self._power_tick_player_turn_end, priority=200)
         self._hooks.register("on_hp_lost", self._power_tick_hp_lost, priority=200)
         self._hooks.register("on_card_exhausted", self._power_tick_card_exhausted, priority=200)
+        # Enemy-side Enrage (Gremlin Nob): triggers when the player plays a
+        # Skill card. The handler iterates monsters so it covers an arbitrary
+        # number of Enrage-bearing enemies in future encounters.
+        self._hooks.register("on_card_played", self._power_tick_card_played, priority=200)
 
     def _power_tick_player_turn_end(self, payload: dict[str, Any]) -> None:
         del payload
@@ -641,6 +668,27 @@ class CombatContext:
                     {"amount": com, "target_scope": "all_enemies", "hits": 1},
                     _EffectContext(actor="player"),
                 )
+        # Strength Down / Dexterity Down: STS semantics are "At the end of
+        # your turn, lose X Strength (or Dex) and this debuff is removed."
+        # Fires once per end-of-turn and then clears. Both powers are
+        # authored with duration="permanent" so _decay_turn_powers does NOT
+        # decrement them before this handler runs — otherwise a 2-stack
+        # debuff would only subtract 1 before being consumed.
+        for debuff_id, stat_id in (("strength_down", "strength"), ("dexterity_down", "dexterity")):
+            delta = self._player.powers.get(debuff_id, 0)
+            if delta > 0:
+                self._player.powers[stat_id] = self._player.powers.get(stat_id, 0) - delta
+                self._player.powers.pop(debuff_id, None)
+                self._player.powers_applied_on_turn.pop(debuff_id, None)
+                self._player.powers_applied_phase.pop(debuff_id, None)
+                self._hooks.dispatch("on_power_applied", {
+                    "actor": "player",
+                    "source_card_id": None,
+                    "source_move_id": None,
+                    "target": self._player,
+                    "power_id": stat_id,
+                    "amount": -delta,
+                })
 
     def _power_tick_hp_lost(self, payload: dict[str, Any]) -> None:
         del payload
@@ -662,6 +710,35 @@ class CombatContext:
                 {"amount": fnp, "target_scope": "self"},
                 _EffectContext(actor="player"),
             )
+
+    def _power_tick_card_played(self, payload: dict[str, Any]) -> None:
+        """Enemy-side on-skill-played reactions (Gremlin Nob's Enrage).
+
+        Fires for every card the player plays; filters by card_type to
+        act only on skills, then iterates alive monsters so a hypothetical
+        encounter with multiple Enrage-bearing enemies covers them all.
+        """
+
+        card_id = payload.get("card_id")
+        if card_id is None:
+            return
+        card = self._card_defs.get(card_id)
+        if card is None or card.card_type != "skill":
+            return
+        for monster in self.combat.monsters:
+            if not monster.alive:
+                continue
+            enrage = monster.powers.get("enrage", 0)
+            if enrage > 0:
+                monster.powers["strength"] = monster.powers.get("strength", 0) + enrage
+                self._hooks.dispatch("on_power_applied", {
+                    "actor": "enemy",
+                    "source_card_id": None,
+                    "source_move_id": None,
+                    "target": monster,
+                    "power_id": "strength",
+                    "amount": enrage,
+                })
 
     # ------------------------------------------------------------------
     # Enemy move picker
@@ -686,12 +763,24 @@ class CombatContext:
         seq_entries = [s for s in edef.movepicker if s.rule == "sequential"]
         if seq_entries:
             max_seq = max(s.sequence_index or 0 for s in seq_entries)
-            seq_target = min(turns_after_first, max_seq)
-            match = [s for s in seq_entries if s.sequence_index == seq_target]
-            if match:
-                monster.queued_move = match[0].move_id
-                return
-            # Fall through if no match (unusual).
+            weighted_entries = [
+                s for s in edef.movepicker
+                if s.rule in ("weighted", "if_not_last", "if_not_two")
+            ]
+            if turns_after_first <= max_seq:
+                match = [s for s in seq_entries if s.sequence_index == turns_after_first]
+                if match:
+                    monster.queued_move = match[0].move_id
+                    return
+            elif not weighted_entries:
+                # Chain exhausted and no weighted fallback — repeat the
+                # final sequential (Cultist's Dark Strike loop).
+                match = [s for s in seq_entries if s.sequence_index == max_seq]
+                if match:
+                    monster.queued_move = match[0].move_id
+                    return
+            # Chain exhausted AND weighted alternatives exist — fall through
+            # to the weighted pool below (Lagavulin's wake-up transition).
 
         pool: list[SelectorEntry] = []
         for s in edef.movepicker:

@@ -828,6 +828,159 @@ class Phase2dPowerCardsTest(unittest.TestCase):
         self.assertEqual(cards["dark_embrace+1"].cost, 1)
 
 
+class Phase2cElitesTest(unittest.TestCase):
+    """Phase 2c-1: Gremlin Nob / Lagavulin / Sentry + their signature mechanics."""
+
+    def setUp(self) -> None:
+        self.sim = _import_sim()
+
+    # Gremlin Nob -----------------------------------------------------
+
+    def test_gremlin_nob_turn_one_bellows_and_gains_enrage(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["gremlin_nob"], ["defend"] * 10)
+        nob = ctx.combat.monsters[0]
+        self.assertEqual(nob.queued_move, "bellow")
+        ctx.end_turn()
+        self.assertEqual(nob.powers.get("enrage"), 2)
+
+    def test_enrage_triggers_on_player_skill_play(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["gremlin_nob"], ["defend"] * 10)
+        nob = ctx.combat.monsters[0]
+        ctx.end_turn()  # turn 1: nob bellows -> enrage 2
+        # Now nob has enrage 2 and 0 strength (minus prior move's damage).
+        # Player turn 2: play a Skill (Defend).
+        _plant_hand(ctx, ["defend"], energy=3)
+        pre_str = nob.powers.get("strength", 0)
+        ctx.play_card("defend")
+        self.assertEqual(nob.powers.get("strength"), pre_str + 2)
+
+    def test_enrage_does_not_trigger_on_attack_play(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["gremlin_nob"], ["strike"] * 10)
+        nob = ctx.combat.monsters[0]
+        ctx.end_turn()  # bellow -> enrage 2
+        _plant_hand(ctx, ["strike"], energy=3)
+        pre_str = nob.powers.get("strength", 0)
+        ctx.play_card("strike", target_slot=0)
+        self.assertEqual(nob.powers.get("strength", 0), pre_str)
+
+    def test_enrage_stacks_each_skill(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["gremlin_nob"], ["defend"] * 10)
+        nob = ctx.combat.monsters[0]
+        ctx.end_turn()  # bellow -> enrage 2
+        _plant_hand(ctx, ["defend", "defend"], energy=3)
+        ctx.play_card("defend")
+        ctx.play_card("defend")
+        # Two skill plays each add 2 strength = 4 total.
+        self.assertEqual(nob.powers.get("strength"), 4)
+
+    # Lagavulin -------------------------------------------------------
+
+    def test_lagavulin_starts_with_eight_metallicize(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["lagavulin"], ["defend"] * 10)
+        lag = ctx.combat.monsters[0]
+        self.assertEqual(lag.powers.get("metallicize"), 8)
+
+    def test_lagavulin_sleeps_first_three_turns(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["lagavulin"], ["defend"] * 20)
+        lag = ctx.combat.monsters[0]
+        self.assertEqual(lag.queued_move, "sleep")
+        hp_player0 = ctx.player.hp
+        ctx.end_turn()  # turn 1 sleep
+        ctx.end_turn()  # turn 2 sleep
+        ctx.end_turn()  # turn 3 sleep
+        # Player never took damage during sleep.
+        self.assertEqual(ctx.player.hp, hp_player0)
+        # Next queued move must be attack or siphon (sequential exhausted).
+        self.assertIn(lag.queued_move, ("attack", "siphon_soul"))
+
+    def test_lagavulin_metallicize_block_each_turn(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["lagavulin"], ["defend"] * 20)
+        lag = ctx.combat.monsters[0]
+        ctx.end_turn()
+        # After one enemy turn, Metallicize fired -> 8 block on Lagavulin.
+        # Block resets at start of each enemy turn; metallicize re-grants it.
+        self.assertEqual(lag.block, 8)
+
+    def test_lagavulin_siphon_soul_applies_both_debuffs(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["lagavulin"], ["defend"] * 20)
+        lag = ctx.combat.monsters[0]
+        ctx.player.powers["strength"] = 5
+        ctx.player.powers["dexterity"] = 5
+        # Force Lagavulin into siphon_soul directly (bypass sleep).
+        lag.queued_move = "siphon_soul"
+        lag.move_history = ["sleep", "sleep", "sleep"]
+        ctx.end_turn()
+        self.assertEqual(ctx.player.powers.get("strength_down"), 1)
+        self.assertEqual(ctx.player.powers.get("dexterity_down"), 1)
+
+    # Sentry ----------------------------------------------------------
+
+    def test_sentry_bolt_adds_two_dazed_to_player_piles(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["sentry"], ["defend"] * 20)
+        sentry = ctx.combat.monsters[0]
+        sentry.queued_move = "bolt"
+        # Count across every pile — Bolt shuffles into draw, but the
+        # subsequent player turn will draw a fresh hand that may pull a
+        # Dazed out of draw into hand or (if ethereal exhausted at prior
+        # end-of-turn) into exhaust.
+        def _total_dazed() -> int:
+            return sum(
+                p.count("dazed")
+                for p in (ctx.player.hand, ctx.player.draw_pile,
+                          ctx.player.discard_pile, ctx.player.exhaust_pile)
+            )
+        pre = _total_dazed()
+        ctx.end_turn()
+        self.assertEqual(_total_dazed(), pre + 2)
+
+    def test_sentry_beam_damages_player(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["sentry"], ["defend"] * 20)
+        sentry = ctx.combat.monsters[0]
+        sentry.queued_move = "beam_of_light"
+        hp0 = ctx.player.hp
+        ctx.end_turn()
+        self.assertEqual(ctx.player.hp, hp0 - 9)
+
+
+class Phase2cDebuffsTest(unittest.TestCase):
+    """Strength Down / Dexterity Down end-of-turn conversion."""
+
+    def setUp(self) -> None:
+        self.sim = _import_sim()
+
+    def test_strength_down_subtracts_at_end_of_player_turn(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["defend"] * 10)
+        ctx.player.powers["strength"] = 5
+        ctx.player.powers["strength_down"] = 2
+        ctx.player.powers_applied_on_turn["strength_down"] = 1
+        ctx.player.powers_applied_phase["strength_down"] = "enemy"
+        ctx.end_turn()
+        self.assertEqual(ctx.player.powers.get("strength"), 3)
+        self.assertNotIn("strength_down", ctx.player.powers)
+
+    def test_dexterity_down_subtracts_at_end_of_player_turn(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["defend"] * 10)
+        ctx.player.powers["dexterity"] = 4
+        ctx.player.powers["dexterity_down"] = 2
+        ctx.player.powers_applied_on_turn["dexterity_down"] = 1
+        ctx.player.powers_applied_phase["dexterity_down"] = "enemy"
+        ctx.end_turn()
+        self.assertEqual(ctx.player.powers.get("dexterity"), 2)
+        self.assertNotIn("dexterity_down", ctx.player.powers)
+
+
 class TurnFlowTest(unittest.TestCase):
     def setUp(self) -> None:
         self.sim = _import_sim()

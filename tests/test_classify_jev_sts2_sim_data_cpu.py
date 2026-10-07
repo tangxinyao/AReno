@@ -41,13 +41,14 @@ class PowersLoadingTest(unittest.TestCase):
         self.sim = _import_sim()
         self.powers = self.sim.load_powers()
 
-    def test_phase2d_powers_present(self) -> None:
+    def test_phase2_powers_present(self) -> None:
         self.assertEqual(
             set(self.powers.keys()),
             {
                 "strength", "dexterity", "vulnerable", "weak", "frail", "ritual",
                 "metallicize", "combust", "rupture", "dark_embrace",
                 "feel_no_pain", "barricade",
+                "enrage", "strength_down", "dexterity_down",
             },
         )
 
@@ -148,8 +149,27 @@ class EnemiesLoadingTest(unittest.TestCase):
             {
                 "jaw_worm", "cultist", "red_louse", "green_louse", "acid_slime_m",
                 "blue_slaver", "red_slaver", "fungi_beast",
+                "gremlin_nob", "lagavulin", "sentry",
             },
         )
+
+    def test_lagavulin_has_starting_metallicize(self) -> None:
+        lagavulin = self.enemies["lagavulin"]
+        self.assertEqual(dict(lagavulin.starting_powers), {"metallicize": 8})
+
+    def test_gremlin_nob_bellow_applies_enrage(self) -> None:
+        nob = self.enemies["gremlin_nob"]
+        bellow = nob.moves["bellow"]
+        self.assertEqual(bellow.effects[0].verb, "apply_power")
+        self.assertEqual(bellow.effects[0].args["power_id"], "enrage")
+        self.assertEqual(bellow.effects[0].args["amount"], 2)
+
+    def test_sentry_bolt_adds_dazed_to_draw(self) -> None:
+        sentry = self.enemies["sentry"]
+        bolt = sentry.moves["bolt"]
+        self.assertEqual(bolt.effects[0].verb, "add_card_to_pile")
+        self.assertEqual(bolt.effects[0].args["card_id"], "dazed")
+        self.assertEqual(bolt.effects[0].args["pile"], "draw")
 
     def test_cultist_first_move_is_incantation(self) -> None:
         cultist = self.enemies["cultist"]
@@ -186,9 +206,9 @@ class LoadAllTest(unittest.TestCase):
 
     def test_load_all_cross_resolves_power_ids(self) -> None:
         powers, cards, enemies = self.sim.load_all()
-        self.assertEqual(len(powers), 12)
+        self.assertEqual(len(powers), 15)
         self.assertEqual(len(cards), 64)
-        self.assertEqual(len(enemies), 8)
+        self.assertEqual(len(enemies), 11)
         # No cross-ref error means every apply_power / add_card_to_pile verb
         # points to a real power or card.
 

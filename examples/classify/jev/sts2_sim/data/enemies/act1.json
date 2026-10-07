@@ -210,5 +210,97 @@
       {"move_id": "bite", "rule": "if_not_two", "weight": 60},
       {"move_id": "grow", "rule": "if_not_last", "weight": 40}
     ]
+  },
+  {
+    "enemy_id": "gremlin_nob",
+    "name": "Gremlin Nob",
+    "hp_min": 82,
+    "hp_max": 86,
+    "moves": {
+      "bellow": {
+        "intent": "buff",
+        "effects": [
+          {"verb": "apply_power", "args": {"power_id": "enrage", "amount": 2, "target_scope": "self"}}
+        ]
+      },
+      "rush": {
+        "intent": "attack",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 14, "target_scope": "player", "hits": 1}}
+        ]
+      },
+      "skull_bash": {
+        "intent": "attack_debuff",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 6, "target_scope": "player", "hits": 1}},
+          {"verb": "apply_power", "args": {"power_id": "vulnerable", "amount": 2, "target_scope": "player"}}
+        ]
+      }
+    },
+    "movepicker": [
+      {"move_id": "bellow", "rule": "always_first"},
+      {"move_id": "rush", "rule": "if_not_two", "weight": 66},
+      {"move_id": "skull_bash", "rule": "if_not_last", "weight": 34}
+    ]
+  },
+  {
+    "enemy_id": "lagavulin",
+    "name": "Lagavulin",
+    "hp_min": 109,
+    "hp_max": 111,
+    "starting_powers": [
+      {"power_id": "metallicize", "stacks": 8}
+    ],
+    "moves": {
+      "sleep": {
+        "intent": "sleep",
+        "effects": []
+      },
+      "attack": {
+        "intent": "attack",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 18, "target_scope": "player", "hits": 1}}
+        ]
+      },
+      "siphon_soul": {
+        "intent": "strong_debuff",
+        "effects": [
+          {"verb": "apply_power", "args": {"power_id": "strength_down", "amount": 1, "target_scope": "player"}},
+          {"verb": "apply_power", "args": {"power_id": "dexterity_down", "amount": 1, "target_scope": "player"}}
+        ]
+      }
+    },
+    "movepicker": [
+      {"move_id": "sleep", "rule": "sequential", "sequence_index": 0},
+      {"move_id": "sleep", "rule": "sequential", "sequence_index": 1},
+      {"move_id": "sleep", "rule": "sequential", "sequence_index": 2},
+      {"move_id": "attack", "rule": "if_not_last", "weight": 1},
+      {"move_id": "siphon_soul", "rule": "if_not_last", "weight": 1}
+    ]
+  },
+  {
+    "enemy_id": "sentry",
+    "name": "Sentry",
+    "hp_min": 38,
+    "hp_max": 42,
+    "moves": {
+      "beam_of_light": {
+        "intent": "attack",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 9, "target_scope": "player", "hits": 1}}
+        ]
+      },
+      "bolt": {
+        "intent": "debuff",
+        "effects": [
+          {"verb": "add_card_to_pile",
+           "args": {"card_id": "dazed", "pile": "draw", "amount": 2}}
+        ]
+      }
+    },
+    "movepicker": [
+      {"move_id": "beam_of_light", "rule": "if_not_last", "weight": 1},
+      {"move_id": "bolt", "rule": "if_not_last", "weight": 1}
+    ]
   }
 ]

@@ -82,5 +82,26 @@
     "kind": "buff",
     "duration": "permanent",
     "stacks": true
+  },
+  {
+    "power_id": "enrage",
+    "name": "Enrage",
+    "kind": "buff",
+    "duration": "permanent",
+    "stacks": true
+  },
+  {
+    "power_id": "strength_down",
+    "name": "Strength Down",
+    "kind": "debuff",
+    "duration": "permanent",
+    "stacks": true
+  },
+  {
+    "power_id": "dexterity_down",
+    "name": "Dexterity Down",
+    "kind": "debuff",
+    "duration": "permanent",
+    "stacks": true
   }
 ]

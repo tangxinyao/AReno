@@ -126,6 +126,10 @@ VERB_ALLOWED_SCOPES: Final[dict[str, frozenset[str]]] = {
 CARD_PILES: Final = frozenset({"hand", "draw", "discard", "exhaust"})
 
 # Verbs cards may use. Enemy moves use the complement defined below.
+# `add_card_to_pile` is dual-use as of Phase 2c — Sentries' Bolt move
+# shuffles Dazed cards into the player's draw pile, so enemy moves may
+# invoke it (the pile always refers to the player's piles since enemies
+# have no card zones of their own).
 CARD_ONLY_VERBS: Final = frozenset({
     "draw_cards",
     "copy_to_discard",
@@ -133,7 +137,6 @@ CARD_ONLY_VERBS: Final = frozenset({
     "deal_damage_equal_to_block",
     "gain_energy",
     "lose_hp_self",
-    "add_card_to_pile",
 })
 ENEMY_ONLY_VERBS: Final = frozenset()  # no enemy-exclusive verbs yet
 
@@ -634,6 +637,12 @@ class EnemySchema:
     selector entries the engine walks each turn to decide which move
     will next telegraph. See MOVE_RULE_DOCS for how each rule filters
     the candidate pool.
+
+    `starting_powers` is an optional tuple of (power_id, stacks) pairs
+    applied to the monster immediately after it is instantiated by
+    start_combat. Lagavulin uses it for its 8 Metallicize that gives
+    the sleep-phase its signature tankiness; a hypothetical Guardian
+    with Mode Shift could use it to seed its first-form buffs.
     """
 
     enemy_id: str
@@ -642,6 +651,7 @@ class EnemySchema:
     hp_max: int
     moves: dict[str, MoveSchema]
     movepicker: tuple[SelectorEntry, ...]
+    starting_powers: tuple[tuple[str, int], ...] = ()
 
 
 @dataclass(frozen=True)

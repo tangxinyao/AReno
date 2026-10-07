@@ -208,6 +208,20 @@ def _parse_enemy(entry: dict, *, where: str, power_ids: set[str] | None) -> Enem
             raise SimDataError(f"{sel_where}.sequence_index required when rule=sequential")
         picker.append(SelectorEntry(move_id=move_ref, rule=rule, weight=weight, sequence_index=seq_idx))
 
+    raw_starting = entry.get("starting_powers", [])
+    _require_list(raw_starting, f"{where}.starting_powers")
+    starting: list[tuple[str, int]] = []
+    for j, item in enumerate(raw_starting):
+        sp_where = f"{where}.starting_powers[{j}]"
+        _require_type(item, dict, sp_where)
+        pid = _get_str(item, "power_id", sp_where)
+        if power_ids is not None and pid not in power_ids:
+            raise SimDataError(f"{sp_where}.power_id references unknown power {pid!r}")
+        stacks = item.get("stacks")
+        if not isinstance(stacks, int) or stacks <= 0:
+            raise SimDataError(f"{sp_where}.stacks must be a positive int")
+        starting.append((pid, stacks))
+
     return EnemySchema(
         enemy_id=enemy_id,
         name=_get_str(entry, "name", where),
@@ -215,6 +229,7 @@ def _parse_enemy(entry: dict, *, where: str, power_ids: set[str] | None) -> Enem
         hp_max=hp_max,
         moves=moves,
         movepicker=tuple(picker),
+        starting_powers=tuple(starting),
     )
 
 
