@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://areno.local/schemas/classify-jev-operator-v1.json",
+  "title": "AReno classify_rl operator contract (STS1/STS2)",
+  "description": "Transport-agnostic JSON contract between an environment operator (real-game headless, simulator, or any decision env) and a rollout worker that produces decisions.jsonl for AReno's --algo classify_rl. Message bodies validate against the shapes under $defs. A conforming HTTP operator exposes POST /reset, POST /step, POST /snapshot, POST /restore, GET /capabilities, all taking/returning the matching bodies. A stdio operator reads/writes newline-delimited JSON of the same shapes. Scope: single-episode-at-a-time; vectorized backends thread multiple episode_ids under this same contract.",
+  "type": "object",
+  "$defs": {
+    "DecisionPoint": {
+      "type": "string",
+      "description": "What kind of choice the agent is making. Targeted combat actions (e.g. 'Strike enemy 0' vs 'Strike enemy 1') are expanded into separate Candidates under combat_play, not a separate decision point. Potions appear as additional candidates in whichever decision point they are legal.",
+      "enum": [
+        "combat_play",
+        "map_select",
+        "card_reward",
+        "rest_site",
+        "event_choice",
+        "shop",
+        "boss_relic",
+        "neow_bonus",
+        "game_over"
+      ]
+    },
+    "Character": {
+      "type": "string",
+      "description": "Union of STS1 and STS2 characters. Backends declare their actual support in Capabilities.characters.",
+      "enum": ["ironclad", "silent", "defect", "watcher", "necrobinder", "regent"]
+    },
+    "EpisodeScope": {
+      "type": "string",
+      "description": "'battle' puts the operator into a single combat encounter; 'full_run' runs the whole climb from Neow to the last boss.",
+      "enum": ["battle", "full_run"]
+    },
+    "Candidate": {
+      "type": "object",
+      "description": "One legal action at a decision point. The operator sends only legal candidates in a stable deterministic order; the Jev score head reads 'text' as its candidate suffix and the rollout worker echoes 'id' back to the operator in StepRequest.action_id.",
+      "required": ["id", "text"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "description": "Opaque backend-specific action id. Must be stable within an episode; two candidates in the same packet must have different ids."},
+        "text": {"type": "string", "minLength": 1, "description": "Human- and model-readable rendering (card name, numeric effect, target). Keep rendering stable across operator versions so cached Jev checkpoints stay comparable."}
+      },
+      "additionalProperties": false
+    },
+    "Info": {
+      "type": "object",
+      "description": "Side-channel structured facts for reward shaping, logging, and advantage computation. Not fed to the Jev prompt.",
+      "required": ["hp", "max_hp", "backend", "episode_scope"],
+      "properties": {
+        "hp": {"type": "integer", "description": "Current HP after the previous step's effects."},
+        "max_hp": {"type": "integer"},
+        "gold": {"type": ["integer", "null"]},
+        "floor": {"type": ["integer", "null"], "description": "Only for episode_scope=full_run."},
+        "act": {"type": ["integer", "null"]},
+        "energy": {"type": ["integer", "null"], "description": "Only populated in combat decision points."},
+        "turn": {"type": ["integer", "null"]},
+        "enemies_alive": {"type": ["integer", "null"]},
+        "outcome": {
+          "description": "Set only on terminal packets. 'win' = cleared the scope; 'loss' = HP->0; 'quit' = caller aborted; 'timeout' = step budget exhausted.",
+          "oneOf": [
+            {"type": "null"},
+            {"type": "string", "enum": ["win", "loss", "quit", "timeout"]}
+          ]
+        },
+        "backend": {"type": "string", "description": "Backend identifier, e.g. 'wuhao21-sts2-cli', 'r33hab-sts2', 'ytcs-sts2-solver', 'sts2-mjs', 'sts_lightspeed-jdc5549', 'mini-spire'."},
+        "backend_version": {"type": ["string", "null"]},
+        "game_version": {"type": ["string", "null"], "description": "Underlying game build, e.g. 'sts2@0.111.0', 'sts1@2.3-16'."},
+        "seed": {"type": ["string", "null"]},
+        "character": {"type": ["string", "null"]},
+        "ascension": {"type": ["integer", "null"], "minimum": 0, "maximum": 20},
+        "episode_scope": {"$ref": "#/$defs/EpisodeScope"}
+      },
+      "additionalProperties": true
+    },
+    "StatePacket": {
+      "type": "object",
+      "description": "Response body for /reset, /step, /restore. One packet = one decision point (or terminal 'game_over'). The operator renders 'state_text' as the Jev prompt; rendering template is operator-specific but must be stable within a backend version so cached checkpoints stay comparable across runs.",
+      "required": ["episode_id", "step", "done", "reward", "decision_point", "state_text", "candidates", "info"],
+      "properties": {
+        "episode_id": {"type": "string", "minLength": 1},
+        "step": {"type": "integer", "minimum": 0, "description": "0 on the packet returned by /reset; +1 per /step response."},
+        "done": {"type": "boolean", "description": "True iff this is the terminal packet (decision_point='game_over')."},
+        "reward": {"type": "number", "description": "Scalar reward attributed to the transition that produced this packet; 0 on the reset packet. Operator picks a default shaping; rollout workers may override by recomputing from Info."},
+        "decision_point": {"$ref": "#/$defs/DecisionPoint"},
+        "state_text": {"type": "string", "description": "Rendered digest fed to the Jev score head as prompt. Operators MUST keep this within the deployment's max_seq_len (1536 tokens on the reference Ling-3.0-tiny recipe)."},
+        "state_struct": {
+          "description": "Optional raw structured state echo for debugging and reward recomputation.",
+          "oneOf": [{"type": "null"}, {"type": "object"}]
+        },
+        "candidates": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Legal candidates, stable deterministic order. Terminal packets send a single sentinel candidate (id='terminal', text='<game_over>').",
+          "items": {"$ref": "#/$defs/Candidate"}
+        },
+        "info": {"$ref": "#/$defs/Info"}
+      },
+      "additionalProperties": false
+    },
+    "ResetRequest": {
+      "type": "object",
+      "required": ["character", "ascension", "episode_scope"],
+      "properties": {
+        "character": {"$ref": "#/$defs/Character"},
+        "ascension": {"type": "integer", "minimum": 0, "maximum": 20},
+        "episode_scope": {"$ref": "#/$defs/EpisodeScope"},
+        "seed": {"type": ["string", "null"], "description": "Backend-defined seed string; null = backend picks one and reports it on the state packet."},
+        "battle_setup": {
+          "description": "Required when episode_scope='battle'. Backend-specific encounter spec (enemy_id, floor, deck override, relics, HP).",
+          "oneOf": [{"type": "null"}, {"type": "object"}]
+        },
+        "episode_id": {"type": ["string", "null"], "description": "Caller-supplied id, otherwise the operator generates one."}
+      },
+      "additionalProperties": false
+    },
+    "StepRequest": {
+      "type": "object",
+      "required": ["episode_id", "action_id"],
+      "properties": {
+        "episode_id": {"type": "string"},
+        "action_id": {"type": "string", "description": "One of the ids from the previous StatePacket.candidates."},
+        "old_logp": {"type": ["number", "null"], "description": "Behavior-policy log probability of the chosen candidate, if known. Operator persists it on its decision log so the rollout worker can retrieve it when assembling DecisionLogRow."}
+      },
+      "additionalProperties": false
+    },
+    "SnapshotRequest": {
+      "type": "object",
+      "required": ["episode_id"],
+      "properties": {"episode_id": {"type": "string"}},
+      "additionalProperties": false
+    },
+    "SnapshotResponse": {
+      "type": "object",
+      "required": ["token"],
+      "properties": {
+        "token": {"type": "string", "description": "Opaque; feed back into /restore. Backends that cannot snapshot MUST return HTTP 501 (or {\"error\": \"unsupported\"} over stdio) and advertise supports_snapshot=false in Capabilities."}
+      },
+      "additionalProperties": false
+    },
+    "RestoreRequest": {
+      "type": "object",
+      "required": ["token"],
+      "properties": {"token": {"type": "string"}},
+      "additionalProperties": false
+    },
+    "Capabilities": {
+      "type": "object",
+      "description": "Response body of GET /capabilities. Lets the rollout worker pick a backend without probing.",
+      "required": ["backend", "characters", "ascensions", "episode_scopes", "game_versions"],
+      "properties": {
+        "backend": {"type": "string"},
+        "backend_version": {"type": ["string", "null"]},
+        "characters": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/Character"}},
+        "ascensions": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 0, "maximum": 20}},
+        "episode_scopes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/EpisodeScope"}},
+        "game_versions": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "supports_snapshot": {"type": "boolean", "default": false},
+        "paired_seed_bit_exact": {"type": "boolean", "default": false, "description": "True iff reset(seed=X) followed by identical actions is byte-identical across invocations. Required for paired-seed advantage baselines."},
+        "approx_step_latency_ms": {"type": ["number", "null"]},
+        "max_parallel_episodes": {"type": ["integer", "null"], "description": "null = unknown; 1 = single-threaded; >1 = vectorized backend."},
+        "notes": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "DecisionLogRow": {
+      "type": "object",
+      "description": "One line of decisions.jsonl, consumed verbatim by areno.experimental.classify.rl_trainer.encode_decision. Produced by the rollout worker from an episode of StatePackets: prompt=StatePacket.state_text at decision time; candidates=[c.text for c in packet.candidates]; chosen=index of the picked candidate; old_logp from StepRequest.old_logp (or recomputed by the worker); advantage from a return-minus-baseline over the full episode; sft_target when a teacher distribution is being distilled; meta carries bookkeeping for diffing against the operator log and is ignored by the trainer.",
+      "required": ["prompt", "candidates", "chosen", "old_logp", "advantage"],
+      "properties": {
+        "prompt": {"type": "string", "minLength": 1},
+        "candidates": {"type": "array", "minItems": 2, "items": {"type": "string", "minLength": 1}},
+        "chosen": {"type": "integer", "minimum": 0},
+        "old_logp": {"type": "number"},
+        "advantage": {"type": "number"},
+        "sft_target": {
+          "description": "Optional per-candidate probability distribution (sums to 1 within 1e-4). When present on any row of a dataset it MUST be present on every row, because sequence-label keys must be uniform in a training pack.",
+          "oneOf": [
+            {"type": "null"},
+            {"type": "array", "minItems": 2, "items": {"type": "number", "minimum": 0.0}}
+          ]
+        },
+        "meta": {
+          "description": "Opaque bookkeeping: episode_id, decision_point, step, seed, info snapshot. Ignored by the trainer.",
+          "oneOf": [{"type": "null"}, {"type": "object"}]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {"$ref": "#/$defs/StatePacket"},
+    {"$ref": "#/$defs/ResetRequest"},
+    {"$ref": "#/$defs/StepRequest"},
+    {"$ref": "#/$defs/SnapshotRequest"},
+    {"$ref": "#/$defs/SnapshotResponse"},
+    {"$ref": "#/$defs/RestoreRequest"},
+    {"$ref": "#/$defs/Capabilities"},
+    {"$ref": "#/$defs/DecisionLogRow"}
+  ]
+}
