@@ -152,6 +152,9 @@ def _parse_card(entry: dict, *, where: str, power_ids: set[str] | None) -> CardS
         effects=effects,
         upgraded_from=entry.get("upgraded_from"),
         upgrade_of=entry.get("upgrade_of"),
+        exhaust_on_play=bool(entry.get("exhaust_on_play", False)),
+        ethereal=bool(entry.get("ethereal", False)),
+        unplayable=bool(entry.get("unplayable", False)),
     )
 
 
@@ -289,10 +292,17 @@ def _validate_upgrade_links(cards: dict[str, CardSchema]) -> None:
             raise SimDataError(f"cards:{cid}.upgrade_of {card.upgrade_of!r} not found")
         if card.upgraded_from is not None and card.upgraded_from not in cards:
             raise SimDataError(f"cards:{cid}.upgraded_from {card.upgraded_from!r} not found")
-    # Base cards (no upgraded_from) must point to a valid upgrade_of; and
-    # upgraded cards must point back.
+    # Base attack/skill/power cards (no upgraded_from) must point to a
+    # valid upgrade_of; and upgraded cards must point back. Status and
+    # curse cards do not upgrade and are allowed to carry neither link.
     for cid, card in cards.items():
         if card.upgraded_from is None:
+            if card.card_type in ("status", "curse"):
+                if card.upgrade_of is not None:
+                    raise SimDataError(
+                        f"cards:{cid} is a {card.card_type} and must not declare upgrade_of"
+                    )
+                continue
             if card.upgrade_of is None:
                 raise SimDataError(f"cards:{cid} base card missing upgrade_of pointer")
             upgraded = cards[card.upgrade_of]

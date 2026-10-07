@@ -451,7 +451,23 @@ class CardSchema:
     `upgrade_of` / `upgraded_from` form a two-way link so Smith at a rest
     site can look up either direction. Base cards point forward via
     upgrade_of; upgraded cards point back via upgraded_from. The loader
-    validates both halves exist.
+    validates both halves exist for attack/skill/power cards; status
+    and curse cards are allowed to have neither (they do not upgrade).
+
+    Boolean flags (default False):
+      exhaust_on_play : after the card's effects resolve, the card lands
+                        in exhaust_pile instead of discard_pile. Used by
+                        Pummel / Impervious / most "exhaust." text.
+      ethereal        : if still in hand at end of the player's turn,
+                        the card is automatically exhausted instead of
+                        being discarded. Used by Carnage / Dazed /
+                        most "ethereal." text.
+      unplayable      : the card is filtered out of legal candidates
+                        by the RunLoop. Set to True for status/curse
+                        cards (Wound / Slimed / Dazed / Burn) and for
+                        a handful of regular cards (AscendersBane).
+                        The engine never resolves effects for an
+                        unplayable card.
     """
 
     card_id: str
@@ -463,6 +479,9 @@ class CardSchema:
     effects: tuple[EffectStep, ...]
     upgraded_from: str | None = None
     upgrade_of: str | None = None
+    exhaust_on_play: bool = False
+    ethereal: bool = False
+    unplayable: bool = False
 
 
 @dataclass(frozen=True)

@@ -258,6 +258,8 @@ class RunLoop:
                 continue
             seen_card_ids.add(card_id)
             card = self._cards[card_id]
+            if card.unplayable:
+                continue
             if card.cost > player.energy:
                 continue
             if card.target == "single_enemy":

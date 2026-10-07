@@ -302,5 +302,93 @@
       {"verb": "deal_damage_strike_scaled",
        "args": {"base": 6, "per_strike_bonus": 3, "target_scope": "single_enemy", "hits": 1}}
     ]
+  },
+  {
+    "card_id": "pummel",
+    "name": "Pummel",
+    "cost": 1,
+    "card_type": "attack",
+    "rarity": "uncommon",
+    "target": "single_enemy",
+    "upgrade_of": "pummel+1",
+    "exhaust_on_play": true,
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 2, "target_scope": "single_enemy", "hits": 4}}
+    ]
+  },
+  {
+    "card_id": "pummel+1",
+    "name": "Pummel+",
+    "cost": 1,
+    "card_type": "attack",
+    "rarity": "uncommon",
+    "target": "single_enemy",
+    "upgraded_from": "pummel",
+    "exhaust_on_play": true,
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 2, "target_scope": "single_enemy", "hits": 5}}
+    ]
+  },
+  {
+    "card_id": "carnage",
+    "name": "Carnage",
+    "cost": 2,
+    "card_type": "attack",
+    "rarity": "uncommon",
+    "target": "single_enemy",
+    "upgrade_of": "carnage+1",
+    "ethereal": true,
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 20, "target_scope": "single_enemy", "hits": 1}}
+    ]
+  },
+  {
+    "card_id": "carnage+1",
+    "name": "Carnage+",
+    "cost": 2,
+    "card_type": "attack",
+    "rarity": "uncommon",
+    "target": "single_enemy",
+    "upgraded_from": "carnage",
+    "ethereal": true,
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 28, "target_scope": "single_enemy", "hits": 1}}
+    ]
+  },
+  {
+    "card_id": "impervious",
+    "name": "Impervious",
+    "cost": 2,
+    "card_type": "skill",
+    "rarity": "rare",
+    "target": "self",
+    "upgrade_of": "impervious+1",
+    "exhaust_on_play": true,
+    "effects": [
+      {"verb": "gain_block", "args": {"amount": 30, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "impervious+1",
+    "name": "Impervious+",
+    "cost": 2,
+    "card_type": "skill",
+    "rarity": "rare",
+    "target": "self",
+    "upgraded_from": "impervious",
+    "exhaust_on_play": true,
+    "effects": [
+      {"verb": "gain_block", "args": {"amount": 40, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "wound",
+    "name": "Wound",
+    "cost": 0,
+    "card_type": "status",
+    "rarity": "special",
+    "target": "none",
+    "unplayable": true,
+    "effects": []
   }
 ]

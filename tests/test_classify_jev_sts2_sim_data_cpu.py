@@ -66,16 +66,42 @@ class CardsLoadingTest(unittest.TestCase):
         self.cards = self.sim.load_cards(power_ids=self.power_ids)
 
     def test_card_entry_count(self) -> None:
-        # 12 base cards + 12 upgraded forms after Phase 1 expansion.
-        self.assertEqual(len(self.cards), 24)
+        # 15 base attack/skill/power cards + 15 upgrades + 1 status (Wound)
+        # after Phase 2a mechanics scaffold.
+        self.assertEqual(len(self.cards), 31)
 
-    def test_each_base_card_has_upgrade_link(self) -> None:
-        bases = [c for c in self.cards.values() if c.upgraded_from is None]
-        self.assertEqual(len(bases), 12)
+    def test_each_regular_base_card_has_upgrade_link(self) -> None:
+        bases = [
+            c for c in self.cards.values()
+            if c.upgraded_from is None and c.card_type not in ("status", "curse")
+        ]
+        self.assertEqual(len(bases), 15)
         for base in bases:
             self.assertIsNotNone(base.upgrade_of, f"{base.card_id} missing upgrade_of")
             upgraded = self.cards[base.upgrade_of]
             self.assertEqual(upgraded.upgraded_from, base.card_id)
+
+    def test_status_cards_have_no_upgrade_links(self) -> None:
+        statuses = [c for c in self.cards.values() if c.card_type == "status"]
+        self.assertGreaterEqual(len(statuses), 1)
+        for s in statuses:
+            self.assertIsNone(s.upgrade_of, f"{s.card_id} should not declare upgrade_of")
+            self.assertIsNone(s.upgraded_from, f"{s.card_id} should not declare upgraded_from")
+
+    def test_wound_is_unplayable_zero_cost_status(self) -> None:
+        wound = self.cards["wound"]
+        self.assertEqual(wound.card_type, "status")
+        self.assertEqual(wound.cost, 0)
+        self.assertTrue(wound.unplayable)
+        self.assertEqual(wound.effects, ())
+
+    def test_pummel_exhausts_on_play(self) -> None:
+        self.assertTrue(self.cards["pummel"].exhaust_on_play)
+        self.assertTrue(self.cards["pummel+1"].exhaust_on_play)
+
+    def test_carnage_is_ethereal(self) -> None:
+        self.assertTrue(self.cards["carnage"].ethereal)
+        self.assertTrue(self.cards["carnage+1"].ethereal)
 
     def test_strike_damage_six(self) -> None:
         strike = self.cards["strike"]
@@ -158,7 +184,7 @@ class LoadAllTest(unittest.TestCase):
     def test_load_all_cross_resolves_power_ids(self) -> None:
         powers, cards, enemies = self.sim.load_all()
         self.assertEqual(len(powers), 6)
-        self.assertEqual(len(cards), 24)
+        self.assertEqual(len(cards), 31)
         self.assertEqual(len(enemies), 8)
         # No cross-ref error means every apply_power verb points to a real power.
 

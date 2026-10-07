@@ -167,7 +167,11 @@ class CombatContext:
                 break
 
         if combat.outcome is None:
-            self._player.discard_pile.append(card_id)
+            if card.exhaust_on_play:
+                self._player.exhaust_pile.append(card_id)
+                self._hooks.dispatch("on_card_exhausted", {"card_id": card_id, "source": "exhaust_on_play"})
+            else:
+                self._player.discard_pile.append(card_id)
             self._hooks.dispatch("on_card_played", {"card_id": card_id})
             if not any(m.alive for m in combat.monsters):
                 self._end_combat("victory")
@@ -202,9 +206,18 @@ class CombatContext:
 
     def _end_player_turn(self) -> None:
         combat = self.combat
-        # Discard hand (STS: everything that isn't retain-tagged goes to
-        # discard; no retains in Phase 1).
-        self._player.discard_pile.extend(self._player.hand)
+        # Ethereal cards still in hand at end of turn exhaust rather than
+        # discard (STS "ethereal." text). Walk hand once, routing cards to
+        # exhaust vs discard based on the schema flag.
+        kept_discards: list[str] = []
+        for card_id in self._player.hand:
+            card = self._card_defs.get(card_id)
+            if card is not None and card.ethereal:
+                self._player.exhaust_pile.append(card_id)
+                self._hooks.dispatch("on_card_exhausted", {"card_id": card_id, "source": "ethereal"})
+            else:
+                kept_discards.append(card_id)
+        self._player.discard_pile.extend(kept_discards)
         self._player.hand.clear()
         self._decay_turn_powers(self._player, owner_phase=CombatPhase.PLAYER)
         self._hooks.dispatch("on_player_turn_end", {})

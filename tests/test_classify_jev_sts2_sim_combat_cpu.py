@@ -457,6 +457,75 @@ class ExpansionEnemiesTest(unittest.TestCase):
         self.assertEqual(ctx.player.hp, hp0 - 9)
 
 
+class ExhaustAndEtherealTest(unittest.TestCase):
+    """Phase 2a mechanics scaffold: exhaust_on_play and ethereal flags."""
+
+    def setUp(self) -> None:
+        self.sim = _import_sim()
+
+    def test_pummel_lands_in_exhaust_not_discard(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["pummel"] * 5)
+        worm = ctx.combat.monsters[0]
+        _plant_hand(ctx, ["pummel"], energy=3)
+        pre_exhaust = len(ctx.player.exhaust_pile)
+        pre_discard = len(ctx.player.discard_pile)
+        hp0 = worm.hp
+        ctx.play_card("pummel", target_slot=0)
+        self.assertEqual(worm.hp, hp0 - 8)  # 2 damage x 4 hits
+        self.assertEqual(len(ctx.player.exhaust_pile), pre_exhaust + 1)
+        self.assertEqual(ctx.player.exhaust_pile[-1], "pummel")
+        self.assertEqual(len(ctx.player.discard_pile), pre_discard)
+
+    def test_pummel_plus_five_hits(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["pummel+1"] * 5)
+        worm = ctx.combat.monsters[0]
+        _plant_hand(ctx, ["pummel+1"], energy=3)
+        hp0 = worm.hp
+        ctx.play_card("pummel+1", target_slot=0)
+        self.assertEqual(worm.hp, hp0 - 10)  # 2 x 5
+
+    def test_impervious_blocks_thirty(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["impervious"] * 5)
+        _plant_hand(ctx, ["impervious"], energy=3)
+        ctx.play_card("impervious")
+        self.assertEqual(ctx.player.block, 30)
+        self.assertEqual(ctx.player.exhaust_pile[-1], "impervious")
+
+    def test_carnage_ethereal_exhausts_at_end_of_turn(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["carnage"] * 5)
+        _plant_hand(ctx, ["carnage"], energy=3)
+        pre_exhaust = len(ctx.player.exhaust_pile)
+        ctx.end_turn()
+        # Carnage was still in hand; must have exhausted, not discarded.
+        self.assertIn("carnage", ctx.player.exhaust_pile)
+        self.assertNotIn("carnage", ctx.player.discard_pile)
+        self.assertGreater(len(ctx.player.exhaust_pile), pre_exhaust)
+
+    def test_non_ethereal_card_still_discards_at_end_of_turn(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["strike"] * 10)
+        _plant_hand(ctx, ["strike"], energy=3)
+        ctx.end_turn()
+        self.assertIn("strike", ctx.player.discard_pile)
+        self.assertNotIn("strike", ctx.player.exhaust_pile)
+
+    def test_carnage_played_still_follows_exhaust_rules_if_flagged(self) -> None:
+        """Carnage without exhaust_on_play lands in discard like a normal card.
+        (The ethereal flag only matters at end of turn — a played Carnage goes
+        to discard, not exhaust, since exhaust_on_play is False.)"""
+
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["carnage"] * 5)
+        _plant_hand(ctx, ["carnage"], energy=3)
+        ctx.play_card("carnage", target_slot=0)
+        self.assertIn("carnage", ctx.player.discard_pile)
+        self.assertNotIn("carnage", ctx.player.exhaust_pile)
+
+
 class TurnFlowTest(unittest.TestCase):
     def setUp(self) -> None:
         self.sim = _import_sim()

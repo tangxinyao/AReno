@@ -181,6 +181,22 @@ class CandidateFilteringTest(unittest.TestCase):
         alive = sum(1 for m in self.loop.state.combat.monsters if m.alive)
         self.assertEqual(len(strike_candidates), alive)
 
+    def test_unplayable_wound_filtered_from_candidates(self) -> None:
+        self.loop.state.player.hand[:] = ["wound", "strike"]
+        self.loop.state.player.energy = 3
+        packet = self.loop._packet()
+        ids = {c["id"] for c in packet["candidates"]}
+        self.assertNotIn("play:wound", ids)
+        self.assertNotIn("play:wound:0", ids)
+        self.assertTrue(any(i.startswith("play:strike") for i in ids))
+
+    def test_hand_of_only_unplayables_leaves_only_end_turn(self) -> None:
+        self.loop.state.player.hand[:] = ["wound", "wound"]
+        self.loop.state.player.energy = 3
+        packet = self.loop._packet()
+        ids = {c["id"] for c in packet["candidates"]}
+        self.assertEqual(ids, {"end_turn"})
+
 
 if __name__ == "__main__":
     unittest.main()
