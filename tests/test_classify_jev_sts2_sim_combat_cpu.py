@@ -291,6 +291,172 @@ class VerbCombinationsTest(unittest.TestCase):
         self.assertEqual(b.powers.get("vulnerable", 0), 1)
 
 
+class ExpansionCardsTest(unittest.TestCase):
+    """Phase 1 expansion: Clothesline + Perfected Strike."""
+
+    def setUp(self) -> None:
+        self.sim = _import_sim()
+
+    def test_clothesline_damage_and_weak(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["clothesline"] * 5)
+        worm = ctx.combat.monsters[0]
+        _plant_hand(ctx, ["clothesline"], energy=3)
+        hp0 = worm.hp
+        ctx.play_card("clothesline", target_slot=0)
+        self.assertEqual(worm.hp, hp0 - 12)
+        self.assertEqual(worm.powers.get("weak"), 2)
+
+    def test_clothesline_plus_fourteen_damage_three_weak(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["clothesline+1"] * 5)
+        worm = ctx.combat.monsters[0]
+        _plant_hand(ctx, ["clothesline+1"], energy=3)
+        hp0 = worm.hp
+        ctx.play_card("clothesline+1", target_slot=0)
+        self.assertEqual(worm.hp, hp0 - 14)
+        self.assertEqual(worm.powers.get("weak"), 3)
+
+    def test_perfected_strike_counts_self(self) -> None:
+        """With nothing else in deck, Perfected Strike still counts itself: 6 + 2*1 = 8."""
+
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["perfected_strike"])
+        worm = ctx.combat.monsters[0]
+        # Clear every pile so only the card in flight counts.
+        ctx.player.hand = ["perfected_strike"]
+        ctx.player.draw_pile = []
+        ctx.player.discard_pile = []
+        ctx.player.exhaust_pile = []
+        ctx.player.energy = 3
+        hp0 = worm.hp
+        ctx.play_card("perfected_strike", target_slot=0)
+        self.assertEqual(worm.hp, hp0 - 8)
+
+    def test_perfected_strike_counts_across_all_zones(self) -> None:
+        """2 strikes in hand + 1 in draw + 1 in discard + 1 in exhaust + self = 6 strikes.
+        Damage = 6 + 2*6 = 18."""
+
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["perfected_strike"])
+        worm = ctx.combat.monsters[0]
+        ctx.player.hand = ["perfected_strike", "strike", "strike"]
+        ctx.player.draw_pile = ["pommel_strike"]
+        ctx.player.discard_pile = ["twin_strike"]
+        ctx.player.exhaust_pile = ["strike+1"]
+        ctx.player.energy = 3
+        hp0 = worm.hp
+        ctx.play_card("perfected_strike", target_slot=0)
+        self.assertEqual(worm.hp, hp0 - 18)
+
+    def test_perfected_strike_ignores_non_strike_cards(self) -> None:
+        """Defend / Bash / Cleave should not count — only cards whose id contains 'strike'."""
+
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["perfected_strike"])
+        worm = ctx.combat.monsters[0]
+        ctx.player.hand = ["perfected_strike"]
+        ctx.player.draw_pile = ["defend", "bash", "cleave"]
+        ctx.player.discard_pile = []
+        ctx.player.exhaust_pile = []
+        ctx.player.energy = 3
+        hp0 = worm.hp
+        ctx.play_card("perfected_strike", target_slot=0)
+        # Only self counts -> 6 + 2 = 8
+        self.assertEqual(worm.hp, hp0 - 8)
+
+    def test_perfected_strike_plus_scales_at_three_per_strike(self) -> None:
+        """PS+ bonus is 3 per strike. 1 strike in draw + self = 2 strikes.
+        Damage = 6 + 3*2 = 12."""
+
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["perfected_strike+1"])
+        worm = ctx.combat.monsters[0]
+        ctx.player.hand = ["perfected_strike+1"]
+        ctx.player.draw_pile = ["strike"]
+        ctx.player.discard_pile = []
+        ctx.player.exhaust_pile = []
+        ctx.player.energy = 3
+        hp0 = worm.hp
+        ctx.play_card("perfected_strike+1", target_slot=0)
+        self.assertEqual(worm.hp, hp0 - 12)
+
+
+class ExpansionEnemiesTest(unittest.TestCase):
+    """Phase 1 expansion: Blue Slaver / Red Slaver / Fungi Beast."""
+
+    def setUp(self) -> None:
+        self.sim = _import_sim()
+
+    def _run_queued(self, ctx, enemy_slot: int = 0) -> None:
+        """Force the queued move to execute via a plain end_turn cycle."""
+
+        ctx.end_turn()
+
+    def test_blue_slaver_rake_damage_and_weak(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["blue_slaver"], ["defend"] * 10)
+        slaver = ctx.combat.monsters[0]
+        slaver.queued_move = "rake"
+        hp0 = ctx.player.hp
+        ctx.end_turn()
+        self.assertEqual(ctx.player.hp, hp0 - 7)
+        self.assertEqual(ctx.player.powers.get("weak"), 1)
+
+    def test_blue_slaver_stab_damage(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["blue_slaver"], ["defend"] * 10)
+        slaver = ctx.combat.monsters[0]
+        slaver.queued_move = "stab"
+        hp0 = ctx.player.hp
+        ctx.end_turn()
+        self.assertEqual(ctx.player.hp, hp0 - 13)
+
+    def test_red_slaver_scrape_damage_and_vulnerable(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["red_slaver"], ["defend"] * 10)
+        slaver = ctx.combat.monsters[0]
+        slaver.queued_move = "scrape"
+        hp0 = ctx.player.hp
+        ctx.end_turn()
+        self.assertEqual(ctx.player.hp, hp0 - 8)
+        self.assertEqual(ctx.player.powers.get("vulnerable"), 1)
+
+    def test_fungi_beast_grow_adds_strength_to_self(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["fungi_beast"], ["defend"] * 10)
+        beast = ctx.combat.monsters[0]
+        beast.queued_move = "grow"
+        hp0 = ctx.player.hp
+        ctx.end_turn()
+        self.assertEqual(beast.powers.get("strength"), 3)
+        self.assertEqual(ctx.player.hp, hp0)  # grow doesn't damage
+
+    def test_fungi_beast_grow_not_repeated(self) -> None:
+        """Grow is if_not_last — after Grow is played, the next pick must be Bite."""
+
+        ctx, *_ = _make_ctx(self.sim, seed=1)
+        ctx.start_combat(["fungi_beast"], ["defend"] * 10)
+        beast = ctx.combat.monsters[0]
+        beast.queued_move = "grow"
+        ctx.end_turn()  # Grow fires, next-turn queue is picked after
+        # The newly-queued move must be bite (grow is if_not_last).
+        self.assertEqual(beast.queued_move, "bite")
+
+    def test_fungi_beast_grow_strength_boosts_next_bite(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["fungi_beast"], ["defend"] * 10)
+        beast = ctx.combat.monsters[0]
+        beast.queued_move = "grow"
+        ctx.end_turn()
+        # Force next move to bite so the test is deterministic.
+        beast.queued_move = "bite"
+        hp0 = ctx.player.hp
+        ctx.end_turn()
+        # Bite base 6 + strength 3 = 9 damage.
+        self.assertEqual(ctx.player.hp, hp0 - 9)
+
+
 class TurnFlowTest(unittest.TestCase):
     def setUp(self) -> None:
         self.sim = _import_sim()

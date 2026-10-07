@@ -136,5 +136,79 @@
       {"move_id": "tackle", "rule": "if_not_two", "weight": 40},
       {"move_id": "lick", "rule": "if_not_two", "weight": 30}
     ]
+  },
+  {
+    "enemy_id": "blue_slaver",
+    "name": "Blue Slaver",
+    "hp_min": 46,
+    "hp_max": 50,
+    "moves": {
+      "stab": {
+        "intent": "attack",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 13, "target_scope": "player", "hits": 1}}
+        ]
+      },
+      "rake": {
+        "intent": "attack_debuff",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 7, "target_scope": "player", "hits": 1}},
+          {"verb": "apply_power", "args": {"power_id": "weak", "amount": 1, "target_scope": "player"}}
+        ]
+      }
+    },
+    "movepicker": [
+      {"move_id": "stab", "rule": "if_not_two", "weight": 60},
+      {"move_id": "rake", "rule": "if_not_two", "weight": 40}
+    ]
+  },
+  {
+    "enemy_id": "red_slaver",
+    "name": "Red Slaver",
+    "hp_min": 46,
+    "hp_max": 50,
+    "moves": {
+      "stab": {
+        "intent": "attack",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 13, "target_scope": "player", "hits": 1}}
+        ]
+      },
+      "scrape": {
+        "intent": "attack_debuff",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 8, "target_scope": "player", "hits": 1}},
+          {"verb": "apply_power", "args": {"power_id": "vulnerable", "amount": 1, "target_scope": "player"}}
+        ]
+      }
+    },
+    "movepicker": [
+      {"move_id": "stab", "rule": "if_not_two", "weight": 60},
+      {"move_id": "scrape", "rule": "if_not_two", "weight": 40}
+    ]
+  },
+  {
+    "enemy_id": "fungi_beast",
+    "name": "Fungi Beast",
+    "hp_min": 22,
+    "hp_max": 28,
+    "moves": {
+      "bite": {
+        "intent": "attack",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 6, "target_scope": "player", "hits": 1}}
+        ]
+      },
+      "grow": {
+        "intent": "buff",
+        "effects": [
+          {"verb": "apply_power", "args": {"power_id": "strength", "amount": 3, "target_scope": "self"}}
+        ]
+      }
+    },
+    "movepicker": [
+      {"move_id": "bite", "rule": "if_not_two", "weight": 60},
+      {"move_id": "grow", "rule": "if_not_last", "weight": 40}
+    ]
   }
 ]

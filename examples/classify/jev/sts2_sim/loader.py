@@ -263,12 +263,19 @@ def _parse_effect(step: Any, *, where: str, source: str, power_ids: set[str] | N
         if pid not in power_ids:
             raise SimDataError(f"{where}.args.power_id references unknown power {pid!r}")
 
-    if "amount" in normalized and not isinstance(normalized["amount"], int):
-        raise SimDataError(f"{where}.args.amount must be int")
-    if "amount" in normalized and normalized["amount"] < 0:
-        raise SimDataError(f"{where}.args.amount must be >= 0")
-    if "hits" in normalized and normalized["hits"] < 1:
-        raise SimDataError(f"{where}.args.hits must be >= 1")
+    # Numeric sanity: every int-typed arg must be >= 0, except `hits` which
+    # must be >= 1 since zero hits is nonsensical for a damage verb.
+    for arg_name, arg_type in spec.items():
+        if arg_type is not int:
+            continue
+        value = normalized.get(arg_name)
+        if value is None:
+            continue
+        if arg_name == "hits":
+            if value < 1:
+                raise SimDataError(f"{where}.args.hits must be >= 1")
+        elif value < 0:
+            raise SimDataError(f"{where}.args.{arg_name} must be >= 0")
 
     return EffectStep(verb=verb, args=normalized)
 

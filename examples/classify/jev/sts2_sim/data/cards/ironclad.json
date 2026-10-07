@@ -250,5 +250,57 @@
       {"verb": "gain_block", "args": {"amount": 11, "target_scope": "self"}},
       {"verb": "draw_cards", "args": {"amount": 1}}
     ]
+  },
+  {
+    "card_id": "clothesline",
+    "name": "Clothesline",
+    "cost": 2,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "single_enemy",
+    "upgrade_of": "clothesline+1",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 12, "target_scope": "single_enemy", "hits": 1}},
+      {"verb": "apply_power", "args": {"power_id": "weak", "amount": 2, "target_scope": "single_enemy"}}
+    ]
+  },
+  {
+    "card_id": "clothesline+1",
+    "name": "Clothesline+",
+    "cost": 2,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "single_enemy",
+    "upgraded_from": "clothesline",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 14, "target_scope": "single_enemy", "hits": 1}},
+      {"verb": "apply_power", "args": {"power_id": "weak", "amount": 3, "target_scope": "single_enemy"}}
+    ]
+  },
+  {
+    "card_id": "perfected_strike",
+    "name": "Perfected Strike",
+    "cost": 2,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "single_enemy",
+    "upgrade_of": "perfected_strike+1",
+    "effects": [
+      {"verb": "deal_damage_strike_scaled",
+       "args": {"base": 6, "per_strike_bonus": 2, "target_scope": "single_enemy", "hits": 1}}
+    ]
+  },
+  {
+    "card_id": "perfected_strike+1",
+    "name": "Perfected Strike+",
+    "cost": 2,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "single_enemy",
+    "upgraded_from": "perfected_strike",
+    "effects": [
+      {"verb": "deal_damage_strike_scaled",
+       "args": {"base": 6, "per_strike_bonus": 3, "target_scope": "single_enemy", "hits": 1}}
+    ]
   }
 ]

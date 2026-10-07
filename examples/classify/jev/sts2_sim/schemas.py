@@ -97,23 +97,25 @@ TARGET_SCOPES: Final = frozenset({
 # arg -> expected Python type. `target_scope` is validated separately against
 # TARGET_SCOPES below.
 EFFECT_VERBS: Final[dict[str, dict[str, type]]] = {
-    "deal_damage":      {"amount": int, "target_scope": str, "hits": int},
-    "gain_block":       {"amount": int, "target_scope": str},
-    "apply_power":      {"power_id": str, "amount": int, "target_scope": str},
-    "draw_cards":       {"amount": int},
-    "copy_to_discard":  {},
+    "deal_damage":               {"amount": int, "target_scope": str, "hits": int},
+    "deal_damage_strike_scaled": {"base": int, "per_strike_bonus": int, "target_scope": str, "hits": int},
+    "gain_block":                {"amount": int, "target_scope": str},
+    "apply_power":               {"power_id": str, "amount": int, "target_scope": str},
+    "draw_cards":                {"amount": int},
+    "copy_to_discard":           {},
 }
 
 # Which scopes each verb accepts. The loader cross-checks the step's
 # target_scope against this map.
 VERB_ALLOWED_SCOPES: Final[dict[str, frozenset[str]]] = {
-    "deal_damage":   frozenset({"single_enemy", "all_enemies", "random_enemy", "player"}),
-    "gain_block":    frozenset({"self"}),
-    "apply_power":   frozenset({"self", "single_enemy", "all_enemies", "random_enemy", "player"}),
+    "deal_damage":               frozenset({"single_enemy", "all_enemies", "random_enemy", "player"}),
+    "deal_damage_strike_scaled": frozenset({"single_enemy", "all_enemies", "random_enemy"}),
+    "gain_block":                frozenset({"self"}),
+    "apply_power":               frozenset({"self", "single_enemy", "all_enemies", "random_enemy", "player"}),
 }
 
 # Verbs cards may use. Enemy moves use the complement defined below.
-CARD_ONLY_VERBS: Final = frozenset({"draw_cards", "copy_to_discard"})
+CARD_ONLY_VERBS: Final = frozenset({"draw_cards", "copy_to_discard", "deal_damage_strike_scaled"})
 ENEMY_ONLY_VERBS: Final = frozenset()  # no enemy-exclusive verbs yet
 
 POWER_KINDS: Final = frozenset({"buff", "debuff"})
@@ -190,6 +192,44 @@ Edge cases:
     a no-op; no hooks fire.
   * hits > 1 against a target that dies on an earlier hit: subsequent
     hits are suppressed (dead enemies are skipped).
+""",
+
+    "deal_damage_strike_scaled": """\
+Deal damage whose amount scales with the count of Strike-family cards
+across every zone of the player's deck. Card-only — only Perfected
+Strike uses it in Phase 1. Enemy moves may not call this verb.
+
+Required args:
+  base              : int >= 0, flat damage before scaling.
+  per_strike_bonus  : int >= 0, bonus damage per Strike-named card.
+  target_scope      : one of single_enemy / all_enemies / random_enemy.
+                      "player" is rejected at load time.
+  hits              : int >= 1, defaults to 1.
+
+Pipeline:
+  1. Count every card_id in hand + draw_pile + discard_pile +
+     exhaust_pile where the substring "strike" appears in the id. All
+     authored Strike-family ids follow snake_case ("strike",
+     "pommel_strike", "twin_strike", "perfected_strike", upgraded
+     variants) so a plain substring match is sufficient and matches
+     STS wording ("cards containing 'Strike'").
+  2. Add 1 if the source card's own id contains "strike" — the card
+     has already been removed from hand by the time the effect
+     resolves (play_card runs hand.remove before the effect loop), so
+     including it manually mirrors STS where Perfected Strike counts
+     itself.
+  3. amount = base + per_strike_bonus * count
+  4. Delegate the rest to deal_damage with the computed amount, so
+     strength / weak / vulnerable / block all apply exactly the same
+     way (see deal_damage spec).
+
+Hooks fired: identical to deal_damage (on_damaged, on_enemy_killed).
+
+Edge cases:
+  * No strike-named cards anywhere AND the source card is not itself
+    strike-named -> amount == base.
+  * Running Perfected Strike against a dead captured target with the
+    full base amount still no-ops silently per deal_damage's rules.
 """,
 
     "gain_block": """\

@@ -271,6 +271,8 @@ class CombatContext:
         args = step.args
         if verb == "deal_damage":
             self._v_deal_damage(args, ctx)
+        elif verb == "deal_damage_strike_scaled":
+            self._v_deal_damage_strike_scaled(args, ctx)
         elif verb == "gain_block":
             self._v_gain_block(args, ctx)
         elif verb == "apply_power":
@@ -321,6 +323,25 @@ class CombatContext:
                 })
                 if isinstance(tgt, MonsterState) and tgt.hp == 0:
                     self._hooks.dispatch("on_enemy_killed", {"target": tgt})
+
+    def _v_deal_damage_strike_scaled(self, args: dict[str, Any], ctx: _EffectContext) -> None:
+        base = int(args["base"])
+        per_strike = int(args["per_strike_bonus"])
+        count = 0
+        for pile in (
+            self._player.hand,
+            self._player.draw_pile,
+            self._player.discard_pile,
+            self._player.exhaust_pile,
+        ):
+            count += sum(1 for cid in pile if "strike" in cid)
+        if ctx.source_card is not None and "strike" in ctx.source_card.card_id:
+            count += 1
+        amount = base + per_strike * count
+        self._v_deal_damage(
+            {"amount": amount, "target_scope": args["target_scope"], "hits": int(args.get("hits", 1))},
+            ctx,
+        )
 
     def _v_gain_block(self, args: dict[str, Any], ctx: _EffectContext) -> None:
         base = int(args["amount"])

@@ -65,12 +65,13 @@ class CardsLoadingTest(unittest.TestCase):
         self.power_ids = set(powers.keys())
         self.cards = self.sim.load_cards(power_ids=self.power_ids)
 
-    def test_twenty_card_entries(self) -> None:
-        self.assertEqual(len(self.cards), 20)
+    def test_card_entry_count(self) -> None:
+        # 12 base cards + 12 upgraded forms after Phase 1 expansion.
+        self.assertEqual(len(self.cards), 24)
 
     def test_each_base_card_has_upgrade_link(self) -> None:
         bases = [c for c in self.cards.values() if c.upgraded_from is None]
-        self.assertEqual(len(bases), 10)
+        self.assertEqual(len(bases), 12)
         for base in bases:
             self.assertIsNotNone(base.upgrade_of, f"{base.card_id} missing upgrade_of")
             upgraded = self.cards[base.upgrade_of]
@@ -112,10 +113,13 @@ class EnemiesLoadingTest(unittest.TestCase):
         powers = self.sim.load_powers()
         self.enemies = self.sim.load_enemies(power_ids=set(powers.keys()))
 
-    def test_five_act1_enemies(self) -> None:
+    def test_act1_enemies_present(self) -> None:
         self.assertEqual(
             set(self.enemies.keys()),
-            {"jaw_worm", "cultist", "red_louse", "green_louse", "acid_slime_m"},
+            {
+                "jaw_worm", "cultist", "red_louse", "green_louse", "acid_slime_m",
+                "blue_slaver", "red_slaver", "fungi_beast",
+            },
         )
 
     def test_cultist_first_move_is_incantation(self) -> None:
@@ -154,8 +158,8 @@ class LoadAllTest(unittest.TestCase):
     def test_load_all_cross_resolves_power_ids(self) -> None:
         powers, cards, enemies = self.sim.load_all()
         self.assertEqual(len(powers), 6)
-        self.assertEqual(len(cards), 20)
-        self.assertEqual(len(enemies), 5)
+        self.assertEqual(len(cards), 24)
+        self.assertEqual(len(enemies), 8)
         # No cross-ref error means every apply_power verb points to a real power.
 
 
