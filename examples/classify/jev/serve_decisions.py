@@ -2,6 +2,7 @@
 
     POST /api/alpha/decisions  {model, state, questions} -> {model, answers, usage, latency_ms}
     POST /v1/systemone         same contract (jev-forge's path)
+    POST /admin/reload         {checkpoint, [temperature]} -> hot-swap weights (--admin-key required)
     GET  /v1/models, /health
 
 The checkpoint is an AReno classify output (`step_XXXXXX/`): an HF backbone
@@ -13,10 +14,24 @@ used in training.
 Candidate paths are encoded exactly as in training (`dataset_loader.py`) and
 all paths of one request are scored in one packed varlen forward (no padding).
 
-Answers follow jev-forge's `Predictor.decide`:
-    noul   -> {"type": "noul", "noul": P(true)}
-    choice -> {"type": "choice", "choice": id, "probabilities": {...}, "confidence": c}
-    score  -> {"type": "score", "score": E[level], "legend": {...}, "probabilities": {...}, "confidence": c}
+Answers follow jev-forge's `Predictor.decide`, with an extra `logits` field
+on every answer so RL rollout workers can record `old_logp` consistently
+regardless of the display `--temperature`:
+    noul   -> {"type": "noul", "noul": P(true), "logits": {"false": s0, "true": s1}}
+    choice -> {"type": "choice", "choice": id, "probabilities": {...}, "confidence": c,
+               "logits": {candidate_id: raw_score}}
+    score  -> {"type": "score", "score": E[level], "legend": {...}, "probabilities": {...},
+               "confidence": c, "logits": {str(i): raw_score}}
+
+`probabilities` is softmax(logits / --temperature) and is intended for display
+and jev-forge callers. For PPO, record `old_logp = log_softmax(logits / T)[chosen]`
+with whatever sampling temperature T you actually sampled from, so that it
+matches the training-time distribution.
+
+Hot-swap during RL rounds: start the server with `--admin-key <secret>` and
+POST `{"checkpoint": "/path/to/step_000400"}` to `/admin/reload`. The old
+model is dropped before the new one loads; in-flight decisions block briefly
+on the swap lock. Without `--admin-key`, the endpoint is not registered.
 
     python examples/classify/jev/serve_decisions.py --checkpoint ~/areno-runs/ling-3.0-tiny-jev --port 8123
 """
@@ -28,8 +43,10 @@ import json
 import logging
 import math
 import sys
+import threading
 import time
 from pathlib import Path
+from typing import Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -145,6 +162,7 @@ class DecisionModel:
         for qid, question, leaves in encoded:
             group = logits[offset : offset + len(leaves)]
             offset += len(leaves)
+            raw = [float(value) for value in group.tolist()]
             values = torch.softmax(group / self.temperature, dim=-1).tolist()
             values = [v if math.isfinite(v) else 0.0 for v in values]
             total = math.fsum(values) or 1.0
@@ -152,7 +170,11 @@ class DecisionModel:
             ids = candidate_ids(question)
             kind = question["type"]
             if kind == "noul":
-                answers[qid] = {"type": "noul", "noul": values[1]}
+                answers[qid] = {
+                    "type": "noul",
+                    "noul": values[1],
+                    "logits": {"false": raw[0], "true": raw[1]},
+                }
             elif kind == "choice":
                 best = max(range(len(ids)), key=values.__getitem__)
                 answers[qid] = {
@@ -160,6 +182,7 @@ class DecisionModel:
                     "choice": ids[best],
                     "probabilities": dict(zip(ids, values, strict=True)),
                     "confidence": confidence_from(values),
+                    "logits": dict(zip(ids, raw, strict=True)),
                 }
             else:
                 answers[qid] = {
@@ -168,11 +191,99 @@ class DecisionModel:
                     "legend": {str(i): text for i, text in enumerate(question["criteria"])},
                     "probabilities": {str(i): v for i, v in enumerate(values)},
                     "confidence": confidence_from(values),
+                    "logits": {str(i): raw[i] for i in range(len(raw))},
                 }
         return answers, sum(len(leaf) for leaf in flat)
 
 
-def build_app(model: DecisionModel, model_name: str, api_key: str | None):
+class ServedModel:
+    """DecisionModel holder with a reload lock, so a running server can hot-swap weights.
+
+    All calls to `decide` and `model_info` take the lock. `reload` drops the
+    current model before loading the new one so VRAM is not held twice; while
+    the swap is in flight callers see one blocking wait, not a 2x spike. A
+    factory callable makes this testable without a real checkpoint.
+    """
+
+    def __init__(
+        self,
+        *,
+        factory: "Callable[[str, dict], DecisionModel]",
+        checkpoint: str,
+        model_name: str,
+        model_opts: dict,
+    ):
+        self._factory = factory
+        self._opts = dict(model_opts)
+        self._model: "DecisionModel | None" = factory(checkpoint, dict(self._opts))
+        self._name = model_name
+        self._checkpoint = checkpoint
+        self._lock = threading.Lock()
+        self.reload_count = 0
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def decide(self, state: str, questions: dict) -> tuple[dict, int]:
+        with self._lock:
+            if self._model is None:
+                raise RuntimeError("model is unavailable during reload")
+            return self._model.decide(state, questions)
+
+    def model_info(self) -> dict:
+        with self._lock:
+            model = self._model
+            return {
+                "model": self._name,
+                "checkpoint": self._checkpoint,
+                "temperature": model.temperature if model is not None else None,
+                "calls": getattr(model, "calls", 0),
+                "reloads": self.reload_count,
+            }
+
+    def reload(self, checkpoint: str, *, overrides: dict | None = None, model_name: str | None = None) -> dict:
+        new_opts = dict(self._opts)
+        new_opts.update(overrides or {})
+        with self._lock:
+            old = self._model
+            self._model = None
+        del old
+        _free_gpu_cache()
+        new_model = self._factory(checkpoint, new_opts)
+        with self._lock:
+            self._model = new_model
+            self._opts = new_opts
+            self._name = model_name or Path(checkpoint).expanduser().name
+            self._checkpoint = checkpoint
+            self.reload_count += 1
+        return self.model_info()
+
+
+def _free_gpu_cache() -> None:
+    import gc
+
+    gc.collect()
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:  # torch missing or CUDA init failure: nothing to free.
+        pass
+
+
+def _default_model_factory(checkpoint: str, opts: dict) -> DecisionModel:
+    return DecisionModel(
+        checkpoint,
+        max_length=int(opts["max_length"]),
+        temperature=float(opts["temperature"]),
+        attn_backend=str(opts["attn_backend"]),
+        max_tokens=int(opts["max_tokens"]),
+    )
+
+
+def build_app(served: ServedModel, api_key: str | None, admin_key: str | None = None):
     from fastapi import FastAPI, Request
     from fastapi.responses import JSONResponse
 
@@ -183,11 +294,12 @@ def build_app(model: DecisionModel, model_name: str, api_key: str | None):
 
     @app.get("/health")
     def health():
-        return {"ready": True, "model": model_name, "calls": model.calls}
+        return {"ready": True, **served.model_info()}
 
     @app.get("/v1/models")
     def models():
-        return {"data": [{"id": model_name, "owned_by": "areno", "temperature": model.temperature}]}
+        info = served.model_info()
+        return {"data": [{"id": info["model"], "owned_by": "areno", "temperature": info["temperature"]}]}
 
     async def decisions(request: Request):
         started = time.perf_counter()
@@ -212,11 +324,11 @@ def build_app(model: DecisionModel, model_name: str, api_key: str | None):
                 paths += 2 if question["type"] == "noul" else len(question["criteria"])
             if paths > MAX_PATHS:
                 return error(422, f"{paths} candidate paths exceed the {MAX_PATHS} limit")
-            answers, input_tokens = model.decide(state, questions)
+            answers, input_tokens = served.decide(state, questions)
         except ValueError as exc:
             return error(422, str(exc))
         return {
-            "model": model_name,
+            "model": served.name,
             "answers": answers,
             "usage": {"input_tokens": input_tokens, "output_tokens": 0, "candidate_paths": paths},
             "latency_ms": round((time.perf_counter() - started) * 1000, 2),
@@ -224,6 +336,42 @@ def build_app(model: DecisionModel, model_name: str, api_key: str | None):
 
     app.add_api_route("/api/alpha/decisions", decisions, methods=["POST"])
     app.add_api_route("/v1/systemone", decisions, methods=["POST"])
+
+    if admin_key is not None:
+        async def admin_reload(request: Request):
+            if request.headers.get("authorization") != f"Bearer {admin_key}":
+                return error(401, "invalid or missing admin token")
+            try:
+                payload = await request.json()
+            except ValueError:
+                return error(400, "body must be JSON")
+            if not isinstance(payload, dict) or "checkpoint" not in payload:
+                return error(422, "body must hold {checkpoint, [temperature], [model_name]}")
+            checkpoint = payload["checkpoint"]
+            if not isinstance(checkpoint, str) or not checkpoint.strip():
+                return error(422, "checkpoint must be a non-empty string path")
+            overrides = {}
+            if "temperature" in payload:
+                try:
+                    overrides["temperature"] = float(payload["temperature"])
+                except (TypeError, ValueError):
+                    return error(422, "temperature must be a number")
+                if overrides["temperature"] <= 0:
+                    return error(422, "temperature must be positive")
+            model_name = payload.get("model_name")
+            if model_name is not None and (not isinstance(model_name, str) or not model_name.strip()):
+                return error(422, "model_name must be a non-empty string")
+            try:
+                info = served.reload(checkpoint, overrides=overrides or None, model_name=model_name)
+            except FileNotFoundError as exc:
+                return error(404, f"checkpoint not found: {exc}")
+            except Exception as exc:  # the server stays up; the admin sees the error.
+                logger.exception("admin reload failed")
+                return error(500, f"reload failed: {exc}")
+            return {"ok": True, **info}
+
+        app.add_api_route("/admin/reload", admin_reload, methods=["POST"])
+
     return app
 
 
@@ -238,20 +386,35 @@ def main() -> None:
     parser.add_argument("--attn-backend", choices=["flash", "native"], default="flash")
     parser.add_argument("--max-tokens", type=int, default=16384, help="packed tokens per forward")
     parser.add_argument("--api-key", default=None, help="require `Authorization: Bearer <key>` when set")
+    parser.add_argument(
+        "--admin-key",
+        default=None,
+        help="enable POST /admin/reload to hot-swap the checkpoint; required for RL rounds",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 
-    model = DecisionModel(
-        args.checkpoint,
-        max_length=args.max_length,
-        temperature=args.temperature,
-        attn_backend=args.attn_backend,
-        max_tokens=args.max_tokens,
-    )
+    opts = {
+        "max_length": args.max_length,
+        "temperature": args.temperature,
+        "attn_backend": args.attn_backend,
+        "max_tokens": args.max_tokens,
+    }
     name = args.model_name or Path(args.checkpoint).expanduser().name
+    served = ServedModel(
+        factory=_default_model_factory,
+        checkpoint=args.checkpoint,
+        model_name=name,
+        model_opts=opts,
+    )
     import uvicorn
 
-    uvicorn.run(build_app(model, name, args.api_key), host=args.host, port=args.port, log_level="info")
+    uvicorn.run(
+        build_app(served, args.api_key, admin_key=args.admin_key),
+        host=args.host,
+        port=args.port,
+        log_level="info",
+    )
 
 
 if __name__ == "__main__":
