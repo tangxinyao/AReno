@@ -1,16 +1,14 @@
-"""End-to-end smoke demo of the r33hab/sts2 operator shim.
+"""End-to-end smoke demo of the in-house `sts2_sim` operator shim.
 
-Builds a backend, resets a fresh run, takes three legal actions chosen by a
-greedy "first legal action" policy, and prints the resulting StatePackets.
-This is the minimum thing that proves /reset -> /step -> /step -> /step
-goes through the operator contract against a real NativeAOT emulator.
+Replaces the earlier `demo_r33hab.py` and no longer depends on any
+NativeAOT emulator. Builds the backend, resets a fresh run, drives the
+decision loop with a greedy "first legal candidate" policy, and emits
+one compact JSON line per StatePacket. Victory, defeat, or hitting
+`--steps` all cause clean termination.
 
-    STS2_LIB_PATH=/tmp/r33hab_sts2/out \\
-    PYTHONPATH=/tmp/r33hab_sts2/src \\
-    python3.11 examples/classify/jev/operators/demo_r33hab.py --seed DEMO01
+Usage:
 
-Prints are one JSON line per packet so the output is grep-friendly; omit
---seed for a time-based random one.
+    python3.11 examples/classify/jev/operators/demo_sts2_sim.py --seed DEMO01
 """
 
 from __future__ import annotations
@@ -23,13 +21,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent.parent))  # AReno root
 
-from examples.classify.jev.operators.r33hab_sts2 import R33habSts2Backend  # noqa: E402
+from examples.classify.jev.operators.sts2_sim import Sts2SimBackend  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--seed", default=None, help="deterministic seed string; None => backend picks")
-    parser.add_argument("--steps", type=int, default=3, help="number of /step calls to make")
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--seed", default=None, help="deterministic seed label; None lets the backend pick")
+    parser.add_argument("--steps", type=int, default=40, help="max /step calls before giving up")
     parser.add_argument("--ascension", type=int, default=0)
     return parser.parse_args()
 
@@ -38,7 +39,7 @@ def main() -> None:
     args = parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 
-    backend = R33habSts2Backend()
+    backend = Sts2SimBackend()
     caps = backend.capabilities()
     print(json.dumps({"stage": "capabilities", **caps}, ensure_ascii=False))
 
@@ -59,8 +60,7 @@ def main() -> None:
             print(json.dumps({"stage": "no_candidates", "step": packet["step"]}))
             break
         chosen = packet["candidates"][0]["id"]
-        step_payload = {"episode_id": episode_id, "action_id": chosen, "old_logp": None}
-        packet = backend.step(step_payload)
+        packet = backend.step({"episode_id": episode_id, "action_id": chosen, "old_logp": None})
         _emit(f"step_{turn+1}", packet, chosen=chosen)
 
     backend.close(episode_id)
@@ -84,7 +84,7 @@ def _emit(stage: str, packet: dict, *, chosen: str | None = None) -> None:
         "candidate_ids": [c["id"] for c in candidates[:8]],
         "info_subset": {
             key: packet["info"].get(key)
-            for key in ("hp", "max_hp", "floor", "act", "outcome", "episode_scope", "backend")
+            for key in ("hp", "max_hp", "turn", "energy", "enemies_alive", "outcome", "backend")
         },
     }
     print(json.dumps(row, ensure_ascii=False))
