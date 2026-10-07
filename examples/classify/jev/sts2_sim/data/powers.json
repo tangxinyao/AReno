@@ -1,0 +1,44 @@
+[
+  {
+    "power_id": "strength",
+    "name": "Strength",
+    "kind": "buff",
+    "duration": "permanent",
+    "stacks": true
+  },
+  {
+    "power_id": "dexterity",
+    "name": "Dexterity",
+    "kind": "buff",
+    "duration": "permanent",
+    "stacks": true
+  },
+  {
+    "power_id": "vulnerable",
+    "name": "Vulnerable",
+    "kind": "debuff",
+    "duration": "turns",
+    "stacks": true
+  },
+  {
+    "power_id": "weak",
+    "name": "Weak",
+    "kind": "debuff",
+    "duration": "turns",
+    "stacks": true
+  },
+  {
+    "power_id": "frail",
+    "name": "Frail",
+    "kind": "debuff",
+    "duration": "turns",
+    "stacks": true
+  },
+  {
+    "power_id": "ritual",
+    "name": "Ritual",
+    "kind": "buff",
+    "duration": "end_of_turn_tick",
+    "stacks": true
+  }
+]

@@ -1,0 +1,254 @@
+[
+  {
+    "card_id": "strike",
+    "name": "Strike",
+    "cost": 1,
+    "card_type": "attack",
+    "rarity": "basic",
+    "target": "single_enemy",
+    "upgrade_of": "strike+1",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 6, "target_scope": "single_enemy", "hits": 1}}
+    ]
+  },
+  {
+    "card_id": "strike+1",
+    "name": "Strike+",
+    "cost": 1,
+    "card_type": "attack",
+    "rarity": "basic",
+    "target": "single_enemy",
+    "upgraded_from": "strike",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 9, "target_scope": "single_enemy", "hits": 1}}
+    ]
+  },
+  {
+    "card_id": "defend",
+    "name": "Defend",
+    "cost": 1,
+    "card_type": "skill",
+    "rarity": "basic",
+    "target": "self",
+    "upgrade_of": "defend+1",
+    "effects": [
+      {"verb": "gain_block", "args": {"amount": 5, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "defend+1",
+    "name": "Defend+",
+    "cost": 1,
+    "card_type": "skill",
+    "rarity": "basic",
+    "target": "self",
+    "upgraded_from": "defend",
+    "effects": [
+      {"verb": "gain_block", "args": {"amount": 8, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "bash",
+    "name": "Bash",
+    "cost": 2,
+    "card_type": "attack",
+    "rarity": "basic",
+    "target": "single_enemy",
+    "upgrade_of": "bash+1",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 8, "target_scope": "single_enemy", "hits": 1}},
+      {"verb": "apply_power", "args": {"power_id": "vulnerable", "amount": 2, "target_scope": "single_enemy"}}
+    ]
+  },
+  {
+    "card_id": "bash+1",
+    "name": "Bash+",
+    "cost": 2,
+    "card_type": "attack",
+    "rarity": "basic",
+    "target": "single_enemy",
+    "upgraded_from": "bash",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 10, "target_scope": "single_enemy", "hits": 1}},
+      {"verb": "apply_power", "args": {"power_id": "vulnerable", "amount": 3, "target_scope": "single_enemy"}}
+    ]
+  },
+  {
+    "card_id": "anger",
+    "name": "Anger",
+    "cost": 0,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "single_enemy",
+    "upgrade_of": "anger+1",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 6, "target_scope": "single_enemy", "hits": 1}},
+      {"verb": "copy_to_discard", "args": {}}
+    ]
+  },
+  {
+    "card_id": "anger+1",
+    "name": "Anger+",
+    "cost": 0,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "single_enemy",
+    "upgraded_from": "anger",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 8, "target_scope": "single_enemy", "hits": 1}},
+      {"verb": "copy_to_discard", "args": {}}
+    ]
+  },
+  {
+    "card_id": "cleave",
+    "name": "Cleave",
+    "cost": 1,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "all_enemies",
+    "upgrade_of": "cleave+1",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 8, "target_scope": "all_enemies", "hits": 1}}
+    ]
+  },
+  {
+    "card_id": "cleave+1",
+    "name": "Cleave+",
+    "cost": 1,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "all_enemies",
+    "upgraded_from": "cleave",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 11, "target_scope": "all_enemies", "hits": 1}}
+    ]
+  },
+  {
+    "card_id": "iron_wave",
+    "name": "Iron Wave",
+    "cost": 1,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "single_enemy",
+    "upgrade_of": "iron_wave+1",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 5, "target_scope": "single_enemy", "hits": 1}},
+      {"verb": "gain_block", "args": {"amount": 5, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "iron_wave+1",
+    "name": "Iron Wave+",
+    "cost": 1,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "single_enemy",
+    "upgraded_from": "iron_wave",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 7, "target_scope": "single_enemy", "hits": 1}},
+      {"verb": "gain_block", "args": {"amount": 7, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "thunderclap",
+    "name": "Thunderclap",
+    "cost": 1,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "all_enemies",
+    "upgrade_of": "thunderclap+1",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 4, "target_scope": "all_enemies", "hits": 1}},
+      {"verb": "apply_power", "args": {"power_id": "vulnerable", "amount": 1, "target_scope": "all_enemies"}}
+    ]
+  },
+  {
+    "card_id": "thunderclap+1",
+    "name": "Thunderclap+",
+    "cost": 1,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "all_enemies",
+    "upgraded_from": "thunderclap",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 7, "target_scope": "all_enemies", "hits": 1}},
+      {"verb": "apply_power", "args": {"power_id": "vulnerable", "amount": 1, "target_scope": "all_enemies"}}
+    ]
+  },
+  {
+    "card_id": "pommel_strike",
+    "name": "Pommel Strike",
+    "cost": 1,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "single_enemy",
+    "upgrade_of": "pommel_strike+1",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 9, "target_scope": "single_enemy", "hits": 1}},
+      {"verb": "draw_cards", "args": {"amount": 1}}
+    ]
+  },
+  {
+    "card_id": "pommel_strike+1",
+    "name": "Pommel Strike+",
+    "cost": 1,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "single_enemy",
+    "upgraded_from": "pommel_strike",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 10, "target_scope": "single_enemy", "hits": 1}},
+      {"verb": "draw_cards", "args": {"amount": 2}}
+    ]
+  },
+  {
+    "card_id": "twin_strike",
+    "name": "Twin Strike",
+    "cost": 1,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "single_enemy",
+    "upgrade_of": "twin_strike+1",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 5, "target_scope": "single_enemy", "hits": 2}}
+    ]
+  },
+  {
+    "card_id": "twin_strike+1",
+    "name": "Twin Strike+",
+    "cost": 1,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "single_enemy",
+    "upgraded_from": "twin_strike",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 7, "target_scope": "single_enemy", "hits": 2}}
+    ]
+  },
+  {
+    "card_id": "shrug_it_off",
+    "name": "Shrug It Off",
+    "cost": 1,
+    "card_type": "skill",
+    "rarity": "common",
+    "target": "self",
+    "upgrade_of": "shrug_it_off+1",
+    "effects": [
+      {"verb": "gain_block", "args": {"amount": 8, "target_scope": "self"}},
+      {"verb": "draw_cards", "args": {"amount": 1}}
+    ]
+  },
+  {
+    "card_id": "shrug_it_off+1",
+    "name": "Shrug It Off+",
+    "cost": 1,
+    "card_type": "skill",
+    "rarity": "common",
+    "target": "self",
+    "upgraded_from": "shrug_it_off",
+    "effects": [
+      {"verb": "gain_block", "args": {"amount": 11, "target_scope": "self"}},
+      {"verb": "draw_cards", "args": {"amount": 1}}
+    ]
+  }
+]

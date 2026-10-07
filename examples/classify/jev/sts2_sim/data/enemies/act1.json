@@ -1,0 +1,140 @@
+[
+  {
+    "enemy_id": "jaw_worm",
+    "name": "Jaw Worm",
+    "hp_min": 40,
+    "hp_max": 44,
+    "moves": {
+      "chomp": {
+        "intent": "attack",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 11, "target_scope": "player", "hits": 1}}
+        ]
+      },
+      "thrash": {
+        "intent": "attack_defend",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 7, "target_scope": "player", "hits": 1}},
+          {"verb": "gain_block", "args": {"amount": 5, "target_scope": "self"}}
+        ]
+      },
+      "bellow": {
+        "intent": "defend_buff",
+        "effects": [
+          {"verb": "apply_power", "args": {"power_id": "strength", "amount": 3, "target_scope": "self"}},
+          {"verb": "gain_block", "args": {"amount": 6, "target_scope": "self"}}
+        ]
+      }
+    },
+    "movepicker": [
+      {"move_id": "chomp", "rule": "always_first"},
+      {"move_id": "bellow", "rule": "if_not_two", "weight": 45},
+      {"move_id": "thrash", "rule": "if_not_two", "weight": 30},
+      {"move_id": "chomp", "rule": "if_not_last", "weight": 25}
+    ]
+  },
+  {
+    "enemy_id": "cultist",
+    "name": "Cultist",
+    "hp_min": 48,
+    "hp_max": 54,
+    "moves": {
+      "incantation": {
+        "intent": "buff",
+        "effects": [
+          {"verb": "apply_power", "args": {"power_id": "ritual", "amount": 3, "target_scope": "self"}}
+        ]
+      },
+      "dark_strike": {
+        "intent": "attack",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 6, "target_scope": "player", "hits": 1}}
+        ]
+      }
+    },
+    "movepicker": [
+      {"move_id": "incantation", "rule": "always_first"},
+      {"move_id": "dark_strike", "rule": "sequential", "sequence_index": 1}
+    ]
+  },
+  {
+    "enemy_id": "red_louse",
+    "name": "Red Louse",
+    "hp_min": 10,
+    "hp_max": 15,
+    "moves": {
+      "bite": {
+        "intent": "attack",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 5, "target_scope": "player", "hits": 1}}
+        ]
+      },
+      "grow": {
+        "intent": "buff",
+        "effects": [
+          {"verb": "apply_power", "args": {"power_id": "strength", "amount": 3, "target_scope": "self"}}
+        ]
+      }
+    },
+    "movepicker": [
+      {"move_id": "bite", "rule": "if_not_two", "weight": 75},
+      {"move_id": "grow", "rule": "if_not_last", "weight": 25}
+    ]
+  },
+  {
+    "enemy_id": "green_louse",
+    "name": "Green Louse",
+    "hp_min": 11,
+    "hp_max": 17,
+    "moves": {
+      "bite": {
+        "intent": "attack",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 5, "target_scope": "player", "hits": 1}}
+        ]
+      },
+      "spit_web": {
+        "intent": "debuff",
+        "effects": [
+          {"verb": "apply_power", "args": {"power_id": "weak", "amount": 2, "target_scope": "player"}}
+        ]
+      }
+    },
+    "movepicker": [
+      {"move_id": "bite", "rule": "if_not_two", "weight": 75},
+      {"move_id": "spit_web", "rule": "if_not_last", "weight": 25}
+    ]
+  },
+  {
+    "enemy_id": "acid_slime_m",
+    "name": "Acid Slime (M)",
+    "hp_min": 28,
+    "hp_max": 32,
+    "moves": {
+      "corrosive_spit": {
+        "intent": "attack_debuff",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 7, "target_scope": "player", "hits": 1}},
+          {"verb": "apply_power", "args": {"power_id": "weak", "amount": 1, "target_scope": "player"}}
+        ]
+      },
+      "tackle": {
+        "intent": "attack",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 10, "target_scope": "player", "hits": 1}}
+        ]
+      },
+      "lick": {
+        "intent": "debuff",
+        "effects": [
+          {"verb": "apply_power", "args": {"power_id": "weak", "amount": 1, "target_scope": "player"}}
+        ]
+      }
+    },
+    "movepicker": [
+      {"move_id": "corrosive_spit", "rule": "if_not_two", "weight": 30},
+      {"move_id": "tackle", "rule": "if_not_two", "weight": 40},
+      {"move_id": "lick", "rule": "if_not_two", "weight": 30}
+    ]
+  }
+]
