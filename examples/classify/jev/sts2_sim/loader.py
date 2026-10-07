@@ -92,7 +92,17 @@ def load_enemies(
         enemy = _parse_enemy(entry, where=f"enemies[{i}]", power_ids=power_ids)
         _require_unique(out, enemy.enemy_id, where="enemies")
         out[enemy.enemy_id] = enemy
+    _validate_on_death_spawn_refs(out)
     return out
+
+
+def _validate_on_death_spawn_refs(enemies: dict[str, EnemySchema]) -> None:
+    for eid, edef in enemies.items():
+        for spawn_id in edef.on_death_spawn:
+            if spawn_id not in enemies:
+                raise SimDataError(
+                    f"enemies:{eid}.on_death_spawn references unknown enemy_id {spawn_id!r}"
+                )
 
 
 def load_all() -> tuple[dict[str, PowerSchema], dict[str, CardSchema], dict[str, EnemySchema]]:
@@ -222,6 +232,15 @@ def _parse_enemy(entry: dict, *, where: str, power_ids: set[str] | None) -> Enem
             raise SimDataError(f"{sp_where}.stacks must be a positive int")
         starting.append((pid, stacks))
 
+    raw_spawn = entry.get("on_death_spawn", [])
+    _require_list(raw_spawn, f"{where}.on_death_spawn")
+    spawn: list[str] = []
+    for j, item in enumerate(raw_spawn):
+        sp_where = f"{where}.on_death_spawn[{j}]"
+        if not isinstance(item, str) or not item:
+            raise SimDataError(f"{sp_where} must be a non-empty string enemy_id")
+        spawn.append(item)
+
     return EnemySchema(
         enemy_id=enemy_id,
         name=_get_str(entry, "name", where),
@@ -230,6 +249,7 @@ def _parse_enemy(entry: dict, *, where: str, power_ids: set[str] | None) -> Enem
         moves=moves,
         movepicker=tuple(picker),
         starting_powers=tuple(starting),
+        on_death_spawn=tuple(spawn),
     )
 
 

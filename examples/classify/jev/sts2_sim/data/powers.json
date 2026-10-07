@@ -103,5 +103,12 @@
     "kind": "debuff",
     "duration": "permanent",
     "stacks": true
+  },
+  {
+    "power_id": "hex_charge",
+    "name": "Hex Charge",
+    "kind": "buff",
+    "duration": "permanent",
+    "stacks": true
   }
 ]

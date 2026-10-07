@@ -403,6 +403,16 @@
     "effects": []
   },
   {
+    "card_id": "slimed",
+    "name": "Slimed",
+    "cost": 0,
+    "card_type": "status",
+    "rarity": "special",
+    "target": "none",
+    "unplayable": true,
+    "effects": []
+  },
+  {
     "card_id": "inflame",
     "name": "Inflame",
     "cost": 1,

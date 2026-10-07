@@ -100,6 +100,7 @@ EFFECT_VERBS: Final[dict[str, dict[str, type]]] = {
     "deal_damage":                {"amount": int, "target_scope": str, "hits": int},
     "deal_damage_strike_scaled":  {"base": int, "per_strike_bonus": int, "target_scope": str, "hits": int},
     "deal_damage_equal_to_block": {"target_scope": str, "hits": int},
+    "deal_damage_from_power":     {"power_id": str, "target_scope": str, "hits": int},
     "gain_block":                 {"amount": int, "target_scope": str},
     "apply_power":                {"power_id": str, "amount": int, "target_scope": str},
     "draw_cards":                 {"amount": int},
@@ -107,6 +108,7 @@ EFFECT_VERBS: Final[dict[str, dict[str, type]]] = {
     "gain_energy":                {"amount": int, "target_scope": str},
     "lose_hp_self":               {"amount": int, "target_scope": str},
     "add_card_to_pile":           {"card_id": str, "pile": str, "amount": int},
+    "activate_hex_charge":        {"target_scope": str},
 }
 
 # Which scopes each verb accepts. The loader cross-checks the step's
@@ -116,10 +118,12 @@ VERB_ALLOWED_SCOPES: Final[dict[str, frozenset[str]]] = {
     "deal_damage":                frozenset({"single_enemy", "all_enemies", "random_enemy", "player"}),
     "deal_damage_strike_scaled":  frozenset({"single_enemy", "all_enemies", "random_enemy"}),
     "deal_damage_equal_to_block": frozenset({"single_enemy", "all_enemies", "random_enemy"}),
+    "deal_damage_from_power":     frozenset({"player"}),
     "gain_block":                 frozenset({"self"}),
     "apply_power":                frozenset({"self", "single_enemy", "all_enemies", "random_enemy", "player"}),
     "gain_energy":                frozenset({"self"}),
     "lose_hp_self":               frozenset({"self"}),
+    "activate_hex_charge":        frozenset({"self"}),
 }
 
 # Which `pile` values add_card_to_pile accepts.
@@ -138,7 +142,10 @@ CARD_ONLY_VERBS: Final = frozenset({
     "gain_energy",
     "lose_hp_self",
 })
-ENEMY_ONLY_VERBS: Final = frozenset()  # no enemy-exclusive verbs yet
+ENEMY_ONLY_VERBS: Final = frozenset({
+    "activate_hex_charge",       # Hexaghost's Activate telegraph
+    "deal_damage_from_power",    # Hexaghost's Divider reads hex_charge
+})
 
 POWER_KINDS: Final = frozenset({"buff", "debuff"})
 POWER_DURATIONS: Final = frozenset({"permanent", "turns", "end_of_turn_tick"})
@@ -358,6 +365,49 @@ Edge cases:
   * amount == 0 is a no-op; no hooks fire.
   * Inserting into "draw" when draw_pile is empty appends (there is
     no random index 0..-1 case).
+""",
+
+    "deal_damage_from_power": """\
+Deal damage per hit equal to the current stacks of a named power on the
+acting owner. Enemy-only (Hexaghost's Divider: 6 hits at hex_charge
+stacks each). Supports strength / weak / vulnerable / block through
+the standard deal_damage pipeline.
+
+Required args:
+  power_id      : the power whose stacks the engine reads for per-hit damage.
+                  Reads from ctx.actor_monster.powers for enemy actors.
+  target_scope  : "player" — enemy-only verb.
+  hits          : int >= 1, defaults to 1.
+
+Pipeline:
+  1. amount = ctx.actor_monster.powers.get(power_id, 0)
+  2. Delegate to deal_damage with that amount, same target_scope and
+     hits. Strength on the enemy stacks on top (Hexaghost has 0 by
+     default so this is usually a no-op).
+
+Edge cases:
+  * power stacks == 0 -> each hit deals 0 damage; on_damaged still
+    fires per deal_damage's "0-damage hits still fire" rule.
+""",
+
+    "activate_hex_charge": """\
+Set the acting owner's hex_charge stacks to floor(player.hp / 12),
+clamped to a minimum of 1. Enemy-only (Hexaghost's turn-1 Activate
+telegraph that charges up its Divider for turn 2).
+
+Required args:
+  target_scope  : MUST be "self".
+
+Pipeline:
+  1. amount = max(1, player.hp // 12)
+  2. owner.powers["hex_charge"] = amount
+  3. Record applied_on_turn / applied_phase so later turn-decay logic
+     (none in Phase 2c, but defensive) treats this as a fresh apply.
+  4. Dispatch on_power_applied.
+
+Edge cases:
+  * player.hp == 0 at Activate time is impossible — the engine would
+    have already ended combat. Clamp to 1 defensively anyway.
 """,
 
     "gain_block": """\
@@ -643,6 +693,13 @@ class EnemySchema:
     start_combat. Lagavulin uses it for its 8 Metallicize that gives
     the sleep-phase its signature tankiness; a hypothetical Guardian
     with Mode Shift could use it to seed its first-form buffs.
+
+    `on_death_spawn` is an optional tuple of enemy_ids that the engine
+    instantiates when this monster hits 0 HP. Slime Boss uses it to
+    split into Acid Slime M + Spike Slime M. The engine fires
+    on_enemy_killed for the dead monster THEN appends the spawns via
+    _spawn_monster so they inherit a fresh HP roll and get picked
+    first moves before the next player turn draws candidates.
     """
 
     enemy_id: str
@@ -652,6 +709,7 @@ class EnemySchema:
     moves: dict[str, MoveSchema]
     movepicker: tuple[SelectorEntry, ...]
     starting_powers: tuple[tuple[str, int], ...] = ()
+    on_death_spawn: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

@@ -49,6 +49,7 @@ class PowersLoadingTest(unittest.TestCase):
                 "metallicize", "combust", "rupture", "dark_embrace",
                 "feel_no_pain", "barricade",
                 "enrage", "strength_down", "dexterity_down",
+                "hex_charge",
             },
         )
 
@@ -71,8 +72,9 @@ class CardsLoadingTest(unittest.TestCase):
         self.cards = self.sim.load_cards(power_ids=self.power_ids)
 
     def test_card_entry_count(self) -> None:
-        # 31 base cards + 31 upgrades + 2 statuses after Phase 2d-1.
-        self.assertEqual(len(self.cards), 64)
+        # 31 base cards + 31 upgrades + 3 statuses (Wound, Dazed, Slimed)
+        # after Phase 2c-2.
+        self.assertEqual(len(self.cards), 65)
 
     def test_each_regular_base_card_has_upgrade_link(self) -> None:
         bases = [
@@ -150,8 +152,13 @@ class EnemiesLoadingTest(unittest.TestCase):
                 "jaw_worm", "cultist", "red_louse", "green_louse", "acid_slime_m",
                 "blue_slaver", "red_slaver", "fungi_beast",
                 "gremlin_nob", "lagavulin", "sentry",
+                "spike_slime_m", "hexaghost", "slime_boss", "the_guardian",
             },
         )
+
+    def test_slime_boss_splits_into_two_medium_slimes(self) -> None:
+        sb = self.enemies["slime_boss"]
+        self.assertEqual(sb.on_death_spawn, ("acid_slime_m", "spike_slime_m"))
 
     def test_lagavulin_has_starting_metallicize(self) -> None:
         lagavulin = self.enemies["lagavulin"]
@@ -206,11 +213,11 @@ class LoadAllTest(unittest.TestCase):
 
     def test_load_all_cross_resolves_power_ids(self) -> None:
         powers, cards, enemies = self.sim.load_all()
-        self.assertEqual(len(powers), 15)
-        self.assertEqual(len(cards), 64)
-        self.assertEqual(len(enemies), 11)
-        # No cross-ref error means every apply_power / add_card_to_pile verb
-        # points to a real power or card.
+        self.assertEqual(len(powers), 16)
+        self.assertEqual(len(cards), 65)
+        self.assertEqual(len(enemies), 15)
+        # No cross-ref error means every apply_power / add_card_to_pile /
+        # on_death_spawn reference points to a real power / card / enemy.
 
 
 class EngineContractDocsTest(unittest.TestCase):
@@ -468,6 +475,23 @@ class LoaderValidationTest(unittest.TestCase):
         )
         with self.assertRaisesRegex(self.sim.SimDataError, "must not declare upgrade_of"):
             self.sim.load_cards(path)
+
+    def test_rejects_on_death_spawn_unknown_enemy(self) -> None:
+        path = self._write(
+            "enemies.json",
+            [{
+                "enemy_id": "big", "name": "Big", "hp_min": 10, "hp_max": 10,
+                "on_death_spawn": ["ghost_enemy"],
+                "moves": {
+                    "hit": {"intent": "attack",
+                            "effects": [{"verb": "deal_damage",
+                                         "args": {"amount": 1, "target_scope": "player", "hits": 1}}]},
+                },
+                "movepicker": [{"move_id": "hit", "rule": "always_first"}],
+            }],
+        )
+        with self.assertRaisesRegex(self.sim.SimDataError, "on_death_spawn"):
+            self.sim.load_enemies(path, power_ids=set())
 
     def test_rejects_sequential_without_sequence_index(self) -> None:
         path = self._write(

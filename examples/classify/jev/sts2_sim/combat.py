@@ -300,6 +300,10 @@ class CombatContext:
             self._v_deal_damage_strike_scaled(args, ctx)
         elif verb == "deal_damage_equal_to_block":
             self._v_deal_damage_equal_to_block(args, ctx)
+        elif verb == "deal_damage_from_power":
+            self._v_deal_damage_from_power(args, ctx)
+        elif verb == "activate_hex_charge":
+            self._v_activate_hex_charge(args, ctx)
         elif verb == "gain_block":
             self._v_gain_block(args, ctx)
         elif verb == "apply_power":
@@ -356,6 +360,13 @@ class CombatContext:
                 })
                 if isinstance(tgt, MonsterState) and tgt.hp == 0:
                     self._hooks.dispatch("on_enemy_killed", {"target": tgt})
+                    # On-death spawns (Slime Boss split). Spawned monsters
+                    # join `combat.monsters` at new slots, inheriting fresh
+                    # HP rolls + starting_powers + an initial queued move.
+                    edef = self._enemy_defs.get(tgt.monster_id)
+                    if edef is not None:
+                        for spawn_id in edef.on_death_spawn:
+                            self._spawn_monster(spawn_id)
 
     def _v_deal_damage_strike_scaled(self, args: dict[str, Any], ctx: _EffectContext) -> None:
         base = int(args["base"])
@@ -385,6 +396,38 @@ class CombatContext:
             },
             ctx,
         )
+
+    def _v_deal_damage_from_power(self, args: dict[str, Any], ctx: _EffectContext) -> None:
+        pid = args["power_id"]
+        if ctx.actor == "enemy":
+            assert ctx.actor_monster is not None
+            amount = ctx.actor_monster.powers.get(pid, 0)
+        else:
+            amount = self._player.powers.get(pid, 0)
+        self._v_deal_damage(
+            {
+                "amount": amount,
+                "target_scope": args["target_scope"],
+                "hits": int(args.get("hits", 1)),
+            },
+            ctx,
+        )
+
+    def _v_activate_hex_charge(self, args: dict[str, Any], ctx: _EffectContext) -> None:
+        del args
+        amount = max(1, self._player.hp // 12)
+        owner: Any = ctx.actor_monster if ctx.actor == "enemy" else self._player
+        owner.powers["hex_charge"] = amount
+        owner.powers_applied_on_turn["hex_charge"] = self.combat.turn
+        owner.powers_applied_phase["hex_charge"] = self.combat.phase
+        self._hooks.dispatch("on_power_applied", {
+            "actor": ctx.actor,
+            "source_card_id": None,
+            "source_move_id": ctx.source_move_id,
+            "target": owner,
+            "power_id": "hex_charge",
+            "amount": amount,
+        })
 
     def _v_gain_energy(self, args: dict[str, Any], ctx: _EffectContext) -> None:
         del ctx
@@ -739,6 +782,40 @@ class CombatContext:
                     "power_id": "strength",
                     "amount": enrage,
                 })
+
+    # ------------------------------------------------------------------
+    # Monster spawning (Phase 2c-2 Slime Boss split)
+
+    def _spawn_monster(self, enemy_id: str) -> MonsterState:
+        """Add a fresh monster to the combat mid-fight.
+
+        Called from the deal_damage pipeline when a dying monster has
+        on_death_spawn entries. The new monster:
+          * rolls HP from the `enemy_hp` stream (deterministic).
+          * inherits starting_powers.
+          * gets a `queued_move` picked immediately so the enemy phase
+            of the current/next turn has a telegraph to execute.
+
+        Returns the new MonsterState so callers can inspect it.
+        """
+
+        edef = self._enemy_defs[enemy_id]
+        hp = self._rng.stream("enemy_hp").randint(edef.hp_min, edef.hp_max)
+        monster = MonsterState(
+            monster_id=enemy_id,
+            name=edef.name,
+            hp=hp,
+            max_hp=hp,
+            slot=len(self.combat.monsters),
+        )
+        for pid, stacks in edef.starting_powers:
+            monster.powers[pid] = stacks
+            monster.powers_applied_on_turn[pid] = self.combat.turn
+            monster.powers_applied_phase[pid] = CombatPhase.START
+        self.combat.monsters.append(monster)
+        self._pick_next_move(monster)
+        self._hooks.dispatch("on_enemy_spawned", {"target": monster})
+        return monster
 
     # ------------------------------------------------------------------
     # Enemy move picker

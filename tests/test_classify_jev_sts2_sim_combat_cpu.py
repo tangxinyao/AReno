@@ -981,6 +981,145 @@ class Phase2cDebuffsTest(unittest.TestCase):
         self.assertNotIn("dexterity_down", ctx.player.powers)
 
 
+class Phase2cBossesTest(unittest.TestCase):
+    """Phase 2c-2: Act 1 bosses — Hexaghost + Slime Boss + The Guardian."""
+
+    def setUp(self) -> None:
+        self.sim = _import_sim()
+
+    # Hexaghost ------------------------------------------------------
+
+    def test_hexaghost_turn_one_activates_and_sets_hex_charge(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.player.hp = 72
+        ctx.player.max_hp = 72
+        ctx.start_combat(["hexaghost"], ["defend"] * 20)
+        hex_ = ctx.combat.monsters[0]
+        self.assertEqual(hex_.queued_move, "activate")
+        ctx.end_turn()
+        # hex_charge = max(1, floor(72/12)) = 6
+        self.assertEqual(hex_.powers.get("hex_charge"), 6)
+        self.assertEqual(hex_.queued_move, "divider")
+
+    def test_hexaghost_divider_deals_hex_charge_damage_per_hit(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["hexaghost"], ["defend"] * 20)
+        hex_ = ctx.combat.monsters[0]
+        hex_.powers["hex_charge"] = 5
+        hex_.queued_move = "divider"
+        ctx.player.block = 20
+        hp_before = ctx.player.hp
+        ctx.end_turn()
+        # 6 hits of 5 damage: first 4 absorbed by 20 block, last 2 hit hp for 10.
+        # (Block gets wiped at start of next player turn, which end_turn also runs,
+        # so we only check hp loss here.)
+        self.assertEqual(ctx.player.hp, hp_before - 10)
+
+    def test_activate_hex_charge_clamps_to_one_at_low_hp(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.player.hp = 5
+        ctx.player.max_hp = 5
+        ctx.start_combat(["hexaghost"], ["defend"] * 20)
+        hex_ = ctx.combat.monsters[0]
+        hex_.queued_move = "activate"
+        ctx.end_turn()
+        # floor(5/12) = 0, clamp to 1
+        self.assertEqual(hex_.powers.get("hex_charge"), 1)
+
+    # Slime Boss -----------------------------------------------------
+
+    def test_slime_boss_pattern_goop_preparing_slam(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["slime_boss"], ["defend"] * 20)
+        sb = ctx.combat.monsters[0]
+        self.assertEqual(sb.queued_move, "goop_spray")
+        ctx.end_turn()
+        self.assertEqual(sb.queued_move, "preparing")
+        ctx.end_turn()
+        self.assertEqual(sb.queued_move, "slam")
+
+    def test_slime_boss_slam_deals_thirty_five_damage(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["slime_boss"], ["defend"] * 20)
+        sb = ctx.combat.monsters[0]
+        sb.queued_move = "slam"
+        hp0 = ctx.player.hp
+        ctx.end_turn()
+        self.assertEqual(ctx.player.hp, hp0 - 35)
+
+    def test_slime_boss_splits_on_death(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["slime_boss"], ["strike"] * 20)
+        sb = ctx.combat.monsters[0]
+        sb.hp = 5  # lethal to one strike
+        _plant_hand(ctx, ["strike"], energy=3)
+        ctx.play_card("strike", target_slot=0)
+        # Original Slime Boss dead, two new slimes appended.
+        self.assertEqual(sb.hp, 0)
+        self.assertFalse(sb.alive)
+        self.assertEqual(len(ctx.combat.monsters), 3)
+        spawned_ids = {m.monster_id for m in ctx.combat.monsters[1:]}
+        self.assertEqual(spawned_ids, {"acid_slime_m", "spike_slime_m"})
+        # Spawned slimes have fresh HP in the authored range.
+        for spawned in ctx.combat.monsters[1:]:
+            self.assertGreaterEqual(spawned.hp, 28)
+            self.assertLessEqual(spawned.hp, 32)
+        # Combat continues — the split alone shouldn't flip the outcome
+        # because the slimes are still alive.
+        self.assertIsNone(ctx.combat.outcome)
+
+    def test_slime_boss_split_assigns_initial_moves(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["slime_boss"], ["strike"] * 20)
+        sb = ctx.combat.monsters[0]
+        sb.hp = 5
+        _plant_hand(ctx, ["strike"], energy=3)
+        ctx.play_card("strike", target_slot=0)
+        for spawned in ctx.combat.monsters[1:]:
+            self.assertIsNotNone(spawned.queued_move)
+            self.assertIn(spawned.queued_move, spawned.monster_id and
+                          {"corrosive_spit", "tackle", "lick", "flame_tackle"})
+
+    def test_spike_slime_m_flame_tackle_adds_slimed(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["spike_slime_m"], ["defend"] * 20)
+        slime = ctx.combat.monsters[0]
+        slime.queued_move = "flame_tackle"
+        hp0 = ctx.player.hp
+        ctx.end_turn()
+        # Flame tackle: 8 damage + 1 Slimed to discard
+        self.assertEqual(ctx.player.hp, hp0 - 8)
+        self.assertEqual(ctx.player.discard_pile.count("slimed"), 1)
+
+    # The Guardian ---------------------------------------------------
+
+    def test_the_guardian_fierce_bash_hits_hard(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["the_guardian"], ["defend"] * 20)
+        g = ctx.combat.monsters[0]
+        g.queued_move = "fierce_bash"
+        hp0 = ctx.player.hp
+        ctx.end_turn()
+        self.assertEqual(ctx.player.hp, hp0 - 32)
+
+    def test_the_guardian_vent_steam_applies_weak_and_frail(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["the_guardian"], ["defend"] * 20)
+        g = ctx.combat.monsters[0]
+        g.queued_move = "vent_steam"
+        ctx.end_turn()
+        self.assertEqual(ctx.player.powers.get("weak"), 2)
+        self.assertEqual(ctx.player.powers.get("frail"), 2)
+
+    def test_the_guardian_charging_up_grants_block(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["the_guardian"], ["defend"] * 20)
+        g = ctx.combat.monsters[0]
+        g.queued_move = "charging_up"
+        ctx.end_turn()
+        self.assertEqual(g.block, 9)
+
+
 class TurnFlowTest(unittest.TestCase):
     def setUp(self) -> None:
         self.sim = _import_sim()

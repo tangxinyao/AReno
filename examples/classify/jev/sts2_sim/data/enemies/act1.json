@@ -302,5 +302,134 @@
       {"move_id": "beam_of_light", "rule": "if_not_last", "weight": 1},
       {"move_id": "bolt", "rule": "if_not_last", "weight": 1}
     ]
+  },
+  {
+    "enemy_id": "spike_slime_m",
+    "name": "Spike Slime (M)",
+    "hp_min": 28,
+    "hp_max": 32,
+    "moves": {
+      "flame_tackle": {
+        "intent": "attack_debuff",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 8, "target_scope": "player", "hits": 1}},
+          {"verb": "add_card_to_pile",
+           "args": {"card_id": "slimed", "pile": "discard", "amount": 1}}
+        ]
+      },
+      "lick": {
+        "intent": "debuff",
+        "effects": [
+          {"verb": "apply_power", "args": {"power_id": "frail", "amount": 1, "target_scope": "player"}}
+        ]
+      }
+    },
+    "movepicker": [
+      {"move_id": "flame_tackle", "rule": "if_not_two", "weight": 70},
+      {"move_id": "lick", "rule": "if_not_two", "weight": 30}
+    ]
+  },
+  {
+    "enemy_id": "hexaghost",
+    "name": "Hexaghost",
+    "hp_min": 250,
+    "hp_max": 264,
+    "moves": {
+      "activate": {
+        "intent": "unknown",
+        "effects": [
+          {"verb": "activate_hex_charge", "args": {"target_scope": "self"}}
+        ]
+      },
+      "divider": {
+        "intent": "attack",
+        "effects": [
+          {"verb": "deal_damage_from_power",
+           "args": {"power_id": "hex_charge", "target_scope": "player", "hits": 6}}
+        ]
+      },
+      "sear": {
+        "intent": "attack",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 6, "target_scope": "player", "hits": 1}}
+        ]
+      },
+      "tackle": {
+        "intent": "attack",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 5, "target_scope": "player", "hits": 2}}
+        ]
+      }
+    },
+    "movepicker": [
+      {"move_id": "activate", "rule": "always_first"},
+      {"move_id": "divider", "rule": "sequential", "sequence_index": 1},
+      {"move_id": "sear", "rule": "if_not_two", "weight": 50},
+      {"move_id": "tackle", "rule": "if_not_two", "weight": 50}
+    ]
+  },
+  {
+    "enemy_id": "slime_boss",
+    "name": "Slime Boss",
+    "hp_min": 140,
+    "hp_max": 144,
+    "on_death_spawn": ["acid_slime_m", "spike_slime_m"],
+    "moves": {
+      "goop_spray": {
+        "intent": "debuff",
+        "effects": [
+          {"verb": "add_card_to_pile",
+           "args": {"card_id": "slimed", "pile": "discard", "amount": 3}}
+        ]
+      },
+      "preparing": {
+        "intent": "unknown",
+        "effects": []
+      },
+      "slam": {
+        "intent": "attack",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 35, "target_scope": "player", "hits": 1}}
+        ]
+      }
+    },
+    "movepicker": [
+      {"move_id": "goop_spray", "rule": "always_first"},
+      {"move_id": "preparing", "rule": "sequential", "sequence_index": 1},
+      {"move_id": "slam", "rule": "if_not_last", "weight": 1},
+      {"move_id": "preparing", "rule": "if_not_last", "weight": 1}
+    ]
+  },
+  {
+    "enemy_id": "the_guardian",
+    "name": "The Guardian",
+    "hp_min": 240,
+    "hp_max": 240,
+    "moves": {
+      "charging_up": {
+        "intent": "defend",
+        "effects": [
+          {"verb": "gain_block", "args": {"amount": 9, "target_scope": "self"}}
+        ]
+      },
+      "fierce_bash": {
+        "intent": "attack",
+        "effects": [
+          {"verb": "deal_damage", "args": {"amount": 32, "target_scope": "player", "hits": 1}}
+        ]
+      },
+      "vent_steam": {
+        "intent": "debuff",
+        "effects": [
+          {"verb": "apply_power", "args": {"power_id": "weak", "amount": 2, "target_scope": "player"}},
+          {"verb": "apply_power", "args": {"power_id": "frail", "amount": 2, "target_scope": "player"}}
+        ]
+      }
+    },
+    "movepicker": [
+      {"move_id": "charging_up", "rule": "if_not_two", "weight": 34},
+      {"move_id": "fierce_bash", "rule": "if_not_two", "weight": 33},
+      {"move_id": "vent_steam", "rule": "if_not_two", "weight": 33}
+    ]
   }
 ]
