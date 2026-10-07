@@ -661,5 +661,149 @@
       {"verb": "deal_damage", "args": {"amount": 17, "target_scope": "single_enemy", "hits": 1}},
       {"verb": "add_card_to_pile", "args": {"card_id": "wound", "pile": "draw", "amount": 1}}
     ]
+  },
+  {
+    "card_id": "metallicize",
+    "name": "Metallicize",
+    "cost": 1,
+    "card_type": "power",
+    "rarity": "uncommon",
+    "target": "self",
+    "upgrade_of": "metallicize+1",
+    "effects": [
+      {"verb": "apply_power", "args": {"power_id": "metallicize", "amount": 3, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "metallicize+1",
+    "name": "Metallicize+",
+    "cost": 1,
+    "card_type": "power",
+    "rarity": "uncommon",
+    "target": "self",
+    "upgraded_from": "metallicize",
+    "effects": [
+      {"verb": "apply_power", "args": {"power_id": "metallicize", "amount": 4, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "combust",
+    "name": "Combust",
+    "cost": 1,
+    "card_type": "power",
+    "rarity": "uncommon",
+    "target": "self",
+    "upgrade_of": "combust+1",
+    "effects": [
+      {"verb": "apply_power", "args": {"power_id": "combust", "amount": 5, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "combust+1",
+    "name": "Combust+",
+    "cost": 1,
+    "card_type": "power",
+    "rarity": "uncommon",
+    "target": "self",
+    "upgraded_from": "combust",
+    "effects": [
+      {"verb": "apply_power", "args": {"power_id": "combust", "amount": 7, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "rupture",
+    "name": "Rupture",
+    "cost": 1,
+    "card_type": "power",
+    "rarity": "uncommon",
+    "target": "self",
+    "upgrade_of": "rupture+1",
+    "effects": [
+      {"verb": "apply_power", "args": {"power_id": "rupture", "amount": 1, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "rupture+1",
+    "name": "Rupture+",
+    "cost": 1,
+    "card_type": "power",
+    "rarity": "uncommon",
+    "target": "self",
+    "upgraded_from": "rupture",
+    "effects": [
+      {"verb": "apply_power", "args": {"power_id": "rupture", "amount": 2, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "dark_embrace",
+    "name": "Dark Embrace",
+    "cost": 2,
+    "card_type": "power",
+    "rarity": "uncommon",
+    "target": "self",
+    "upgrade_of": "dark_embrace+1",
+    "effects": [
+      {"verb": "apply_power", "args": {"power_id": "dark_embrace", "amount": 1, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "dark_embrace+1",
+    "name": "Dark Embrace+",
+    "cost": 1,
+    "card_type": "power",
+    "rarity": "uncommon",
+    "target": "self",
+    "upgraded_from": "dark_embrace",
+    "effects": [
+      {"verb": "apply_power", "args": {"power_id": "dark_embrace", "amount": 1, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "feel_no_pain",
+    "name": "Feel No Pain",
+    "cost": 1,
+    "card_type": "power",
+    "rarity": "uncommon",
+    "target": "self",
+    "upgrade_of": "feel_no_pain+1",
+    "effects": [
+      {"verb": "apply_power", "args": {"power_id": "feel_no_pain", "amount": 3, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "feel_no_pain+1",
+    "name": "Feel No Pain+",
+    "cost": 1,
+    "card_type": "power",
+    "rarity": "uncommon",
+    "target": "self",
+    "upgraded_from": "feel_no_pain",
+    "effects": [
+      {"verb": "apply_power", "args": {"power_id": "feel_no_pain", "amount": 4, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "barricade",
+    "name": "Barricade",
+    "cost": 3,
+    "card_type": "power",
+    "rarity": "rare",
+    "target": "self",
+    "upgrade_of": "barricade+1",
+    "effects": [
+      {"verb": "apply_power", "args": {"power_id": "barricade", "amount": 1, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "barricade+1",
+    "name": "Barricade+",
+    "cost": 2,
+    "card_type": "power",
+    "rarity": "rare",
+    "target": "self",
+    "upgraded_from": "barricade",
+    "effects": [
+      {"verb": "apply_power", "args": {"power_id": "barricade", "amount": 1, "target_scope": "self"}}
+    ]
   }
 ]

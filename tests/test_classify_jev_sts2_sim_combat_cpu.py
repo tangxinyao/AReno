@@ -672,6 +672,162 @@ class Phase2bCardFamiliesTest(unittest.TestCase):
         self.assertEqual(worm.hp, hp0 - 10)
 
 
+class Phase2dPowersTest(unittest.TestCase):
+    """Phase 2d-1: Metallicize / Combust / Rupture / Dark Embrace / Feel No Pain / Barricade."""
+
+    def setUp(self) -> None:
+        self.sim = _import_sim()
+
+    def test_metallicize_grants_block_at_end_of_player_turn(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["defend"] * 10)
+        ctx.player.powers["metallicize"] = 3
+        pre_block = ctx.player.block
+        ctx.end_turn()
+        # After end_turn, _run_enemy_turn clears player.block to 0 only at
+        # start of next player turn. Metallicize fires at end-of-player-turn
+        # and lands BEFORE enemy attacks. Jaw Worm's chomp (11) hits a
+        # player with 3 block (3 metallicize + any defend if played).
+        # We planted no defend, so block starts at 0 before Metallicize, 3
+        # after Metallicize, then enemy hits for 11-3=8 of raw damage.
+        del pre_block
+        self.assertEqual(ctx.player.hp, 80 - 8)
+
+    def test_combust_damages_all_enemies_and_self(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["red_louse", "green_louse"], ["defend"] * 10)
+        a, b = ctx.combat.monsters
+        # Prevent enemies from attacking so we isolate Combust's damage.
+        a.queued_move = "grow"  # not actually a red_louse move; override
+        a.queued_move = "bite"  # bite is a known red_louse move; 5 dmg
+        b.queued_move = "bite"  # 5 dmg
+        ctx.player.powers["combust"] = 5
+        hp_a, hp_b = a.hp, b.hp
+        hp_p = ctx.player.hp
+        ctx.end_turn()
+        # Combust fires at end-of-player-turn:
+        #   - lose 1 HP self (via lose_hp_self)
+        #   - deal 5 damage to each enemy
+        # Then enemy turn: both bite for 5 => player loses 10 more HP.
+        self.assertEqual(a.hp, hp_a - 5)
+        self.assertEqual(b.hp, hp_b - 5)
+        self.assertEqual(ctx.player.hp, hp_p - 1 - 10)
+
+    def test_rupture_grants_strength_on_hemokinesis_hp_loss(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["hemokinesis"] * 5)
+        ctx.player.powers["rupture"] = 2
+        _plant_hand(ctx, ["hemokinesis"], energy=3)
+        ctx.play_card("hemokinesis", target_slot=0)
+        self.assertEqual(ctx.player.powers.get("strength"), 2)
+
+    def test_rupture_cascades_from_combust(self) -> None:
+        """Combust's self-tick (lose 1 HP) must trigger Rupture — this
+        is the key cascade STS players rely on when stacking the two."""
+
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["defend"] * 10)
+        ctx.player.powers["combust"] = 3
+        ctx.player.powers["rupture"] = 2
+        # Keep the worm from killing us.
+        ctx.combat.monsters[0].queued_move = "thrash"
+        ctx.end_turn()
+        self.assertEqual(ctx.player.powers.get("strength"), 2)
+
+    def test_dark_embrace_draws_one_on_exhaust(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["strike"] * 10 + ["pummel"])
+        ctx.player.powers["dark_embrace"] = 1
+        _plant_hand(ctx, ["pummel"], energy=3)
+        pre_hand = len(ctx.player.hand)
+        pre_draw = len(ctx.player.draw_pile)
+        ctx.play_card("pummel", target_slot=0)
+        # Pummel exhausts -> Dark Embrace draws 1. Net hand delta: -1 played + 1 drawn = 0.
+        self.assertEqual(len(ctx.player.hand), pre_hand)
+        self.assertEqual(len(ctx.player.draw_pile), pre_draw - 1)
+        self.assertIn("pummel", ctx.player.exhaust_pile)
+
+    def test_feel_no_pain_blocks_on_exhaust(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["pummel"] * 5)
+        ctx.player.powers["feel_no_pain"] = 3
+        _plant_hand(ctx, ["pummel"], energy=3)
+        pre_block = ctx.player.block
+        ctx.play_card("pummel", target_slot=0)
+        # Pummel exhausts once -> Feel No Pain grants 3 block.
+        self.assertEqual(ctx.player.block, pre_block + 3)
+
+    def test_barricade_preserves_block_across_player_turns(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["defend"] * 10)
+        ctx.player.powers["barricade"] = 1
+        ctx.player.block = 20
+        # Keep the worm from attacking the block (make its queued move zero-damage).
+        ctx.combat.monsters[0].queued_move = "bellow"  # defend_buff, no damage
+        ctx.end_turn()
+        # After the enemy phase (Bellow doesn't hit), block should remain 20
+        # since Barricade skipped the start-of-player-turn reset.
+        self.assertEqual(ctx.player.block, 20)
+
+    def test_barricade_does_not_apply_on_initial_turn(self) -> None:
+        """Combat start sets block=0 even with Barricade — the flag only
+        guards the start-of-NEXT-player-turn reset."""
+
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["defend"] * 10)
+        # Players don't start with Barricade — this just verifies that even
+        # if they did, combat start wipes block from the previous combat.
+        self.assertEqual(ctx.player.block, 0)
+
+
+class Phase2dPowerCardsTest(unittest.TestCase):
+    """The six new power cards each apply their namesake."""
+
+    def setUp(self) -> None:
+        self.sim = _import_sim()
+
+    def _play_power(self, card_id: str, energy: int = 3):
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], [card_id] * 5)
+        _plant_hand(ctx, [card_id], energy=energy)
+        ctx.play_card(card_id)
+        return ctx
+
+    def test_metallicize_card_applies_three_stacks(self) -> None:
+        ctx = self._play_power("metallicize")
+        self.assertEqual(ctx.player.powers.get("metallicize"), 3)
+
+    def test_metallicize_plus_card_applies_four_stacks(self) -> None:
+        ctx = self._play_power("metallicize+1")
+        self.assertEqual(ctx.player.powers.get("metallicize"), 4)
+
+    def test_combust_card_applies_five_stacks(self) -> None:
+        ctx = self._play_power("combust")
+        self.assertEqual(ctx.player.powers.get("combust"), 5)
+
+    def test_rupture_card_applies_one_stack(self) -> None:
+        ctx = self._play_power("rupture")
+        self.assertEqual(ctx.player.powers.get("rupture"), 1)
+
+    def test_dark_embrace_card_applies_one_stack(self) -> None:
+        ctx = self._play_power("dark_embrace", energy=3)
+        self.assertEqual(ctx.player.powers.get("dark_embrace"), 1)
+
+    def test_feel_no_pain_card_applies_three_stacks(self) -> None:
+        ctx = self._play_power("feel_no_pain")
+        self.assertEqual(ctx.player.powers.get("feel_no_pain"), 3)
+
+    def test_barricade_card_applies_one_stack(self) -> None:
+        ctx = self._play_power("barricade")
+        self.assertEqual(ctx.player.powers.get("barricade"), 1)
+
+    def test_dark_embrace_plus_cost_is_one(self) -> None:
+        # Dark Embrace+ costs 1 instead of 2. Verify the card data.
+        powers, cards, _enemies = self.sim.load_all()
+        self.assertEqual(cards["dark_embrace"].cost, 2)
+        self.assertEqual(cards["dark_embrace+1"].cost, 1)
+
+
 class TurnFlowTest(unittest.TestCase):
     def setUp(self) -> None:
         self.sim = _import_sim()

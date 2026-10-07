@@ -40,5 +40,47 @@
     "kind": "buff",
     "duration": "end_of_turn_tick",
     "stacks": true
+  },
+  {
+    "power_id": "metallicize",
+    "name": "Metallicize",
+    "kind": "buff",
+    "duration": "permanent",
+    "stacks": true
+  },
+  {
+    "power_id": "combust",
+    "name": "Combust",
+    "kind": "buff",
+    "duration": "permanent",
+    "stacks": true
+  },
+  {
+    "power_id": "rupture",
+    "name": "Rupture",
+    "kind": "buff",
+    "duration": "permanent",
+    "stacks": true
+  },
+  {
+    "power_id": "dark_embrace",
+    "name": "Dark Embrace",
+    "kind": "buff",
+    "duration": "permanent",
+    "stacks": true
+  },
+  {
+    "power_id": "feel_no_pain",
+    "name": "Feel No Pain",
+    "kind": "buff",
+    "duration": "permanent",
+    "stacks": true
+  },
+  {
+    "power_id": "barricade",
+    "name": "Barricade",
+    "kind": "buff",
+    "duration": "permanent",
+    "stacks": true
   }
 ]

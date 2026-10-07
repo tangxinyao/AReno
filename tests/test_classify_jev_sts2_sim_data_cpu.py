@@ -41,10 +41,14 @@ class PowersLoadingTest(unittest.TestCase):
         self.sim = _import_sim()
         self.powers = self.sim.load_powers()
 
-    def test_six_phase1_powers_present(self) -> None:
+    def test_phase2d_powers_present(self) -> None:
         self.assertEqual(
             set(self.powers.keys()),
-            {"strength", "dexterity", "vulnerable", "weak", "frail", "ritual"},
+            {
+                "strength", "dexterity", "vulnerable", "weak", "frail", "ritual",
+                "metallicize", "combust", "rupture", "dark_embrace",
+                "feel_no_pain", "barricade",
+            },
         )
 
     def test_vulnerable_is_turn_scoped_debuff(self) -> None:
@@ -66,16 +70,15 @@ class CardsLoadingTest(unittest.TestCase):
         self.cards = self.sim.load_cards(power_ids=self.power_ids)
 
     def test_card_entry_count(self) -> None:
-        # 25 base attack/skill/power cards + 25 upgrades + 2 statuses
-        # (Wound, Dazed) after Phase 2b-1 content batch.
-        self.assertEqual(len(self.cards), 52)
+        # 31 base cards + 31 upgrades + 2 statuses after Phase 2d-1.
+        self.assertEqual(len(self.cards), 64)
 
     def test_each_regular_base_card_has_upgrade_link(self) -> None:
         bases = [
             c for c in self.cards.values()
             if c.upgraded_from is None and c.card_type not in ("status", "curse")
         ]
-        self.assertEqual(len(bases), 25)
+        self.assertEqual(len(bases), 31)
         for base in bases:
             self.assertIsNotNone(base.upgrade_of, f"{base.card_id} missing upgrade_of")
             upgraded = self.cards[base.upgrade_of]
@@ -183,8 +186,8 @@ class LoadAllTest(unittest.TestCase):
 
     def test_load_all_cross_resolves_power_ids(self) -> None:
         powers, cards, enemies = self.sim.load_all()
-        self.assertEqual(len(powers), 6)
-        self.assertEqual(len(cards), 52)
+        self.assertEqual(len(powers), 12)
+        self.assertEqual(len(cards), 64)
         self.assertEqual(len(enemies), 8)
         # No cross-ref error means every apply_power / add_card_to_pile verb
         # points to a real power or card.

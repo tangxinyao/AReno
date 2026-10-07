@@ -126,6 +126,7 @@ class CombatContext:
         self._player.powers_applied_on_turn = {}
 
         self._hand_size = int(hand_size)
+        self._register_player_power_hooks()
         self._hooks.dispatch("on_combat_start", {"monsters": monsters})
         self._begin_player_turn(initial=True)
 
@@ -193,8 +194,10 @@ class CombatContext:
         combat.phase = CombatPhase.PLAYER
         if not initial:
             # Block carries into enemy turn and resets at start of next player
-            # turn — see schemas.py gain_block spec.
-            self._player.block = 0
+            # turn — see schemas.py gain_block spec. Barricade (Phase 2d) skips
+            # the reset so block persists across turns.
+            if self._player.powers.get("barricade", 0) == 0:
+                self._player.block = 0
             self._player.energy = self._player.max_energy
         # Pick upcoming moves for each alive enemy BEFORE drawing so hooks
         # that read intents on draw see the current telegraph.
@@ -601,6 +604,64 @@ class CombatContext:
                     "power_id": "strength",
                     "amount": stacks,
                 })
+
+    # ------------------------------------------------------------------
+    # Player-side power hooks (Phase 2d)
+    #
+    # Each handler reads the player's current stacks for its power and
+    # acts. Handlers are registered once per combat in start_combat; the
+    # stacks check makes a handler for a never-applied power a cheap
+    # no-op, so there's no per-apply hook registration/teardown.
+
+    def _register_player_power_hooks(self) -> None:
+        self._hooks.register("on_player_turn_end", self._power_tick_player_turn_end, priority=200)
+        self._hooks.register("on_hp_lost", self._power_tick_hp_lost, priority=200)
+        self._hooks.register("on_card_exhausted", self._power_tick_card_exhausted, priority=200)
+
+    def _power_tick_player_turn_end(self, payload: dict[str, Any]) -> None:
+        del payload
+        met = self._player.powers.get("metallicize", 0)
+        if met > 0:
+            self._v_gain_block(
+                {"amount": met, "target_scope": "self"},
+                _EffectContext(actor="player"),
+            )
+        com = self._player.powers.get("combust", 0)
+        if com > 0:
+            # Combust self-damage is card-sourced for Rupture's purposes,
+            # so route through lose_hp_self (fires on_hp_lost -> cascades).
+            self._v_lose_hp_self(
+                {"amount": 1, "target_scope": "self"},
+                _EffectContext(actor="player"),
+            )
+            # If Combust's self-tick dropped the player to 0, _v_lose_hp_self
+            # has already called _end_combat. Guard before the AoE.
+            if self.combat.outcome is None:
+                self._v_deal_damage(
+                    {"amount": com, "target_scope": "all_enemies", "hits": 1},
+                    _EffectContext(actor="player"),
+                )
+
+    def _power_tick_hp_lost(self, payload: dict[str, Any]) -> None:
+        del payload
+        rup = self._player.powers.get("rupture", 0)
+        if rup > 0:
+            self._v_apply_power(
+                {"power_id": "strength", "amount": rup, "target_scope": "self"},
+                _EffectContext(actor="player"),
+            )
+
+    def _power_tick_card_exhausted(self, payload: dict[str, Any]) -> None:
+        del payload
+        de = self._player.powers.get("dark_embrace", 0)
+        if de > 0:
+            self._draw_cards(de)
+        fnp = self._player.powers.get("feel_no_pain", 0)
+        if fnp > 0:
+            self._v_gain_block(
+                {"amount": fnp, "target_scope": "self"},
+                _EffectContext(actor="player"),
+            )
 
     # ------------------------------------------------------------------
     # Enemy move picker
