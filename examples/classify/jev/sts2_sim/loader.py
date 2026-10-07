@@ -19,6 +19,7 @@ from typing import Any
 
 from .schemas import (
     CARD_ONLY_VERBS,
+    CARD_PILES,
     CARD_RARITIES,
     CARD_TARGETS,
     CARD_TYPES,
@@ -74,6 +75,7 @@ def load_cards(
         _require_unique(out, card.card_id, where="cards")
         out[card.card_id] = card
     _validate_upgrade_links(out)
+    _validate_add_card_refs(out)
     return out
 
 
@@ -266,6 +268,15 @@ def _parse_effect(step: Any, *, where: str, source: str, power_ids: set[str] | N
         if pid not in power_ids:
             raise SimDataError(f"{where}.args.power_id references unknown power {pid!r}")
 
+    if verb == "add_card_to_pile":
+        pile = normalized.get("pile")
+        if pile not in CARD_PILES:
+            raise SimDataError(
+                f"{where}.args.pile {pile!r} not in allowed set {sorted(CARD_PILES)}"
+            )
+        # card_id cross-ref is deferred to a second pass over the full card
+        # table — see _validate_add_card_refs below.
+
     # Numeric sanity: every int-typed arg must be >= 0, except `hits` which
     # must be >= 1 since zero hits is nonsensical for a damage verb.
     for arg_name, arg_type in spec.items():
@@ -310,6 +321,18 @@ def _validate_upgrade_links(cards: dict[str, CardSchema]) -> None:
                 raise SimDataError(
                     f"cards:{cid}.upgrade_of -> {card.upgrade_of!r}, "
                     f"but that card's upgraded_from = {upgraded.upgraded_from!r}"
+                )
+
+
+def _validate_add_card_refs(cards: dict[str, CardSchema]) -> None:
+    for cid, card in cards.items():
+        for i, eff in enumerate(card.effects):
+            if eff.verb != "add_card_to_pile":
+                continue
+            ref = eff.args.get("card_id")
+            if ref not in cards:
+                raise SimDataError(
+                    f"cards:{cid}.effects[{i}].args.card_id references unknown card {ref!r}"
                 )
 
 

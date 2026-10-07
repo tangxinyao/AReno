@@ -526,6 +526,152 @@ class ExhaustAndEtherealTest(unittest.TestCase):
         self.assertNotIn("carnage", ctx.player.exhaust_pile)
 
 
+class Phase2bNewVerbsTest(unittest.TestCase):
+    """Phase 2b-1 new verbs: equal_to_block / gain_energy / lose_hp_self / add_card_to_pile."""
+
+    def setUp(self) -> None:
+        self.sim = _import_sim()
+
+    def test_body_slam_deals_damage_equal_to_block(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["body_slam"] * 5)
+        worm = ctx.combat.monsters[0]
+        ctx.player.block = 17
+        _plant_hand(ctx, ["body_slam"], energy=3)
+        hp0 = worm.hp
+        ctx.play_card("body_slam", target_slot=0)
+        self.assertEqual(worm.hp, hp0 - 17)
+
+    def test_body_slam_zero_block_zero_damage(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["body_slam"] * 5)
+        worm = ctx.combat.monsters[0]
+        ctx.player.block = 0
+        _plant_hand(ctx, ["body_slam"], energy=3)
+        hp0 = worm.hp
+        ctx.play_card("body_slam", target_slot=0)
+        self.assertEqual(worm.hp, hp0)
+
+    def test_seeing_red_adds_two_energy(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["seeing_red"] * 5)
+        _plant_hand(ctx, ["seeing_red"], energy=3)
+        before = ctx.player.energy
+        ctx.play_card("seeing_red")
+        # Net: -1 (card cost) +2 (gain_energy) = +1
+        self.assertEqual(ctx.player.energy, before - 1 + 2)
+        self.assertIn("seeing_red", ctx.player.exhaust_pile)
+
+    def test_hemokinesis_costs_two_hp_before_damage(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["hemokinesis"] * 5)
+        worm = ctx.combat.monsters[0]
+        _plant_hand(ctx, ["hemokinesis"], energy=3)
+        hp_player0 = ctx.player.hp
+        hp_worm0 = worm.hp
+        ctx.play_card("hemokinesis", target_slot=0)
+        self.assertEqual(ctx.player.hp, hp_player0 - 2)
+        self.assertEqual(worm.hp, hp_worm0 - 15)
+
+    def test_lose_hp_self_can_kill_player(self) -> None:
+        ctx, *_ = _make_ctx(self.sim, player_max_hp=2)
+        ctx.player.hp = 2
+        ctx.start_combat(["jaw_worm"], ["hemokinesis"] * 5)
+        _plant_hand(ctx, ["hemokinesis"], energy=3)
+        ctx.play_card("hemokinesis", target_slot=0)
+        self.assertEqual(ctx.player.hp, 0)
+        self.assertEqual(ctx.combat.outcome, "defeat")
+
+    def test_wild_strike_adds_wound_to_draw(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["wild_strike"] * 5)
+        _plant_hand(ctx, ["wild_strike"], energy=3)
+        pre_draw = len(ctx.player.draw_pile)
+        pre_wound = ctx.player.draw_pile.count("wound")
+        ctx.play_card("wild_strike", target_slot=0)
+        self.assertEqual(len(ctx.player.draw_pile), pre_draw + 1)
+        self.assertEqual(ctx.player.draw_pile.count("wound"), pre_wound + 1)
+
+    def test_reckless_charge_adds_dazed_to_draw(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["reckless_charge"] * 5)
+        _plant_hand(ctx, ["reckless_charge"], energy=3)
+        ctx.play_card("reckless_charge", target_slot=0)
+        self.assertEqual(ctx.player.draw_pile.count("dazed"), 1)
+
+
+class Phase2bCardFamiliesTest(unittest.TestCase):
+    """Phase 2b-1 new cards: spot checks on signature behavior."""
+
+    def setUp(self) -> None:
+        self.sim = _import_sim()
+
+    def test_inflame_adds_two_strength(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["inflame"] * 5)
+        _plant_hand(ctx, ["inflame"], energy=3)
+        ctx.play_card("inflame")
+        self.assertEqual(ctx.player.powers.get("strength"), 2)
+
+    def test_inflame_plus_adds_three_strength(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["inflame+1"] * 5)
+        _plant_hand(ctx, ["inflame+1"], energy=3)
+        ctx.play_card("inflame+1")
+        self.assertEqual(ctx.player.powers.get("strength"), 3)
+
+    def test_intimidate_applies_weak_to_all_and_exhausts(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["red_louse", "green_louse"], ["intimidate"] * 5)
+        _plant_hand(ctx, ["intimidate"], energy=3)
+        ctx.play_card("intimidate")
+        for m in ctx.combat.monsters:
+            self.assertEqual(m.powers.get("weak"), 1)
+        self.assertIn("intimidate", ctx.player.exhaust_pile)
+
+    def test_uppercut_damage_weak_vulnerable(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["uppercut"] * 5)
+        worm = ctx.combat.monsters[0]
+        _plant_hand(ctx, ["uppercut"], energy=3)
+        hp0 = worm.hp
+        ctx.play_card("uppercut", target_slot=0)
+        self.assertEqual(worm.hp, hp0 - 13)
+        self.assertEqual(worm.powers.get("weak"), 1)
+        self.assertEqual(worm.powers.get("vulnerable"), 1)
+
+    def test_shockwave_applies_weak_and_vulnerable_to_all(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["red_louse", "green_louse"], ["shockwave"] * 5)
+        _plant_hand(ctx, ["shockwave"], energy=3)
+        ctx.play_card("shockwave")
+        for m in ctx.combat.monsters:
+            self.assertEqual(m.powers.get("weak"), 3)
+            self.assertEqual(m.powers.get("vulnerable"), 3)
+        self.assertIn("shockwave", ctx.player.exhaust_pile)
+
+    def test_bludgeon_deals_32(self) -> None:
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["bludgeon"] * 5)
+        worm = ctx.combat.monsters[0]
+        _plant_hand(ctx, ["bludgeon"], energy=3)
+        hp0 = worm.hp
+        ctx.play_card("bludgeon", target_slot=0)
+        self.assertEqual(worm.hp, max(0, hp0 - 32))
+
+    def test_body_slam_plus_is_free(self) -> None:
+        """Body Slam+ costs 0 — playable with 0 energy."""
+
+        ctx, *_ = _make_ctx(self.sim)
+        ctx.start_combat(["jaw_worm"], ["body_slam+1"] * 5)
+        worm = ctx.combat.monsters[0]
+        ctx.player.block = 10
+        _plant_hand(ctx, ["body_slam+1"], energy=0)
+        hp0 = worm.hp
+        ctx.play_card("body_slam+1", target_slot=0)
+        self.assertEqual(worm.hp, hp0 - 10)
+
+
 class TurnFlowTest(unittest.TestCase):
     def setUp(self) -> None:
         self.sim = _import_sim()

@@ -66,16 +66,16 @@ class CardsLoadingTest(unittest.TestCase):
         self.cards = self.sim.load_cards(power_ids=self.power_ids)
 
     def test_card_entry_count(self) -> None:
-        # 15 base attack/skill/power cards + 15 upgrades + 1 status (Wound)
-        # after Phase 2a mechanics scaffold.
-        self.assertEqual(len(self.cards), 31)
+        # 25 base attack/skill/power cards + 25 upgrades + 2 statuses
+        # (Wound, Dazed) after Phase 2b-1 content batch.
+        self.assertEqual(len(self.cards), 52)
 
     def test_each_regular_base_card_has_upgrade_link(self) -> None:
         bases = [
             c for c in self.cards.values()
             if c.upgraded_from is None and c.card_type not in ("status", "curse")
         ]
-        self.assertEqual(len(bases), 15)
+        self.assertEqual(len(bases), 25)
         for base in bases:
             self.assertIsNotNone(base.upgrade_of, f"{base.card_id} missing upgrade_of")
             upgraded = self.cards[base.upgrade_of]
@@ -184,9 +184,10 @@ class LoadAllTest(unittest.TestCase):
     def test_load_all_cross_resolves_power_ids(self) -> None:
         powers, cards, enemies = self.sim.load_all()
         self.assertEqual(len(powers), 6)
-        self.assertEqual(len(cards), 31)
+        self.assertEqual(len(cards), 52)
         self.assertEqual(len(enemies), 8)
-        # No cross-ref error means every apply_power verb points to a real power.
+        # No cross-ref error means every apply_power / add_card_to_pile verb
+        # points to a real power or card.
 
 
 class EngineContractDocsTest(unittest.TestCase):
@@ -387,6 +388,63 @@ class LoaderValidationTest(unittest.TestCase):
         )
         with self.assertRaisesRegex(self.sim.SimDataError, "unknown move"):
             self.sim.load_enemies(path, power_ids=set())
+
+    def test_rejects_bad_pile_for_add_card_to_pile(self) -> None:
+        path = self._write(
+            "cards.json",
+            [{
+                "card_id": "shuffler", "name": "Shuffler", "cost": 0,
+                "card_type": "attack", "rarity": "common", "target": "single_enemy",
+                "upgrade_of": "shuffler+1",
+                "effects": [{"verb": "add_card_to_pile",
+                             "args": {"card_id": "shuffler+1", "pile": "void", "amount": 1}}],
+            }, {
+                "card_id": "shuffler+1", "name": "Shuffler+", "cost": 0,
+                "card_type": "attack", "rarity": "common", "target": "single_enemy",
+                "upgraded_from": "shuffler",
+                "effects": [],
+            }],
+        )
+        with self.assertRaisesRegex(self.sim.SimDataError, "pile"):
+            self.sim.load_cards(path)
+
+    def test_rejects_add_card_to_pile_with_unknown_card_id(self) -> None:
+        path = self._write(
+            "cards.json",
+            [{
+                "card_id": "noper", "name": "Noper", "cost": 0,
+                "card_type": "attack", "rarity": "common", "target": "single_enemy",
+                "upgrade_of": "noper+1",
+                "effects": [{"verb": "add_card_to_pile",
+                             "args": {"card_id": "chrono_curse", "pile": "draw", "amount": 1}}],
+            }, {
+                "card_id": "noper+1", "name": "Noper+", "cost": 0,
+                "card_type": "attack", "rarity": "common", "target": "single_enemy",
+                "upgraded_from": "noper",
+                "effects": [],
+            }],
+        )
+        with self.assertRaisesRegex(self.sim.SimDataError, "unknown card"):
+            self.sim.load_cards(path)
+
+    def test_rejects_status_card_with_upgrade_of(self) -> None:
+        path = self._write(
+            "cards.json",
+            [{
+                "card_id": "fake_status", "name": "FakeStatus", "cost": 0,
+                "card_type": "status", "rarity": "special", "target": "none",
+                "unplayable": True,
+                "upgrade_of": "fake_status+1",
+                "effects": [],
+            }, {
+                "card_id": "fake_status+1", "name": "FakeStatus+", "cost": 0,
+                "card_type": "attack", "rarity": "common", "target": "single_enemy",
+                "upgraded_from": "fake_status",
+                "effects": [],
+            }],
+        )
+        with self.assertRaisesRegex(self.sim.SimDataError, "must not declare upgrade_of"):
+            self.sim.load_cards(path)
 
     def test_rejects_sequential_without_sequence_index(self) -> None:
         path = self._write(

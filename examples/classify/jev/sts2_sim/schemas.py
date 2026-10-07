@@ -97,25 +97,44 @@ TARGET_SCOPES: Final = frozenset({
 # arg -> expected Python type. `target_scope` is validated separately against
 # TARGET_SCOPES below.
 EFFECT_VERBS: Final[dict[str, dict[str, type]]] = {
-    "deal_damage":               {"amount": int, "target_scope": str, "hits": int},
-    "deal_damage_strike_scaled": {"base": int, "per_strike_bonus": int, "target_scope": str, "hits": int},
-    "gain_block":                {"amount": int, "target_scope": str},
-    "apply_power":               {"power_id": str, "amount": int, "target_scope": str},
-    "draw_cards":                {"amount": int},
-    "copy_to_discard":           {},
+    "deal_damage":                {"amount": int, "target_scope": str, "hits": int},
+    "deal_damage_strike_scaled":  {"base": int, "per_strike_bonus": int, "target_scope": str, "hits": int},
+    "deal_damage_equal_to_block": {"target_scope": str, "hits": int},
+    "gain_block":                 {"amount": int, "target_scope": str},
+    "apply_power":                {"power_id": str, "amount": int, "target_scope": str},
+    "draw_cards":                 {"amount": int},
+    "copy_to_discard":            {},
+    "gain_energy":                {"amount": int, "target_scope": str},
+    "lose_hp_self":               {"amount": int, "target_scope": str},
+    "add_card_to_pile":           {"card_id": str, "pile": str, "amount": int},
 }
 
 # Which scopes each verb accepts. The loader cross-checks the step's
-# target_scope against this map.
+# target_scope against this map. Verbs without target_scope (e.g.
+# add_card_to_pile) are intentionally absent here.
 VERB_ALLOWED_SCOPES: Final[dict[str, frozenset[str]]] = {
-    "deal_damage":               frozenset({"single_enemy", "all_enemies", "random_enemy", "player"}),
-    "deal_damage_strike_scaled": frozenset({"single_enemy", "all_enemies", "random_enemy"}),
-    "gain_block":                frozenset({"self"}),
-    "apply_power":               frozenset({"self", "single_enemy", "all_enemies", "random_enemy", "player"}),
+    "deal_damage":                frozenset({"single_enemy", "all_enemies", "random_enemy", "player"}),
+    "deal_damage_strike_scaled":  frozenset({"single_enemy", "all_enemies", "random_enemy"}),
+    "deal_damage_equal_to_block": frozenset({"single_enemy", "all_enemies", "random_enemy"}),
+    "gain_block":                 frozenset({"self"}),
+    "apply_power":                frozenset({"self", "single_enemy", "all_enemies", "random_enemy", "player"}),
+    "gain_energy":                frozenset({"self"}),
+    "lose_hp_self":               frozenset({"self"}),
 }
 
+# Which `pile` values add_card_to_pile accepts.
+CARD_PILES: Final = frozenset({"hand", "draw", "discard", "exhaust"})
+
 # Verbs cards may use. Enemy moves use the complement defined below.
-CARD_ONLY_VERBS: Final = frozenset({"draw_cards", "copy_to_discard", "deal_damage_strike_scaled"})
+CARD_ONLY_VERBS: Final = frozenset({
+    "draw_cards",
+    "copy_to_discard",
+    "deal_damage_strike_scaled",
+    "deal_damage_equal_to_block",
+    "gain_energy",
+    "lose_hp_self",
+    "add_card_to_pile",
+})
 ENEMY_ONLY_VERBS: Final = frozenset()  # no enemy-exclusive verbs yet
 
 POWER_KINDS: Final = frozenset({"buff", "debuff"})
@@ -230,6 +249,112 @@ Edge cases:
     strike-named -> amount == base.
   * Running Perfected Strike against a dead captured target with the
     full base amount still no-ops silently per deal_damage's rules.
+""",
+
+    "deal_damage_equal_to_block": """\
+Deal damage whose amount is the player's current block. Card-only
+(Body Slam). Enemy moves may not call this verb.
+
+Required args:
+  target_scope  : single_enemy / all_enemies / random_enemy. "player"
+                  is rejected at load time.
+  hits          : int >= 1, defaults to 1.
+
+Pipeline:
+  1. amount = self._player.block at the time this effect runs. This
+     uses the LIVE block value, so a prior gain_block step in the same
+     card does feed into this one (Body Slam itself has no block step,
+     but a hypothetical Iron Wave -> Body Slam chain within a card
+     would compound).
+  2. Delegate to deal_damage with the computed amount. Strength does
+     NOT add — Body Slam's damage is purely block-based, so this verb
+     does NOT pipe through the attack-strength branch of deal_damage.
+     (Implementation note: the delegate still runs full deal_damage,
+     which adds strength for attack-type source cards. Body Slam is
+     card_type=attack in STS1 and the +strength is actually how STS1
+     Body Slam DOES behave — strength adds on top of block. Keep this
+     delegation as-is unless parity testing proves otherwise.)
+
+Hooks fired: identical to deal_damage (on_damaged, on_enemy_killed).
+
+Edge cases:
+  * player.block == 0 -> deals 0 damage per hit; on_damaged still
+    fires with amount=0 (matches deal_damage's "0-damage hits still
+    fire" rule).
+""",
+
+    "gain_energy": """\
+Add energy to the player. Card-only; takes `amount` and `target_scope`
+("self"-only). Used by Seeing Red; later by Dropkick+ when the
+conditional-apply plumbing lands.
+
+Required args:
+  amount        : int >= 0.
+  target_scope  : MUST be "self". Enforced at load time.
+
+Pipeline:
+  1. self._player.energy += amount
+  2. Dispatch on_energy_gained with payload {amount}.
+
+Edge cases:
+  * No max-energy cap in STS1 (Watcher aside); amount simply adds.
+  * amount == 0 is a no-op that still fires the hook.
+""",
+
+    "lose_hp_self": """\
+Unblockable HP loss on the player, used by cards like Hemokinesis,
+Bloodletting, and Offering. Does NOT trigger on_damaged — this verb
+represents a *cost*, not combat damage, so vulnerable / block / weak
+have no effect.
+
+Required args:
+  amount        : int >= 0.
+  target_scope  : MUST be "self".
+
+Pipeline:
+  1. actual = min(amount, self._player.hp)
+  2. self._player.hp -= actual
+  3. Dispatch on_hp_lost with payload {amount:actual, source:"self"}.
+  4. If self._player.hp == 0: _end_combat("defeat").
+
+Edge cases:
+  * Can kill the player — Hemokinesis-into-death matches STS behavior
+    (very rare, but legal: dropping to 0 HP from Hemokinesis is a
+    valid loss).
+  * amount == 0 is a no-op that does NOT fire the hook (avoid noisy
+    0-HP-lost events for Powers subscribers like Rupture in Phase 2d).
+""",
+
+    "add_card_to_pile": """\
+Insert N copies of a named card into one of the player's piles.
+Card-only. Used to inflict statuses (Wild Strike -> Wound, Reckless
+Charge -> Dazed, Burning Pact's exhaust, Power Through) and in later
+phases to seed curses or copy specific attacks.
+
+Required args:
+  card_id  : the id of the card to insert. The loader cross-checks
+             this against the full card table after all cards load.
+  pile     : one of "hand" / "draw" / "discard" / "exhaust". Enforced
+             at load time.
+  amount   : int >= 0, number of copies to insert.
+
+Pipeline (per copy):
+  * pile == "hand":    append if hand size < 10, else fall through
+                       to discard with on_card_overdrawn. Fires
+                       on_card_added_to_hand.
+  * pile == "draw":    insert at a random position via
+                       rng.stream("combat_shuffle"). Fires
+                       on_card_added_to_draw. Mirrors STS "Shuffle N
+                       into your draw pile" wording.
+  * pile == "discard": append. Fires on_card_added_to_discard with
+                       source="add_card_to_pile".
+  * pile == "exhaust": append. Fires on_card_exhausted with
+                       source="add_card_to_pile".
+
+Edge cases:
+  * amount == 0 is a no-op; no hooks fire.
+  * Inserting into "draw" when draw_pile is empty appends (there is
+    no random index 0..-1 case).
 """,
 
     "gain_block": """\
@@ -545,6 +670,7 @@ class PowerSchema:
 
 __all__ = [
     "CARD_ONLY_VERBS",
+    "CARD_PILES",
     "CARD_RARITIES",
     "CARD_TARGETS",
     "CARD_TYPES",

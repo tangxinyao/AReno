@@ -286,6 +286,8 @@ class CombatContext:
             self._v_deal_damage(args, ctx)
         elif verb == "deal_damage_strike_scaled":
             self._v_deal_damage_strike_scaled(args, ctx)
+        elif verb == "deal_damage_equal_to_block":
+            self._v_deal_damage_equal_to_block(args, ctx)
         elif verb == "gain_block":
             self._v_gain_block(args, ctx)
         elif verb == "apply_power":
@@ -294,6 +296,12 @@ class CombatContext:
             self._v_draw_cards(args, ctx)
         elif verb == "copy_to_discard":
             self._v_copy_to_discard(args, ctx)
+        elif verb == "gain_energy":
+            self._v_gain_energy(args, ctx)
+        elif verb == "lose_hp_self":
+            self._v_lose_hp_self(args, ctx)
+        elif verb == "add_card_to_pile":
+            self._v_add_card_to_pile(args, ctx)
         else:
             raise CombatError(f"unhandled verb {verb!r}")
 
@@ -355,6 +363,64 @@ class CombatContext:
             {"amount": amount, "target_scope": args["target_scope"], "hits": int(args.get("hits", 1))},
             ctx,
         )
+
+    def _v_deal_damage_equal_to_block(self, args: dict[str, Any], ctx: _EffectContext) -> None:
+        self._v_deal_damage(
+            {
+                "amount": self._player.block,
+                "target_scope": args["target_scope"],
+                "hits": int(args.get("hits", 1)),
+            },
+            ctx,
+        )
+
+    def _v_gain_energy(self, args: dict[str, Any], ctx: _EffectContext) -> None:
+        del ctx
+        amount = int(args["amount"])
+        self._player.energy += amount
+        self._hooks.dispatch("on_energy_gained", {"amount": amount})
+
+    def _v_lose_hp_self(self, args: dict[str, Any], ctx: _EffectContext) -> None:
+        del ctx
+        amount = int(args["amount"])
+        if amount <= 0:
+            return
+        actual = min(amount, self._player.hp)
+        self._player.hp -= actual
+        self._hooks.dispatch("on_hp_lost", {"amount": actual, "source": "self"})
+        if self._player.hp == 0:
+            self._end_combat("defeat")
+
+    def _v_add_card_to_pile(self, args: dict[str, Any], ctx: _EffectContext) -> None:
+        del ctx
+        card_id = args["card_id"]
+        pile = args["pile"]
+        amount = int(args["amount"])
+        for _ in range(amount):
+            if pile == "hand":
+                if len(self._player.hand) < 10:
+                    self._player.hand.append(card_id)
+                    self._hooks.dispatch("on_card_added_to_hand", {"card_id": card_id})
+                else:
+                    self._player.discard_pile.append(card_id)
+                    self._hooks.dispatch("on_card_overdrawn", {"card_id": card_id})
+            elif pile == "draw":
+                if not self._player.draw_pile:
+                    self._player.draw_pile.append(card_id)
+                else:
+                    pos = self._rng.stream("combat_shuffle").randint(0, len(self._player.draw_pile))
+                    self._player.draw_pile.insert(pos, card_id)
+                self._hooks.dispatch("on_card_added_to_draw", {"card_id": card_id})
+            elif pile == "discard":
+                self._player.discard_pile.append(card_id)
+                self._hooks.dispatch("on_card_added_to_discard",
+                                     {"card_id": card_id, "source": "add_card_to_pile"})
+            elif pile == "exhaust":
+                self._player.exhaust_pile.append(card_id)
+                self._hooks.dispatch("on_card_exhausted",
+                                     {"card_id": card_id, "source": "add_card_to_pile"})
+            else:
+                raise CombatError(f"unknown pile {pile!r}")
 
     def _v_gain_block(self, args: dict[str, Any], ctx: _EffectContext) -> None:
         base = int(args["amount"])

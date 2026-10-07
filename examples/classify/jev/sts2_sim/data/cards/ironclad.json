@@ -390,5 +390,276 @@
     "target": "none",
     "unplayable": true,
     "effects": []
+  },
+  {
+    "card_id": "dazed",
+    "name": "Dazed",
+    "cost": 0,
+    "card_type": "status",
+    "rarity": "special",
+    "target": "none",
+    "unplayable": true,
+    "ethereal": true,
+    "effects": []
+  },
+  {
+    "card_id": "inflame",
+    "name": "Inflame",
+    "cost": 1,
+    "card_type": "power",
+    "rarity": "uncommon",
+    "target": "self",
+    "upgrade_of": "inflame+1",
+    "effects": [
+      {"verb": "apply_power", "args": {"power_id": "strength", "amount": 2, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "inflame+1",
+    "name": "Inflame+",
+    "cost": 1,
+    "card_type": "power",
+    "rarity": "uncommon",
+    "target": "self",
+    "upgraded_from": "inflame",
+    "effects": [
+      {"verb": "apply_power", "args": {"power_id": "strength", "amount": 3, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "intimidate",
+    "name": "Intimidate",
+    "cost": 0,
+    "card_type": "skill",
+    "rarity": "uncommon",
+    "target": "all_enemies",
+    "upgrade_of": "intimidate+1",
+    "exhaust_on_play": true,
+    "effects": [
+      {"verb": "apply_power", "args": {"power_id": "weak", "amount": 1, "target_scope": "all_enemies"}}
+    ]
+  },
+  {
+    "card_id": "intimidate+1",
+    "name": "Intimidate+",
+    "cost": 0,
+    "card_type": "skill",
+    "rarity": "uncommon",
+    "target": "all_enemies",
+    "upgraded_from": "intimidate",
+    "exhaust_on_play": true,
+    "effects": [
+      {"verb": "apply_power", "args": {"power_id": "weak", "amount": 2, "target_scope": "all_enemies"}}
+    ]
+  },
+  {
+    "card_id": "uppercut",
+    "name": "Uppercut",
+    "cost": 2,
+    "card_type": "attack",
+    "rarity": "uncommon",
+    "target": "single_enemy",
+    "upgrade_of": "uppercut+1",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 13, "target_scope": "single_enemy", "hits": 1}},
+      {"verb": "apply_power", "args": {"power_id": "weak", "amount": 1, "target_scope": "single_enemy"}},
+      {"verb": "apply_power", "args": {"power_id": "vulnerable", "amount": 1, "target_scope": "single_enemy"}}
+    ]
+  },
+  {
+    "card_id": "uppercut+1",
+    "name": "Uppercut+",
+    "cost": 2,
+    "card_type": "attack",
+    "rarity": "uncommon",
+    "target": "single_enemy",
+    "upgraded_from": "uppercut",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 13, "target_scope": "single_enemy", "hits": 1}},
+      {"verb": "apply_power", "args": {"power_id": "weak", "amount": 2, "target_scope": "single_enemy"}},
+      {"verb": "apply_power", "args": {"power_id": "vulnerable", "amount": 2, "target_scope": "single_enemy"}}
+    ]
+  },
+  {
+    "card_id": "shockwave",
+    "name": "Shockwave",
+    "cost": 2,
+    "card_type": "skill",
+    "rarity": "uncommon",
+    "target": "all_enemies",
+    "upgrade_of": "shockwave+1",
+    "exhaust_on_play": true,
+    "effects": [
+      {"verb": "apply_power", "args": {"power_id": "weak", "amount": 3, "target_scope": "all_enemies"}},
+      {"verb": "apply_power", "args": {"power_id": "vulnerable", "amount": 3, "target_scope": "all_enemies"}}
+    ]
+  },
+  {
+    "card_id": "shockwave+1",
+    "name": "Shockwave+",
+    "cost": 2,
+    "card_type": "skill",
+    "rarity": "uncommon",
+    "target": "all_enemies",
+    "upgraded_from": "shockwave",
+    "exhaust_on_play": true,
+    "effects": [
+      {"verb": "apply_power", "args": {"power_id": "weak", "amount": 5, "target_scope": "all_enemies"}},
+      {"verb": "apply_power", "args": {"power_id": "vulnerable", "amount": 5, "target_scope": "all_enemies"}}
+    ]
+  },
+  {
+    "card_id": "body_slam",
+    "name": "Body Slam",
+    "cost": 1,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "single_enemy",
+    "upgrade_of": "body_slam+1",
+    "effects": [
+      {"verb": "deal_damage_equal_to_block",
+       "args": {"target_scope": "single_enemy", "hits": 1}}
+    ]
+  },
+  {
+    "card_id": "body_slam+1",
+    "name": "Body Slam+",
+    "cost": 0,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "single_enemy",
+    "upgraded_from": "body_slam",
+    "effects": [
+      {"verb": "deal_damage_equal_to_block",
+       "args": {"target_scope": "single_enemy", "hits": 1}}
+    ]
+  },
+  {
+    "card_id": "seeing_red",
+    "name": "Seeing Red",
+    "cost": 1,
+    "card_type": "skill",
+    "rarity": "uncommon",
+    "target": "self",
+    "upgrade_of": "seeing_red+1",
+    "exhaust_on_play": true,
+    "effects": [
+      {"verb": "gain_energy", "args": {"amount": 2, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "seeing_red+1",
+    "name": "Seeing Red+",
+    "cost": 0,
+    "card_type": "skill",
+    "rarity": "uncommon",
+    "target": "self",
+    "upgraded_from": "seeing_red",
+    "exhaust_on_play": true,
+    "effects": [
+      {"verb": "gain_energy", "args": {"amount": 2, "target_scope": "self"}}
+    ]
+  },
+  {
+    "card_id": "bludgeon",
+    "name": "Bludgeon",
+    "cost": 3,
+    "card_type": "attack",
+    "rarity": "rare",
+    "target": "single_enemy",
+    "upgrade_of": "bludgeon+1",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 32, "target_scope": "single_enemy", "hits": 1}}
+    ]
+  },
+  {
+    "card_id": "bludgeon+1",
+    "name": "Bludgeon+",
+    "cost": 3,
+    "card_type": "attack",
+    "rarity": "rare",
+    "target": "single_enemy",
+    "upgraded_from": "bludgeon",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 42, "target_scope": "single_enemy", "hits": 1}}
+    ]
+  },
+  {
+    "card_id": "hemokinesis",
+    "name": "Hemokinesis",
+    "cost": 1,
+    "card_type": "attack",
+    "rarity": "uncommon",
+    "target": "single_enemy",
+    "upgrade_of": "hemokinesis+1",
+    "effects": [
+      {"verb": "lose_hp_self", "args": {"amount": 2, "target_scope": "self"}},
+      {"verb": "deal_damage", "args": {"amount": 15, "target_scope": "single_enemy", "hits": 1}}
+    ]
+  },
+  {
+    "card_id": "hemokinesis+1",
+    "name": "Hemokinesis+",
+    "cost": 1,
+    "card_type": "attack",
+    "rarity": "uncommon",
+    "target": "single_enemy",
+    "upgraded_from": "hemokinesis",
+    "effects": [
+      {"verb": "lose_hp_self", "args": {"amount": 2, "target_scope": "self"}},
+      {"verb": "deal_damage", "args": {"amount": 20, "target_scope": "single_enemy", "hits": 1}}
+    ]
+  },
+  {
+    "card_id": "reckless_charge",
+    "name": "Reckless Charge",
+    "cost": 0,
+    "card_type": "attack",
+    "rarity": "uncommon",
+    "target": "single_enemy",
+    "upgrade_of": "reckless_charge+1",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 7, "target_scope": "single_enemy", "hits": 1}},
+      {"verb": "add_card_to_pile", "args": {"card_id": "dazed", "pile": "draw", "amount": 1}}
+    ]
+  },
+  {
+    "card_id": "reckless_charge+1",
+    "name": "Reckless Charge+",
+    "cost": 0,
+    "card_type": "attack",
+    "rarity": "uncommon",
+    "target": "single_enemy",
+    "upgraded_from": "reckless_charge",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 10, "target_scope": "single_enemy", "hits": 1}},
+      {"verb": "add_card_to_pile", "args": {"card_id": "dazed", "pile": "draw", "amount": 1}}
+    ]
+  },
+  {
+    "card_id": "wild_strike",
+    "name": "Wild Strike",
+    "cost": 1,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "single_enemy",
+    "upgrade_of": "wild_strike+1",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 12, "target_scope": "single_enemy", "hits": 1}},
+      {"verb": "add_card_to_pile", "args": {"card_id": "wound", "pile": "draw", "amount": 1}}
+    ]
+  },
+  {
+    "card_id": "wild_strike+1",
+    "name": "Wild Strike+",
+    "cost": 1,
+    "card_type": "attack",
+    "rarity": "common",
+    "target": "single_enemy",
+    "upgraded_from": "wild_strike",
+    "effects": [
+      {"verb": "deal_damage", "args": {"amount": 17, "target_scope": "single_enemy", "hits": 1}},
+      {"verb": "add_card_to_pile", "args": {"card_id": "wound", "pile": "draw", "amount": 1}}
+    ]
   }
 ]
