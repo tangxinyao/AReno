@@ -1,72 +1,135 @@
-"""Phase 1 combat engine.
+"""Combat engine for Slay the Spire 2 (Ironclad, v0.107.1 rules).
 
-Owns one combat: start -> player turn (draw/energy/actions) -> end turn ->
-enemy turn (move resolution + decay) -> back to player, until victory or
-defeat. All mutations target the RunState passed in; CombatContext holds
-no state of its own beyond caches for the data tables.
+Owns one combat: start -> player turn (draw / energy / plays) -> end turn ->
+enemy turn -> round end -> next player turn, until victory or defeat. All
+mutations target the RunState passed in.
 
-Follows the engine development contract pinned in `schemas.py`. In
-particular, see the Resolution order, Dead-target semantics, Hook timing,
-and Scaling rules sections of that module docstring.
+Turn order, damage math and power timings follow r33hab/sts2's emulator
+(`CombatEngine.EndTurn`, `BuffSystem.IncomingDamage`, `CardEffects`), which
+is itself checked against live game captures. Where the emulator and the
+card text disagree, the card text wins and the spot carries a comment.
+
+Card behavior lives in card_effects.py (one function per card, keyed by
+game id); monster behavior in monster_ai.py. This module provides the
+primitives both call: powered/unpowered damage, block, power application,
+draw, exhaust, HP loss, and the turn loop.
+
+Known approximation: piles hold card ids, so per-instance card state
+(Rampage / Thrash growth, Infernal Blade's free-this-turn) is tracked per
+card id. Two copies of the same card in one combat share it.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
+import inspect
+from dataclasses import dataclass, field
+from typing import Any, Callable, Iterator
 
 from .effects import EffectQueue
 from .enums import CombatPhase
 from .hooks import HookBus
 from .rng import Rng
-from .schemas import CardSchema, EffectStep, EnemySchema, PowerSchema, SelectorEntry
-from .state import CombatState, MonsterState, PlayerState, RunState
+from .schemas import CardSchema, EncounterSchema, MonsterSchema, PowerSchema
+from .state import CombatState, MonsterState, PendingSelection, PlayerState, RunState
 
 
 class CombatError(RuntimeError):
     pass
 
 
+MAX_HAND = 10
+BASE_HAND_SIZE = 5
+
+# Debuffs on the player that tick down once per round.
+_DURATION_DEBUFFS = ("vulnerable", "weak", "frail")
+# Debuffs Artifact negates (monster side). Strength loss counts as a debuff.
+_DEBUFF_IDS = frozenset({
+    "vulnerable", "weak", "frail", "shrink", "constrict", "tangled", "smoggy", "ringing",
+    "no_draw", "no_energy_gain", "slow", "strength_loss",
+})
+# End-of-turn-in-hand status/curse effects: (kind, amount).
+_TURN_END_IN_HAND: dict[str, tuple[str, int]] = {
+    "burn": ("damage", 2),
+    "infection": ("damage", 3),
+    "toxic": ("damage", 5),
+    "decay": ("damage", 2),
+    "wither": ("damage", 3),
+    "beckon": ("lose_hp", 6),
+    "bad_luck": ("lose_hp", 13),
+    "regret": ("lose_hp_hand", 0),
+    "doubt": ("weak", 1),
+    "shame": ("frail", 1),
+    "debt": ("gold", 10),
+}
+
+
 @dataclass
-class _EffectContext:
-    """Transient context passed down the verb dispatcher.
+class Play:
+    """One resolution of a card (a replay or auto-play is a new Play)."""
 
-    Captures the actor identity and the single_enemy target chosen at
-    card-play time so later effects of the same card see the same slot
-    (see Dead-target semantics in schemas.py)."""
+    card: CardSchema
+    target: MonsterState | None
+    x: int = 0  # energy spent on an X-cost card
+    auto: bool = False  # auto-played (Havoc, Cascade ...): selections auto-pick
+    hp_lost_from_card: int = 0
+    bonus: int = 0  # Rampage / Thrash growth banked by this play
 
-    actor: str  # "player" | "enemy"
-    actor_monster: MonsterState | None = None  # set when actor == "enemy"
-    source_card: CardSchema | None = None
-    source_move_id: str | None = None
-    captured_target_slot: int | None = None
+
+@dataclass
+class SelectionRequest:
+    """Yielded by a card generator to ask the player to pick cards."""
+
+    source: str  # "hand" | "discard"
+    candidates: list[int]
+    count: int
+    purpose: str
+    min_count: int | None = None
+
+
+@dataclass
+class _PendingPlay:
+    play: Play
+    gen: Iterator[Any] | None
+    finish: Callable[[], None]
+
+
+@dataclass
+class _Scratch:
+    rupture_owed: int = 0
+    dark_embrace_deferred: int = 0
+    pending: _PendingPlay | None = None
+    autoplaying: int = 0
+    extra: dict[str, Any] = field(default_factory=dict)
 
 
 class CombatContext:
-    DEFAULT_HAND_SIZE: int = 5
+    DEFAULT_HAND_SIZE: int = BASE_HAND_SIZE
 
     def __init__(
         self,
         *,
         run: RunState,
         cards: dict[str, CardSchema],
-        enemies: dict[str, EnemySchema],
+        monsters: dict[str, MonsterSchema],
         powers: dict[str, PowerSchema],
         rng: Rng,
         hooks: HookBus,
         effects: EffectQueue,
+        encounters: dict[str, EncounterSchema] | None = None,
     ) -> None:
         if run.player is None:
             raise CombatError("RunState.player must be set before CombatContext")
         self._run = run
         self._card_defs = cards
-        self._enemy_defs = enemies
+        self._monster_defs = monsters
         self._power_defs = powers
+        self._encounters = encounters or {}
         self._rng = rng
         self._hooks = hooks
         self._effects = effects
         self._player: PlayerState = run.player
         self._combat: CombatState | None = run.combat
+        self._s = _Scratch()
 
     # ------------------------------------------------------------------
     # Public surface
@@ -81,63 +144,125 @@ class CombatContext:
     def player(self) -> PlayerState:
         return self._player
 
+    @property
+    def ascension(self) -> int:
+        return self._run.ascension
+
+    @property
+    def cards(self) -> dict[str, CardSchema]:
+        return self._card_defs
+
+    @property
+    def monster_defs(self) -> dict[str, MonsterSchema]:
+        return self._monster_defs
+
+    @property
+    def rng(self) -> Rng:
+        return self._rng
+
     def start_combat(
         self,
-        enemy_ids: list[str],
+        monster_ids: list[str],
         starting_deck: list[str],
         *,
         hand_size: int = DEFAULT_HAND_SIZE,
+        monster_flags: list[dict[str, Any]] | None = None,
     ) -> None:
-        """Set up a fresh combat on this run."""
+        """Set up a fresh combat against `monster_ids` (slot order).
 
-        for eid in enemy_ids:
-            if eid not in self._enemy_defs:
-                raise CombatError(f"unknown enemy_id {eid!r}")
+        `monster_flags[i]` seeds monster i's flags (encounter starters)."""
+
+        from . import monster_ai
+
+        for mid in monster_ids:
+            if mid not in self._monster_defs:
+                raise CombatError(f"unknown monster_id {mid!r}")
         for cid in starting_deck:
             if cid not in self._card_defs:
                 raise CombatError(f"unknown card_id {cid!r}")
 
-        monsters: list[MonsterState] = []
-        hp_stream = self._rng.stream("enemy_hp")
-        for slot, eid in enumerate(enemy_ids):
-            edef = self._enemy_defs[eid]
-            hp = hp_stream.randint(edef.hp_min, edef.hp_max)
-            monster = MonsterState(
-                monster_id=eid,
-                name=edef.name,
-                hp=hp,
-                max_hp=hp,
-                slot=slot,
-            )
-            # Apply any pre-combat powers (Lagavulin's starting Metallicize 8,
-            # Guardian's starting Mode Shift buff etc.). applied_on_turn=0 is
-            # strictly less than any live turn, so decay / tick logic treats
-            # these as if they'd been on the monster forever.
-            for pid, stacks in edef.starting_powers:
-                monster.powers[pid] = stacks
-                monster.powers_applied_on_turn[pid] = 0
-                monster.powers_applied_phase[pid] = CombatPhase.START
-            monsters.append(monster)
-
-        combat = CombatState(turn=0, phase=CombatPhase.START, monsters=monsters, outcome=None)
+        combat = CombatState(turn=0, phase=CombatPhase.START)
         self._run.combat = combat
         self._combat = combat
-
-        self._player.deck = list(starting_deck)
-        self._player.hand = []
-        self._player.discard_pile = []
-        self._player.exhaust_pile = []
-        self._player.draw_pile = list(starting_deck)
-        self._rng.stream("combat_shuffle").shuffle(self._player.draw_pile)
-        self._player.block = 0
-        self._player.energy = self._player.max_energy
-        self._player.powers = {}
-        self._player.powers_applied_on_turn = {}
-
+        self._s = _Scratch()
         self._hand_size = int(hand_size)
-        self._register_player_power_hooks()
-        self._hooks.dispatch("on_combat_start", {"monsters": monsters})
+
+        kind_counts: dict[str, int] = {}
+        for i, mid in enumerate(monster_ids):
+            monster = self._new_monster(mid)
+            if monster_flags is not None:
+                monster.flags.update(monster_flags[i])
+            monster.kind_index = kind_counts.get(mid, 0)
+            kind_counts[mid] = monster.kind_index + 1
+            combat.monsters.append(monster)
+        self._reslot()
+        for m in combat.monsters:
+            monster_ai.enter_combat(self, m)
+
+        p = self._player
+        p.deck = list(starting_deck)
+        p.hand = []
+        p.discard_pile = []
+        p.exhaust_pile = []
+        p.draw_pile = list(starting_deck)
+        self._rng.stream("combat_shuffle").shuffle(p.draw_pile)
+        # Innate cards start on top of the draw pile (end of list = top).
+        innate = [c for c in p.draw_pile if "innate" in self._card_defs[c].keywords]
+        if innate:
+            rest = [c for c in p.draw_pile if "innate" not in self._card_defs[c].keywords]
+            p.draw_pile = rest + innate
+        p.block = 0
+        p.powers = {}
+        p.energy = 0
+
+        for m in combat.monsters:
+            monster_ai.choose_first_move(self, m)
+        self._hooks.dispatch("on_combat_start", {"monsters": combat.monsters})
         self._begin_player_turn(initial=True)
+
+    # -- legality --------------------------------------------------------
+
+    def effective_cost(self, card_id: str) -> int:
+        card = self._card_defs[card_id]
+        if card.x_cost:
+            return 0
+        p = self._player.powers
+        cost = card.cost
+        if card.game_id == "STOMP":
+            cost = max(0, cost - self.combat.attacks_played_this_turn)
+        if card.card_type == "attack":
+            cost += p.get("tangled", 0)
+        if card.card_type == "skill" and p.get("corruption", 0) > 0:
+            cost = 0
+        if card.card_type == "attack" and p.get("free_attack", 0) > 0:
+            cost = 0
+        if self.combat.free_this_turn.get(card_id, 0) > 0:
+            cost = 0
+        return max(0, cost)
+
+    def can_play(self, card_id: str) -> bool:
+        combat = self.combat
+        if combat.phase != CombatPhase.PLAYER or combat.outcome is not None:
+            return False
+        if combat.pending_selection is not None:
+            return False
+        if card_id not in self._player.hand:
+            return False
+        card = self._card_defs[card_id]
+        if card.unplayable or card.multiplayer_only:
+            return False
+        if self.effective_cost(card_id) > self._player.energy:
+            return False
+        p = self._player.powers
+        if p.get("ringing", 0) > 0 and combat.cards_played_this_turn > 0:
+            return False
+        if card.card_type == "skill" and p.get("smoggy", 0) > 0 and combat.skills_played_this_turn > 0:
+            return False
+        if any(c == "normality" for c in self._player.hand) and combat.cards_played_this_turn >= 3:
+            return False
+        return True
+
+    # -- player actions --------------------------------------------------
 
     def play_card(self, card_id: str, *, target_slot: int | None = None) -> None:
         combat = self.combat
@@ -145,46 +270,37 @@ class CombatContext:
             raise CombatError(f"play_card called in phase {combat.phase!r}")
         if combat.outcome is not None:
             raise CombatError("combat already finished")
+        if combat.pending_selection is not None:
+            raise CombatError("a card selection is pending")
         if card_id not in self._player.hand:
             raise CombatError(f"card {card_id!r} not in hand")
-
         card = self._card_defs[card_id]
-        if card.cost > self._player.energy:
+        cost = self.effective_cost(card_id)
+        if card.unplayable or card.multiplayer_only:
+            raise CombatError(f"{card_id!r} is unplayable")
+        if cost > self._player.energy:
             raise CombatError(f"insufficient energy to play {card_id!r}")
-
+        if not self.can_play(card_id):
+            raise CombatError(f"{card_id!r} cannot be played now")
+        target: MonsterState | None = None
         if card.target == "single_enemy":
             if target_slot is None:
                 raise CombatError(f"{card_id!r} requires target_slot")
             if not (0 <= target_slot < len(combat.monsters)):
                 raise CombatError(f"target_slot {target_slot} out of range")
-            if not combat.monsters[target_slot].alive:
+            target = combat.monsters[target_slot]
+            if not target.alive:
                 raise CombatError(f"target slot {target_slot} is dead")
-        else:
-            target_slot = None
 
-        self._player.energy -= card.cost
+        x = self._player.energy if card.x_cost else 0
+        self._player.energy -= x if card.x_cost else cost
+        if self.combat.free_this_turn.get(card_id, 0) > 0:
+            self.combat.free_this_turn[card_id] -= 1
+        elif card.card_type == "attack" and self._player.powers.get("free_attack", 0) > 0:
+            self._change_power(self._player, "free_attack", -1)
         self._player.hand.remove(card_id)
         combat.last_card_played = card_id
-
-        ctx = _EffectContext(
-            actor="player",
-            source_card=card,
-            captured_target_slot=target_slot,
-        )
-        for step in card.effects:
-            self._apply_effect(step, ctx)
-            if combat.outcome is not None:
-                break
-
-        if combat.outcome is None:
-            if card.exhaust_on_play:
-                self._player.exhaust_pile.append(card_id)
-                self._hooks.dispatch("on_card_exhausted", {"card_id": card_id, "source": "exhaust_on_play"})
-            else:
-                self._player.discard_pile.append(card_id)
-            self._hooks.dispatch("on_card_played", {"card_id": card_id})
-            if not any(m.alive for m in combat.monsters):
-                self._end_combat("victory")
+        self._resolve_play(Play(card=card, target=target, x=x), from_hand=True)
 
     def end_turn(self) -> None:
         combat = self.combat
@@ -192,709 +308,830 @@ class CombatContext:
             raise CombatError(f"end_turn called in phase {combat.phase!r}")
         if combat.outcome is not None:
             raise CombatError("combat already finished")
+        if combat.pending_selection is not None:
+            raise CombatError("a card selection is pending")
         self._end_player_turn()
+
+    def toggle_selection(self, index: int) -> None:
+        sel = self.combat.pending_selection
+        if sel is None:
+            raise CombatError("no pending selection")
+        if index not in sel.candidates:
+            raise CombatError(f"index {index} is not selectable")
+        if index in sel.selected:
+            sel.selected.remove(index)
+        elif len(sel.selected) < sel.max_count:
+            sel.selected.append(index)
+        else:
+            raise CombatError("selection is full")
+
+    def can_confirm_selection(self) -> bool:
+        sel = self.combat.pending_selection
+        return sel is not None and sel.min_count <= len(sel.selected) <= sel.max_count
+
+    def confirm_selection(self) -> None:
+        sel = self.combat.pending_selection
+        if sel is None:
+            raise CombatError("no pending selection")
+        if not self.can_confirm_selection():
+            raise CombatError("selection count not satisfied")
+        pending = self._s.pending
+        assert pending is not None
+        self.combat.pending_selection = None
+        self._s.pending = None
+        pile = self._player.hand if sel.source == "hand" else self._player.discard_pile
+        chosen = [pile[i] for i in sorted(sel.selected)]
+        self._continue_play(pending, chosen, sel)
+
+    # ------------------------------------------------------------------
+    # Card resolution
+
+    def _resolve_play(self, play: Play, *, from_hand: bool) -> None:
+        """Run a card's effect (plus replays), then route the card."""
+
+        from .card_effects import CARD_EFFECTS
+
+        combat = self.combat
+        combat.cards_played_this_turn += 1
+        if play.card.card_type == "attack":
+            combat.attacks_played_this_turn += 1
+        elif play.card.card_type == "skill":
+            combat.skills_played_this_turn += 1
+
+        def finish() -> None:
+            self._after_play(play, from_hand=from_hand)
+
+        fn = CARD_EFFECTS.get(play.card.game_id)
+        self._run_card_fn(fn, play, finish, extra_plays=self._extra_plays(play))
+
+    def _extra_plays(self, play: Play) -> int:
+        if play.card.card_type != "attack":
+            return 0
+        otp = self._player.powers.get("one_two_punch", 0)
+        if otp > 0:
+            self._change_power(self._player, "one_two_punch", -1)
+            return 1
+        return 0
+
+    def _run_card_fn(self, fn, play: Play, finish: Callable[[], None], *, extra_plays: int = 0) -> None:
+        def chain() -> None:
+            # Replays (One-Two Punch) re-run the effect before the card is routed.
+            if extra_plays > 0 and self.combat.outcome is None:
+                self._run_card_fn(fn, play, finish, extra_plays=extra_plays - 1)
+            else:
+                finish()
+
+        if fn is None:
+            chain()
+            return
+        if inspect.isgeneratorfunction(fn):
+            gen = fn(self, play)
+            self._drive(_PendingPlay(play=play, gen=gen, finish=chain), None)
+        else:
+            fn(self, play)
+            chain()
+
+    def _drive(self, pending: _PendingPlay, send: Any) -> None:
+        gen = pending.gen
+        assert gen is not None
+        try:
+            request = gen.send(send) if send is not None else next(gen)
+        except StopIteration:
+            pending.finish()
+            return
+        while True:
+            assert isinstance(request, SelectionRequest)
+            cands = list(request.candidates)
+            want = min(request.count, len(cands))
+            if want <= 0:
+                chosen: list[str] = []
+            elif pending.play.auto or self._s.autoplaying > 0:
+                # Auto-played cards resolve their choices without a prompt, taking
+                # the game's autoPick (first hand card / top of discard).
+                pile = self._player.hand if request.source == "hand" else self._player.discard_pile
+                pick = cands[:want] if request.source == "hand" else cands[-want:]
+                chosen = [pile[i] for i in pick]
+            else:
+                self.combat.pending_selection = PendingSelection(
+                    source=request.source,
+                    candidates=cands,
+                    min_count=want if request.min_count is None else request.min_count,
+                    max_count=want,
+                    purpose=request.purpose,
+                    source_card=pending.play.card.card_id,
+                )
+                self._s.pending = pending
+                return
+            try:
+                request = gen.send(chosen)
+            except StopIteration:
+                pending.finish()
+                return
+
+    def _continue_play(self, pending: _PendingPlay, chosen: list[str], sel: PendingSelection) -> None:
+        del sel
+        self._drive(pending, chosen)
+
+    def _after_play(self, play: Play, *, from_hand: bool) -> None:
+        combat = self.combat
+        card = play.card
+        p = self._player
+        # Bank per-card growth (Rampage / Thrash).
+        if play.bonus:
+            combat.bonus_damage[card.card_id] = combat.bonus_damage.get(card.card_id, 0) + play.bonus
+        if card.card_type == "attack":
+            # Juggling: a copy of the third Attack each turn.
+            if combat.attacks_played_this_turn == 3 and p.powers.get("juggling", 0) > 0:
+                for _ in range(p.powers["juggling"]):
+                    self._add_to_hand(card.card_id)
+            rage = p.powers.get("rage", 0)
+            if rage > 0:
+                self.gain_block(rage, powered=False)
+        # Route the played card.
+        if from_hand or play.auto:
+            if card.card_type == "power":
+                pass
+            elif card.exhausts or (card.card_type == "skill" and p.powers.get("corruption", 0) > 0) \
+                    or play.auto and self._s.extra.get("exhaust_autoplay") == card.card_id:
+                self._s.extra.pop("exhaust_autoplay", None)
+                self.exhaust_card(card.card_id)
+            else:
+                p.discard_pile.append(card.card_id)
+        # Rupture owed for HP the card itself cost.
+        if self._s.rupture_owed > 0 and self.combat.outcome is None:
+            owed, self._s.rupture_owed = self._s.rupture_owed, 0
+            self.gain_strength(owed)
+        # Monster reactions to plays.
+        for m in list(combat.monsters):
+            if not m.alive:
+                continue
+            if m.powers.get("slow", 0) > 0:
+                m.flags["slow_count"] = m.flags.get("slow_count", 0) + 1
+        self._hooks.dispatch("on_card_played", {"card_id": card.card_id})
+        self._check_end()
+
+    # ------------------------------------------------------------------
+    # Primitives used by card_effects / monster_ai
+
+    def alive_monsters(self) -> list[MonsterState]:
+        return [m for m in self.combat.monsters if m.alive]
+
+    def random_monster(self) -> MonsterState | None:
+        alive = self.alive_monsters()
+        if not alive:
+            return None
+        return self._rng.stream("combat_target").choice(alive)
+
+    # -- damage ------------------------------------------------------------
+
+    def _powered_amount(self, base: int, attacker: Any, defender: Any) -> int:
+        a = attacker.powers
+        d = defender.powers
+        dmg = float(base) + a.get("strength", 0) + a.get("vigor", 0)
+        if a.get("weak", 0) > 0:
+            dmg *= 0.75
+        if a.get("shrink", 0) != 0:
+            dmg *= 0.70
+        if d.get("vulnerable", 0) > 0:
+            mult = 1.5
+            if attacker is self._player:
+                mult += self._player.powers.get("cruelty", 0) / 100.0
+            dmg *= mult
+        out = max(0, int(dmg))
+        if isinstance(defender, MonsterState):
+            slow = defender.flags.get("slow_count", 0)
+            if defender.powers.get("slow", 0) > 0 and slow > 0:
+                out = int(out * (1.0 + 0.1 * slow))
+        if d.get("intangible", 0) > 0:
+            out = min(out, 1)
+        return out
+
+    def card_damage_preview(self, card_id: str, base: int, target: MonsterState | None) -> int:
+        """Per-hit damage a card would deal (for state text)."""
+
+        if target is None:
+            dummy = MonsterState(monster_id="?", name="?", hp=1, max_hp=1, slot=-1)
+            return self._powered_amount(base, self._player, dummy)
+        return self._powered_amount(base, self._player, target)
+
+    def attack_monster(self, target: MonsterState, base: int, *, hits: int = 1) -> int:
+        """Powered attack from the player's card; returns total HP lost."""
+
+        lost = 0
+        for _ in range(max(0, hits)):
+            if not target.alive or self.combat.outcome is not None:
+                break
+            lost += self._hit_monster(target, base, powered=True)
+        return lost
+
+    def attack_all(self, base: int, *, hits: int = 1) -> None:
+        for _ in range(max(0, hits)):
+            for m in self.alive_monsters():
+                self._hit_monster(m, base, powered=True)
+            if not self.alive_monsters():
+                break
+
+    def attack_random(self, base: int, *, hits: int = 1) -> None:
+        for _ in range(max(0, hits)):
+            t = self.random_monster()
+            if t is None:
+                break
+            self._hit_monster(t, base, powered=True)
+
+    def damage_monster_unpowered(self, target: MonsterState, amount: int) -> int:
+        if not target.alive:
+            return 0
+        return self._hit_monster(target, amount, powered=False)
+
+    def damage_all_unpowered(self, amount: int) -> None:
+        for m in self.alive_monsters():
+            self._hit_monster(m, amount, powered=False)
+
+    def _hit_monster(self, target: MonsterState, base: int, *, powered: bool) -> int:
+        if powered:
+            thorns = target.powers.get("thorns", 0)
+            if thorns > 0:
+                self.damage_player(thorns, powered=False)
+                if not self._player.alive:
+                    return 0
+            dmg = self._powered_amount(base, self._player, target)
+        else:
+            dmg = max(0, int(base))
+            if target.powers.get("intangible", 0) > 0:
+                dmg = min(dmg, 1)
+        absorbed = min(target.block, dmg)
+        target.block -= absorbed
+        hp_loss = dmg - absorbed
+        hp_loss = self._cap_monster_hp_loss(target, hp_loss)
+        target.hp = max(0, target.hp - hp_loss)
+        self._hooks.dispatch("on_damaged", {"target": target, "amount": hp_loss, "blocked": absorbed})
+        from . import monster_ai
+
+        if hp_loss > 0 and target.hp > 0:
+            monster_ai.after_hp_lost(self, target, hp_loss)
+        if powered and hp_loss > 0 and target.hp > 0:
+            skittish = target.powers.get("skittish", 0)
+            if skittish > 0 and not target.flags.get("skittish_spent"):
+                target.flags["skittish_spent"] = True
+                target.block += skittish
+        if target.hp == 0:
+            monster_ai.on_death(self, target)
+        return hp_loss
+
+    def _cap_monster_hp_loss(self, target: MonsterState, hp_loss: int) -> int:
+        hardened = target.powers.get("hardened_shell", 0)
+        if hardened > 0 and hp_loss > 0:
+            hp_loss = min(hp_loss, hardened)
+            self._change_power(target, "hardened_shell", -hp_loss, allow_zero=True)
+        slippery = target.powers.get("slippery", 0)
+        if slippery > 0 and hp_loss >= 1:
+            hp_loss = 1
+            self._change_power(target, "slippery", -1)
+        return hp_loss
+
+    def monster_attack(self, monster: MonsterState, base: int, hits: int = 1) -> int:
+        """Powered attack from a monster on the player; returns hits that landed unblocked."""
+
+        landed = 0
+        p = self._player
+        for _ in range(max(0, hits)):
+            if not p.alive or not monster.alive:
+                break
+            dmg = self._powered_amount(base, monster, p)
+            if p.powers.get("colossus", 0) > 0 and monster.powers.get("vulnerable", 0) > 0:
+                dmg //= 2
+            absorbed = min(p.block, dmg)
+            p.block -= absorbed
+            unblocked = dmg - absorbed
+            if unblocked > 0:
+                self._lose_player_hp(unblocked)
+                landed += 1
+                suck = monster.powers.get("suck", 0)
+                if suck > 0:
+                    self._change_power(monster, "strength", suck)
+            if p.alive:
+                fb = p.powers.get("flame_barrier", 0)
+                if fb > 0:
+                    self.damage_monster_unpowered(monster, fb)
+        return landed
+
+    def damage_player(self, amount: int, *, powered: bool = False) -> int:
+        """Blockable, unpowered damage to the player (Burn, Constrict, Thorns)."""
+
+        p = self._player
+        dmg = max(0, int(amount))
+        if p.powers.get("intangible", 0) > 0:
+            dmg = min(dmg, 1)
+        absorbed = min(p.block, dmg)
+        p.block -= absorbed
+        unblocked = dmg - absorbed
+        if unblocked > 0:
+            self._lose_player_hp(unblocked)
+        return unblocked
+
+    def lose_hp(self, amount: int, *, from_card: bool = False) -> int:
+        """Unblockable HP loss on the player (card costs, Beckon, Inferno tick)."""
+
+        if amount <= 0 or not self._player.alive:
+            return 0
+        amt = amount
+        if self._player.powers.get("intangible", 0) > 0:
+            amt = min(amt, 1)
+        return self._lose_player_hp(amt, from_card=from_card)
+
+    def _lose_player_hp(self, amount: int, *, from_card: bool = False) -> int:
+        p = self._player
+        before = p.hp
+        p.hp = max(0, p.hp - amount)
+        lost = before - p.hp
+        if lost <= 0:
+            return 0
+        combat = self.combat
+        combat.hp_loss_events_this_combat += 1
+        on_our_turn = combat.phase == CombatPhase.PLAYER
+        if on_our_turn:
+            combat.hp_lost_this_turn += lost
+            rupture = p.powers.get("rupture", 0)
+            if rupture > 0:
+                if from_card:
+                    self._s.rupture_owed += rupture
+                else:
+                    self.gain_strength(rupture)
+            inferno = p.powers.get("inferno", 0)
+            if inferno > 0 and p.alive:
+                self.damage_all_unpowered(inferno)
+        if not p.alive:
+            self._end_combat("defeat")
+        return lost
+
+    def heal_player(self, amount: int) -> None:
+        p = self._player
+        p.hp = min(p.max_hp, p.hp + max(0, amount))
+
+    def gain_max_hp(self, amount: int) -> None:
+        self._player.max_hp += amount
+        self.heal_player(amount)
+
+    # -- block / energy / stats ------------------------------------------------
+
+    def gain_block(self, amount: int, *, powered: bool = True) -> int:
+        p = self._player
+        if powered:
+            blk = float(amount) + p.powers.get("dexterity", 0)
+            if p.powers.get("frail", 0) > 0:
+                blk *= 0.75
+            eff = max(0, int(blk))
+        else:
+            eff = max(0, int(amount))
+        if eff <= 0:
+            return 0
+        if powered and p.powers.get("unmovable", 0) > self.combat.block_gains_this_turn:
+            eff *= 2
+            self.combat.block_gains_this_turn += 1
+        p.block += eff
+        jug = p.powers.get("juggernaut", 0)
+        if jug > 0:
+            t = self.random_monster()
+            if t is not None:
+                self.damage_monster_unpowered(t, jug)
+        return eff
+
+    def gain_energy(self, amount: int) -> None:
+        if amount <= 0 or self._player.powers.get("no_energy_gain", 0) > 0:
+            return
+        self._player.energy += amount
+
+    def gain_strength(self, amount: int) -> None:
+        self._change_power(self._player, "strength", amount, allow_negative=True)
+
+    def apply_power(self, target: Any, power_id: str, amount: int, *, source: Any = None) -> bool:
+        """Apply `amount` of `power_id` to target. Returns False if Artifact blocked it."""
+
+        if amount == 0:
+            return False
+        if power_id not in self._power_defs:
+            raise CombatError(f"unknown power {power_id!r}")
+        if isinstance(target, MonsterState) and not target.alive:
+            return False
+        is_debuff = power_id in _DEBUFF_IDS or (power_id in ("strength", "dexterity") and amount < 0)
+        if is_debuff and target.powers.get("artifact", 0) > 0:
+            self._change_power(target, "artifact", -1)
+            return False
+        self._change_power(target, power_id, amount, allow_negative=power_id in ("strength", "dexterity"))
+        if power_id == "vulnerable" and source is self._player and isinstance(target, MonsterState):
+            vicious = self._player.powers.get("vicious", 0)
+            if vicious > 0:
+                self.draw(vicious)
+        return True
+
+    def _change_power(self, owner: Any, pid: str, delta: int, *, allow_negative: bool = False,
+                      allow_zero: bool = False) -> None:
+        cur = owner.powers.get(pid, 0) + delta
+        if cur == 0 or (cur < 0 and not allow_negative):
+            if allow_zero and cur == 0:
+                owner.powers[pid] = 0
+                return
+            owner.powers.pop(pid, None)
+        else:
+            owner.powers[pid] = cur
+
+    # -- cards / piles ------------------------------------------------------
+
+    def draw(self, amount: int) -> list[str]:
+        drawn: list[str] = []
+        p = self._player
+        for _ in range(max(0, amount)):
+            if p.powers.get("no_draw", 0) > 0:
+                break
+            card_id = self._draw_one()
+            if card_id is None:
+                break
+            drawn.append(card_id)
+        return drawn
+
+    def _draw_one(self) -> str | None:
+        p = self._player
+        if len(p.hand) >= MAX_HAND:
+            return None
+        if not p.draw_pile:
+            if not p.discard_pile:
+                return None
+            p.draw_pile = list(p.discard_pile)
+            p.discard_pile.clear()
+            self._rng.stream("combat_shuffle").shuffle(p.draw_pile)
+        card_id = p.draw_pile.pop()
+        p.hand.append(card_id)
+        self._hooks.dispatch("on_card_drawn", {"card_id": card_id})
+        card = self._card_defs[card_id]
+        if card.game_id == "VOID":
+            p.energy = max(0, p.energy - card.v("energy"))
+        if p.powers.get("hellraiser", 0) > 0 and "Strike" in card.name and card.card_type == "attack":
+            self._autoplay_from_hand(card_id, random_target=True)
+        return card_id
+
+    def _add_to_hand(self, card_id: str) -> None:
+        p = self._player
+        if len(p.hand) < MAX_HAND:
+            p.hand.append(card_id)
+        else:
+            p.discard_pile.append(card_id)
+
+    def add_to_hand(self, card_id: str) -> None:
+        self._add_to_hand(card_id)
+
+    def add_card_to_pile(self, card_id: str, pile: str) -> None:
+        p = self._player
+        if card_id not in self._card_defs:
+            raise CombatError(f"unknown card {card_id!r}")
+        if pile == "hand":
+            self._add_to_hand(card_id)
+        elif pile == "discard":
+            p.discard_pile.append(card_id)
+        elif pile == "draw_top":
+            p.draw_pile.append(card_id)
+        elif pile == "draw_random":
+            pos = self._rng.stream("combat_shuffle").randint(0, len(p.draw_pile))
+            p.draw_pile.insert(pos, card_id)
+        else:
+            raise CombatError(f"unknown pile {pile!r}")
+
+    def exhaust_card(self, card_id: str, *, ethereal: bool = False) -> None:
+        """Put `card_id` (already removed from its pile) into the exhaust pile."""
+
+        p = self._player
+        p.exhaust_pile.append(card_id)
+        self.combat.cards_exhausted_this_turn += 1
+        self._hooks.dispatch("on_card_exhausted", {"card_id": card_id})
+        card = self._card_defs[card_id]
+        if card.game_id == "DRUM_OF_BATTLE":
+            self.gain_energy(card.v("energy"))
+        fnp = p.powers.get("feel_no_pain", 0)
+        if fnp > 0:
+            self.gain_block(fnp, powered=False)
+        de = p.powers.get("dark_embrace", 0)
+        if de > 0:
+            if ethereal:
+                self._s.dark_embrace_deferred += de
+            else:
+                self.draw(de)
+
+    def exhaust_from_hand(self, card_id: str) -> None:
+        self._player.hand.remove(card_id)
+        self.exhaust_card(card_id)
+
+    def upgrade_in_hand(self, index: int) -> None:
+        p = self._player
+        card = self._card_defs[p.hand[index]]
+        if card.upgrade_of is not None:
+            p.hand[index] = card.upgrade_of
+
+    def is_upgradable(self, card_id: str) -> bool:
+        card = self._card_defs[card_id]
+        return card.upgrade_of is not None and card.card_type not in ("status", "curse")
+
+    def generation_pool(self, card_type: str | None = None) -> list[str]:
+        """Ironclad cards an in-combat generator may roll (Infernal Blade, Stoke)."""
+
+        out = []
+        for cid, c in self._card_defs.items():
+            if c.color != "ironclad" or c.upgraded or c.multiplayer_only:
+                continue
+            if c.rarity not in ("common", "uncommon", "rare") or not c.generated_in_combat:
+                continue
+            if card_type is not None and c.card_type != card_type:
+                continue
+            out.append(cid)
+        return sorted(out)
+
+    def autoplay(self, card_id: str, *, exhaust: bool = False, target: MonsterState | None = None) -> None:
+        """Play a card for free outside the hand (Havoc, Cascade, Howl, Hellraiser)."""
+
+        card = self._card_defs[card_id]
+        if card.unplayable:
+            # Unplayable cards drawn by Havoc / Cascade just go to their pile.
+            if exhaust:
+                self.exhaust_card(card_id)
+            else:
+                self._player.discard_pile.append(card_id)
+            return
+        if card.target == "single_enemy" and (target is None or not target.alive):
+            target = self.random_monster()
+            if target is None:
+                self._player.discard_pile.append(card_id)
+                return
+        x = self._player.energy if card.x_cost else 0
+        if card.x_cost:
+            self._player.energy = 0
+        if exhaust:
+            self._s.extra["exhaust_autoplay"] = card_id
+        self._s.autoplaying += 1
+        try:
+            self._resolve_play(Play(card=card, target=target, x=x, auto=True), from_hand=False)
+        finally:
+            self._s.autoplaying -= 1
+
+    def _autoplay_from_hand(self, card_id: str, *, random_target: bool) -> None:
+        if card_id not in self._player.hand:
+            return
+        self._player.hand.remove(card_id)
+        target = self.random_monster() if random_target else None
+        if target is None and self._card_defs[card_id].target == "single_enemy":
+            self._player.discard_pile.append(card_id)
+            return
+        self.autoplay(card_id, target=target)
 
     # ------------------------------------------------------------------
     # Turn flow
 
     def _begin_player_turn(self, *, initial: bool) -> None:
+        from . import monster_ai
+
         combat = self.combat
+        p = self._player
         combat.turn += 1
         combat.phase = CombatPhase.PLAYER
-        if not initial:
-            # Block carries into enemy turn and resets at start of next player
-            # turn — see schemas.py gain_block spec. Barricade (Phase 2d) skips
-            # the reset so block persists across turns.
-            if self._player.powers.get("barricade", 0) == 0:
-                self._player.block = 0
-            self._player.energy = self._player.max_energy
-        # Pick upcoming moves for each alive enemy BEFORE drawing so hooks
-        # that read intents on draw see the current telegraph.
+        combat.cards_played_this_turn = 0
+        combat.attacks_played_this_turn = 0
+        combat.skills_played_this_turn = 0
+        combat.cards_exhausted_this_turn = 0
+        combat.hp_lost_this_turn = 0
+        combat.block_gains_this_turn = 0
+        combat.free_this_turn.clear()
         for m in combat.monsters:
-            if m.alive:
-                self._pick_next_move(m)
-        self._draw_cards(self._hand_size)
-        self._hooks.dispatch("on_player_turn_start", {"turn": combat.turn})
-
-    def _end_player_turn(self) -> None:
-        combat = self.combat
-        # Ethereal cards still in hand at end of turn exhaust rather than
-        # discard (STS "ethereal." text). Walk hand once, routing cards to
-        # exhaust vs discard based on the schema flag.
-        kept_discards: list[str] = []
-        for card_id in self._player.hand:
-            card = self._card_defs.get(card_id)
-            if card is not None and card.ethereal:
-                self._player.exhaust_pile.append(card_id)
-                self._hooks.dispatch("on_card_exhausted", {"card_id": card_id, "source": "ethereal"})
-            else:
-                kept_discards.append(card_id)
-        self._player.discard_pile.extend(kept_discards)
-        self._player.hand.clear()
-        self._decay_turn_powers(self._player, owner_phase=CombatPhase.PLAYER)
-        self._hooks.dispatch("on_player_turn_end", {})
-        combat.phase = CombatPhase.ENEMY
-        self._run_enemy_turn()
-
-    def _run_enemy_turn(self) -> None:
-        combat = self.combat
-        for monster in combat.monsters:
-            if not monster.alive:
-                continue
-            monster.block = 0
-            self._execute_enemy_move(monster)
-            if not self._player.alive:
-                self._end_combat("defeat")
-                return
+            m.flags.pop("slow_count", None)
+            m.flags.pop("skittish_spent", None)
+            if m.monster_id == "skulking_colony" and m.alive:
+                m.powers["hardened_shell"] = 20
+        p.energy = p.max_energy
+        if not initial:
+            if p.powers.get("barricade", 0) == 0:
+                p.block = 0
+        pyre = p.powers.get("pyre", 0)
+        if pyre > 0:
+            p.energy += pyre
+        # Start-of-turn powers (CombatEngine.EndTurn order).
+        crimson = p.powers.get("crimson_mantle", 0)
+        if crimson > 0:
+            self.lose_hp(p.powers.get("crimson_mantle_hp", 1))
+            if combat.outcome is None:
+                self.gain_block(crimson, powered=False)
+        if combat.outcome is None and p.powers.get("demon_form", 0) > 0:
+            self.gain_strength(p.powers["demon_form"])
+        if combat.outcome is None and p.powers.get("aggression", 0) > 0:
+            self._aggression(p.powers["aggression"])
+        if combat.outcome is None and p.powers.get("inferno", 0) > 0:
+            self.lose_hp(1)
+        plating = p.powers.get("plating", 0)
+        if plating > 0 and not initial:
+            self._change_power(p, "plating", -1)
         if combat.outcome is not None:
             return
-        for monster in combat.monsters:
-            if monster.alive:
-                self._tick_end_of_turn_powers(monster, owner_phase=CombatPhase.ENEMY)
-                self._decay_turn_powers(monster, owner_phase=CombatPhase.ENEMY)
-        self._hooks.dispatch("on_enemy_turn_end", {})
-        if not any(m.alive for m in combat.monsters):
-            self._end_combat("victory")
+        self.draw(self._hand_size)
+        if combat.outcome is not None:
             return
-        if not self._player.alive:
-            self._end_combat("defeat")
+        if not initial:
+            for m in combat.monsters:
+                if m.alive:
+                    monster_ai.choose_next_move(self, m)
+        self._hooks.dispatch("on_player_turn_start", {"turn": combat.turn})
+        self._check_end()
+
+    def _aggression(self, count: int) -> None:
+        p = self._player
+        attacks = [i for i, c in enumerate(p.discard_pile) if self._card_defs[c].card_type == "attack"]
+        if not attacks:
+            return
+        self._rng.stream("card_select").shuffle(attacks)
+        for i in sorted(attacks[:count], reverse=True):
+            cid = p.discard_pile.pop(i)
+            if len(p.hand) >= MAX_HAND:
+                p.discard_pile.append(cid)
+                continue
+            if self.is_upgradable(cid):
+                cid = self._card_defs[cid].upgrade_of or cid
+            p.hand.append(cid)
+
+    def _end_player_turn(self) -> None:
+        from . import monster_ai
+
+        combat = self.combat
+        p = self._player
+        # End-of-turn auto plays.
+        stampede = p.powers.get("stampede", 0)
+        for _ in range(stampede):
+            attacks = [c for c in p.hand if self._card_defs[c].card_type == "attack"
+                       and not self._card_defs[c].unplayable]
+            if not attacks or not self.alive_monsters() or combat.outcome is not None:
+                break
+            pick = self._rng.stream("combat_shuffle").choice(attacks)
+            self._autoplay_from_hand(pick, random_target=True)
+        for cid in [c for c in p.exhaust_pile if self._card_defs[c].game_id == "HOWL_FROM_BEYOND"]:
+            if combat.outcome is not None or not self.alive_monsters():
+                break
+            p.exhaust_pile.remove(cid)
+            self.autoplay(cid)
+        if combat.outcome is not None:
+            return
+        plating = p.powers.get("plating", 0)
+        if plating > 0:
+            self.gain_block(plating, powered=False)
+        # Turn-scoped powers fall off.
+        temp = p.powers.pop("temporary_strength", 0)
+        if temp:
+            self.gain_strength(-temp)
+        for pid in ("rage", "one_two_punch", "tangled", "ringing", "no_draw", "smoggy_used"):
+            p.powers.pop(pid, None)
+        # Hand flush: in-hand statuses fire, ethereal exhausts, retain stays.
+        hand_size = len(p.hand)
+        keep: list[str] = []
+        for cid in list(p.hand):
+            card = self._card_defs[cid]
+            effect = _TURN_END_IN_HAND.get(card.card_id)
+            if effect is not None:
+                self._turn_end_in_hand(effect, hand_size)
+                if combat.outcome is not None:
+                    return
+            if card.ethereal:
+                p.hand.remove(cid)
+                self.exhaust_card(cid, ethereal=True)
+            elif "retain" in card.keywords:
+                keep.append(cid)
+                p.hand.remove(cid)
+            else:
+                p.hand.remove(cid)
+                p.discard_pile.append(cid)
+        p.hand = keep
+        constrict = p.powers.get("constrict", 0)
+        if constrict > 0:
+            self.damage_player(constrict)
+            if combat.outcome is not None:
+                return
+        self._hooks.dispatch("on_player_turn_end", {})
+        combat.phase = CombatPhase.ENEMY
+        monster_ai.run_enemy_turn(self)
+        if combat.outcome is not None:
+            return
+        self._round_end()
+        if self._check_end():
             return
         self._begin_player_turn(initial=False)
 
-    def _execute_enemy_move(self, monster: MonsterState) -> None:
-        move_id = monster.queued_move
-        if move_id is None:
-            # Shouldn't happen — _pick_next_move always sets one.
-            return
-        edef = self._enemy_defs[monster.monster_id]
-        move = edef.moves[move_id]
-        monster.move_history.append(move_id)
-        if len(monster.move_history) > 3:
-            monster.move_history = monster.move_history[-3:]
+    def _turn_end_in_hand(self, effect: tuple[str, int], hand_size: int) -> None:
+        kind, amount = effect
+        p = self._player
+        if kind == "damage":
+            self.damage_player(amount)
+        elif kind == "lose_hp":
+            self.lose_hp(amount)
+        elif kind == "lose_hp_hand":
+            self.lose_hp(hand_size)
+        elif kind == "weak":
+            self.apply_power(p, "weak", amount)
+        elif kind == "frail":
+            self.apply_power(p, "frail", amount)
+        elif kind == "gold":
+            p.gold = max(0, p.gold - min(amount, p.gold))
 
-        ctx = _EffectContext(
-            actor="enemy",
-            actor_monster=monster,
-            source_move_id=move_id,
-        )
-        for step in move.effects:
-            self._apply_effect(step, ctx)
-            if not self._player.alive:
-                return
+    def _round_end(self) -> None:
+        """After the enemy turn: duration debuffs tick on both sides."""
+
+        combat = self.combat
+        p = self._player
+        for m in combat.monsters:
+            if not m.alive:
+                continue
+            for pid in _DURATION_DEBUFFS:
+                if m.powers.get(pid, 0) > 0:
+                    self._change_power(m, pid, -1)
+            if m.powers.get("intangible", 0) > 0:
+                self._change_power(m, "intangible", -1)
+        snap = combat.player_debuffs_at_round_start
+        for pid in _DURATION_DEBUFFS:
+            if p.powers.get(pid, 0) > 0 and pid in snap:
+                self._change_power(p, pid, -1)
+        combat.player_debuffs_at_round_start = {pid for pid in _DURATION_DEBUFFS if p.powers.get(pid, 0) > 0}
+        if p.powers.get("intangible", 0) > 0:
+            self._change_power(p, "intangible", -1)
+        if p.powers.get("colossus", 0) > 0:
+            self._change_power(p, "colossus", -1)
+        for pid in ("flame_barrier", "no_energy_gain"):
+            p.powers.pop(pid, None)
+        if self._s.dark_embrace_deferred > 0:
+            n, self._s.dark_embrace_deferred = self._s.dark_embrace_deferred, 0
+            self.draw(n)
+
+    def _check_end(self) -> bool:
+        from . import monster_ai
+
+        combat = self.combat
+        if combat.outcome is not None:
+            return True
+        if not self._player.alive:
+            self._end_combat("defeat")
+            return True
+        if not monster_ai.any_primary_alive(self):
+            # Minions abandon combat without their leader.
+            for m in combat.monsters:
+                if m.alive:
+                    m.escaped = True
+            self._end_combat("victory")
+            return True
+        return False
 
     def _end_combat(self, outcome: str) -> None:
         combat = self.combat
+        if combat.outcome is not None:
+            return
         combat.outcome = outcome
         combat.phase = CombatPhase.END
+        combat.pending_selection = None
+        self._s.pending = None
         self._hooks.dispatch("on_combat_end", {"outcome": outcome})
 
     # ------------------------------------------------------------------
-    # Verb dispatch
+    # Monsters
 
-    def _apply_effect(self, step: EffectStep, ctx: _EffectContext) -> None:
-        verb = step.verb
-        args = step.args
-        if verb == "deal_damage":
-            self._v_deal_damage(args, ctx)
-        elif verb == "deal_damage_strike_scaled":
-            self._v_deal_damage_strike_scaled(args, ctx)
-        elif verb == "deal_damage_equal_to_block":
-            self._v_deal_damage_equal_to_block(args, ctx)
-        elif verb == "deal_damage_from_power":
-            self._v_deal_damage_from_power(args, ctx)
-        elif verb == "activate_hex_charge":
-            self._v_activate_hex_charge(args, ctx)
-        elif verb == "gain_block":
-            self._v_gain_block(args, ctx)
-        elif verb == "apply_power":
-            self._v_apply_power(args, ctx)
-        elif verb == "draw_cards":
-            self._v_draw_cards(args, ctx)
-        elif verb == "copy_to_discard":
-            self._v_copy_to_discard(args, ctx)
-        elif verb == "gain_energy":
-            self._v_gain_energy(args, ctx)
-        elif verb == "lose_hp_self":
-            self._v_lose_hp_self(args, ctx)
-        elif verb == "add_card_to_pile":
-            self._v_add_card_to_pile(args, ctx)
+    def _new_monster(self, monster_id: str) -> MonsterState:
+        # The game rolls a max HP no living enemy already has, when the band allows
+        # (CombatState.SetUniqueMonsterHpValue).
+        mdef = self._monster_defs[monster_id]
+        lo, hi = mdef.hp_asc if self.ascension >= 8 else mdef.hp
+        taken = {m.max_hp for m in self.combat.monsters if m.alive}
+        free = [v for v in range(lo, hi + 1) if v not in taken]
+        stream = self._rng.stream("enemy_hp")
+        hp = stream.choice(free) if free else stream.randint(lo, hi)
+        return MonsterState(monster_id=monster_id, name=mdef.name, hp=hp, max_hp=hp, slot=0)
+
+    def spawn_monster(self, monster_id: str, *, index: int | None = None, stunned: bool = False) -> MonsterState:
+        from . import monster_ai
+
+        combat = self.combat
+        m = self._new_monster(monster_id)
+        m.kind_index = sum(1 for o in combat.monsters if o.monster_id == monster_id)
+        if index is None:
+            combat.monsters.append(m)
         else:
-            raise CombatError(f"unhandled verb {verb!r}")
+            combat.monsters.insert(index, m)
+        self._reslot()
+        monster_ai.enter_combat(self, m)
+        m.stunned = stunned
+        monster_ai.choose_first_move(self, m)
+        self._hooks.dispatch("on_enemy_spawned", {"target": m})
+        return m
 
-    def _v_deal_damage(self, args: dict[str, Any], ctx: _EffectContext) -> None:
-        amount = int(args["amount"])
-        scope = args["target_scope"]
-        hits = int(args.get("hits", 1))
-        for hit_index in range(hits):
-            base = amount
-            if ctx.actor == "player":
-                if ctx.source_card is not None and ctx.source_card.card_type == "attack":
-                    base += self._player.powers.get("strength", 0)
-                if self._player.powers.get("weak", 0) > 0:
-                    base = (base * 3) // 4
-            else:
-                assert ctx.actor_monster is not None
-                base += ctx.actor_monster.powers.get("strength", 0)
-                if ctx.actor_monster.powers.get("weak", 0) > 0:
-                    base = (base * 3) // 4
+    def _reslot(self) -> None:
+        for i, m in enumerate(self.combat.monsters):
+            m.slot = i
 
-            targets = self._resolve_targets(scope, ctx, require_alive=True)
-            if not targets:
-                return
-            for tgt in targets:
-                per_hit = base
-                if _get_power(tgt, "vulnerable") > 0:
-                    per_hit = (per_hit * 3) // 2
-                absorbed = min(per_hit, tgt.block)
-                tgt.block -= absorbed
-                remainder = per_hit - absorbed
-                _apply_hp_loss(tgt, remainder)
-                self._hooks.dispatch("on_damaged", {
-                    "actor": ctx.actor,
-                    "source_card_id": ctx.source_card.card_id if ctx.source_card else None,
-                    "source_move_id": ctx.source_move_id,
-                    "target": tgt,
-                    "amount": remainder,
-                    "blocked": absorbed,
-                    "hit_index": hit_index,
-                })
-                if isinstance(tgt, MonsterState) and tgt.hp == 0:
-                    self._hooks.dispatch("on_enemy_killed", {"target": tgt})
-                    # On-death spawns (Slime Boss split). Spawned monsters
-                    # join `combat.monsters` at new slots, inheriting fresh
-                    # HP rolls + starting_powers + an initial queued move.
-                    edef = self._enemy_defs.get(tgt.monster_id)
-                    if edef is not None:
-                        for spawn_id in edef.on_death_spawn:
-                            self._spawn_monster(spawn_id)
+    def remove_dead(self) -> None:
+        """Drop corpses that hold nothing open (the game removes dead creatures)."""
 
-    def _v_deal_damage_strike_scaled(self, args: dict[str, Any], ctx: _EffectContext) -> None:
-        base = int(args["base"])
-        per_strike = int(args["per_strike_bonus"])
-        count = 0
-        for pile in (
-            self._player.hand,
-            self._player.draw_pile,
-            self._player.discard_pile,
-            self._player.exhaust_pile,
-        ):
-            count += sum(1 for cid in pile if "strike" in cid)
-        if ctx.source_card is not None and "strike" in ctx.source_card.card_id:
-            count += 1
-        amount = base + per_strike * count
-        self._v_deal_damage(
-            {"amount": amount, "target_scope": args["target_scope"], "hits": int(args.get("hits", 1))},
-            ctx,
-        )
+        from . import monster_ai
 
-    def _v_deal_damage_equal_to_block(self, args: dict[str, Any], ctx: _EffectContext) -> None:
-        self._v_deal_damage(
-            {
-                "amount": self._player.block,
-                "target_scope": args["target_scope"],
-                "hits": int(args.get("hits", 1)),
-            },
-            ctx,
-        )
-
-    def _v_deal_damage_from_power(self, args: dict[str, Any], ctx: _EffectContext) -> None:
-        pid = args["power_id"]
-        if ctx.actor == "enemy":
-            assert ctx.actor_monster is not None
-            amount = ctx.actor_monster.powers.get(pid, 0)
-        else:
-            amount = self._player.powers.get(pid, 0)
-        self._v_deal_damage(
-            {
-                "amount": amount,
-                "target_scope": args["target_scope"],
-                "hits": int(args.get("hits", 1)),
-            },
-            ctx,
-        )
-
-    def _v_activate_hex_charge(self, args: dict[str, Any], ctx: _EffectContext) -> None:
-        del args
-        amount = max(1, self._player.hp // 12)
-        owner: Any = ctx.actor_monster if ctx.actor == "enemy" else self._player
-        owner.powers["hex_charge"] = amount
-        owner.powers_applied_on_turn["hex_charge"] = self.combat.turn
-        owner.powers_applied_phase["hex_charge"] = self.combat.phase
-        self._hooks.dispatch("on_power_applied", {
-            "actor": ctx.actor,
-            "source_card_id": None,
-            "source_move_id": ctx.source_move_id,
-            "target": owner,
-            "power_id": "hex_charge",
-            "amount": amount,
-        })
-
-    def _v_gain_energy(self, args: dict[str, Any], ctx: _EffectContext) -> None:
-        del ctx
-        amount = int(args["amount"])
-        self._player.energy += amount
-        self._hooks.dispatch("on_energy_gained", {"amount": amount})
-
-    def _v_lose_hp_self(self, args: dict[str, Any], ctx: _EffectContext) -> None:
-        del ctx
-        amount = int(args["amount"])
-        if amount <= 0:
-            return
-        actual = min(amount, self._player.hp)
-        self._player.hp -= actual
-        self._hooks.dispatch("on_hp_lost", {"amount": actual, "source": "self"})
-        if self._player.hp == 0:
-            self._end_combat("defeat")
-
-    def _v_add_card_to_pile(self, args: dict[str, Any], ctx: _EffectContext) -> None:
-        del ctx
-        card_id = args["card_id"]
-        pile = args["pile"]
-        amount = int(args["amount"])
-        for _ in range(amount):
-            if pile == "hand":
-                if len(self._player.hand) < 10:
-                    self._player.hand.append(card_id)
-                    self._hooks.dispatch("on_card_added_to_hand", {"card_id": card_id})
-                else:
-                    self._player.discard_pile.append(card_id)
-                    self._hooks.dispatch("on_card_overdrawn", {"card_id": card_id})
-            elif pile == "draw":
-                if not self._player.draw_pile:
-                    self._player.draw_pile.append(card_id)
-                else:
-                    pos = self._rng.stream("combat_shuffle").randint(0, len(self._player.draw_pile))
-                    self._player.draw_pile.insert(pos, card_id)
-                self._hooks.dispatch("on_card_added_to_draw", {"card_id": card_id})
-            elif pile == "discard":
-                self._player.discard_pile.append(card_id)
-                self._hooks.dispatch("on_card_added_to_discard",
-                                     {"card_id": card_id, "source": "add_card_to_pile"})
-            elif pile == "exhaust":
-                self._player.exhaust_pile.append(card_id)
-                self._hooks.dispatch("on_card_exhausted",
-                                     {"card_id": card_id, "source": "add_card_to_pile"})
-            else:
-                raise CombatError(f"unknown pile {pile!r}")
-
-    def _v_gain_block(self, args: dict[str, Any], ctx: _EffectContext) -> None:
-        base = int(args["amount"])
-        if ctx.actor == "player":
-            base += self._player.powers.get("dexterity", 0)
-            if self._player.powers.get("frail", 0) > 0:
-                base = (base * 3) // 4
-            self._player.block += max(0, base)
-            self._hooks.dispatch("on_block_gained", {
-                "actor": "player",
-                "source_card_id": ctx.source_card.card_id if ctx.source_card else None,
-                "amount": base,
-            })
-        else:
-            assert ctx.actor_monster is not None
-            ctx.actor_monster.block += max(0, base)
-            self._hooks.dispatch("on_block_gained", {
-                "actor": "enemy",
-                "source_move_id": ctx.source_move_id,
-                "amount": base,
-            })
-
-    def _v_apply_power(self, args: dict[str, Any], ctx: _EffectContext) -> None:
-        pid = args["power_id"]
-        amount = int(args["amount"])
-        scope = args["target_scope"]
-        if amount == 0:
-            return
-        if pid not in self._power_defs:
-            raise CombatError(f"apply_power references unknown power {pid!r}")
-        pdef = self._power_defs[pid]
-        targets = self._resolve_targets(scope, ctx, require_alive=True)
-        for tgt in targets:
-            tgt.powers[pid] = tgt.powers.get(pid, 0) + amount
-            if pdef.duration != "permanent" and pid not in tgt.powers_applied_on_turn:
-                tgt.powers_applied_on_turn[pid] = self.combat.turn
-                # Track phase so decay only skips when applied during the
-                # owner's own phase (self-apply); cross-phase applies (e.g.
-                # Bash's vul on an enemy) do not get a skip grace turn.
-                tgt.powers_applied_phase[pid] = self.combat.phase
-            self._hooks.dispatch("on_power_applied", {
-                "actor": ctx.actor,
-                "source_card_id": ctx.source_card.card_id if ctx.source_card else None,
-                "source_move_id": ctx.source_move_id,
-                "target": tgt,
-                "power_id": pid,
-                "amount": amount,
-            })
-
-    def _v_draw_cards(self, args: dict[str, Any], ctx: _EffectContext) -> None:
-        del ctx
-        self._draw_cards(int(args["amount"]))
-
-    def _v_copy_to_discard(self, args: dict[str, Any], ctx: _EffectContext) -> None:
-        del args
-        if ctx.source_card is None:
-            return
-        self._player.discard_pile.append(ctx.source_card.card_id)
-        self._hooks.dispatch("on_card_added_to_discard", {
-            "card_id": ctx.source_card.card_id,
-            "source": "copy_to_discard",
-        })
-
-    # ------------------------------------------------------------------
-    # Target resolution
-
-    def _resolve_targets(
-        self,
-        scope: str,
-        ctx: _EffectContext,
-        *,
-        require_alive: bool,
-    ) -> list[Any]:
-        combat = self.combat
-        if scope == "self":
-            if ctx.actor == "player":
-                return [self._player] if (not require_alive or self._player.alive) else []
-            assert ctx.actor_monster is not None
-            return [ctx.actor_monster] if (not require_alive or ctx.actor_monster.alive) else []
-        if scope == "player":
-            return [self._player] if (not require_alive or self._player.alive) else []
-        if scope == "single_enemy":
-            slot = ctx.captured_target_slot
-            if slot is None:
-                return []
-            m = combat.monsters[slot]
-            return [m] if (not require_alive or m.alive) else []
-        if scope == "all_enemies":
-            return [m for m in combat.monsters if m.alive]
-        if scope == "random_enemy":
-            alive = [m for m in combat.monsters if m.alive]
-            if not alive:
-                return []
-            return [self._rng.stream("combat_target").choice(alive)]
-        raise CombatError(f"unknown target_scope {scope!r}")
-
-    # ------------------------------------------------------------------
-    # Cards: draw / shuffle
-
-    def _draw_cards(self, amount: int) -> None:
-        for _ in range(max(0, amount)):
-            if not self._player.draw_pile:
-                if not self._player.discard_pile:
-                    return
-                self._player.draw_pile = list(self._player.discard_pile)
-                self._player.discard_pile.clear()
-                self._rng.stream("combat_shuffle").shuffle(self._player.draw_pile)
-            card_id = self._player.draw_pile.pop()
-            if len(self._player.hand) >= 10:
-                self._player.discard_pile.append(card_id)
-                self._hooks.dispatch("on_card_overdrawn", {"card_id": card_id})
-            else:
-                self._player.hand.append(card_id)
-                self._hooks.dispatch("on_card_drawn", {"card_id": card_id, "source": "draw_cards"})
-
-    # ------------------------------------------------------------------
-    # Powers: end-of-turn decay + ritual tick
-
-    def _decay_turn_powers(
-        self,
-        owner: PlayerState | MonsterState,
-        *,
-        owner_phase: str,
-    ) -> None:
-        """Decrement every turn-scoped power on `owner`.
-
-        Skip the first decrement only when the power was applied by the
-        owner's own action this same turn (self-apply). Debuffs applied by
-        the opposing side do NOT get a grace turn — they decrement at the
-        very next end of the owner's turn. See VERB_DOCS["apply_power"]."""
-
-        combat = self.combat
-        to_remove: list[str] = []
-        for pid, stacks in list(owner.powers.items()):
-            pdef = self._power_defs.get(pid)
-            if pdef is None or pdef.duration != "turns":
-                continue
-            applied_on = owner.powers_applied_on_turn.get(pid, combat.turn)
-            applied_phase = owner.powers_applied_phase.get(pid)
-            if applied_on == combat.turn and applied_phase == owner_phase:
-                continue
-            owner.powers[pid] = stacks - 1
-            if owner.powers[pid] <= 0:
-                to_remove.append(pid)
-        for pid in to_remove:
-            owner.powers.pop(pid, None)
-            owner.powers_applied_on_turn.pop(pid, None)
-            owner.powers_applied_phase.pop(pid, None)
-
-    def _tick_end_of_turn_powers(
-        self,
-        owner: PlayerState | MonsterState,
-        *,
-        owner_phase: str,
-    ) -> None:
-        """Fire end-of-turn triggers for duration=end_of_turn_tick powers.
-
-        Phase 1 only ritual. Ritual grants `stacks` of strength to the owner
-        at the end of every one of their turns, starting the turn AFTER it
-        was applied (see Ritual's applied_on_turn note in VERB_DOCS)."""
-
-        combat = self.combat
-        for pid, stacks in list(owner.powers.items()):
-            pdef = self._power_defs.get(pid)
-            if pdef is None:
-                continue
-            # Enemy-side Metallicize tick (Lagavulin's starting 8).
-            # The player side fires via on_player_turn_end hook; monsters
-            # don't ride that hook, so handle them inline here. Permanent
-            # duration means no applied-this-turn skip is needed.
-            if pid == "metallicize" and isinstance(owner, MonsterState):
-                owner.block += stacks
-                self._hooks.dispatch("on_block_gained", {
-                    "actor": "enemy",
-                    "source_move_id": None,
-                    "amount": stacks,
-                })
-                continue
-            if pdef.duration != "end_of_turn_tick":
-                continue
-            applied_on = owner.powers_applied_on_turn.get(pid, combat.turn)
-            applied_phase = owner.powers_applied_phase.get(pid)
-            if applied_on == combat.turn and applied_phase == owner_phase:
-                continue
-            if pid == "ritual":
-                owner.powers["strength"] = owner.powers.get("strength", 0) + stacks
-                self._hooks.dispatch("on_power_applied", {
-                    "actor": "enemy" if isinstance(owner, MonsterState) else "player",
-                    "source_card_id": None,
-                    "source_move_id": None,
-                    "target": owner,
-                    "power_id": "strength",
-                    "amount": stacks,
-                })
-
-    # ------------------------------------------------------------------
-    # Player-side power hooks (Phase 2d)
-    #
-    # Each handler reads the player's current stacks for its power and
-    # acts. Handlers are registered once per combat in start_combat; the
-    # stacks check makes a handler for a never-applied power a cheap
-    # no-op, so there's no per-apply hook registration/teardown.
-
-    def _register_player_power_hooks(self) -> None:
-        self._hooks.register("on_player_turn_end", self._power_tick_player_turn_end, priority=200)
-        self._hooks.register("on_hp_lost", self._power_tick_hp_lost, priority=200)
-        self._hooks.register("on_card_exhausted", self._power_tick_card_exhausted, priority=200)
-        # Enemy-side Enrage (Gremlin Nob): triggers when the player plays a
-        # Skill card. The handler iterates monsters so it covers an arbitrary
-        # number of Enrage-bearing enemies in future encounters.
-        self._hooks.register("on_card_played", self._power_tick_card_played, priority=200)
-
-    def _power_tick_player_turn_end(self, payload: dict[str, Any]) -> None:
-        del payload
-        met = self._player.powers.get("metallicize", 0)
-        if met > 0:
-            self._v_gain_block(
-                {"amount": met, "target_scope": "self"},
-                _EffectContext(actor="player"),
-            )
-        com = self._player.powers.get("combust", 0)
-        if com > 0:
-            # Combust self-damage is card-sourced for Rupture's purposes,
-            # so route through lose_hp_self (fires on_hp_lost -> cascades).
-            self._v_lose_hp_self(
-                {"amount": 1, "target_scope": "self"},
-                _EffectContext(actor="player"),
-            )
-            # If Combust's self-tick dropped the player to 0, _v_lose_hp_self
-            # has already called _end_combat. Guard before the AoE.
-            if self.combat.outcome is None:
-                self._v_deal_damage(
-                    {"amount": com, "target_scope": "all_enemies", "hits": 1},
-                    _EffectContext(actor="player"),
-                )
-        # Strength Down / Dexterity Down: STS semantics are "At the end of
-        # your turn, lose X Strength (or Dex) and this debuff is removed."
-        # Fires once per end-of-turn and then clears. Both powers are
-        # authored with duration="permanent" so _decay_turn_powers does NOT
-        # decrement them before this handler runs — otherwise a 2-stack
-        # debuff would only subtract 1 before being consumed.
-        for debuff_id, stat_id in (("strength_down", "strength"), ("dexterity_down", "dexterity")):
-            delta = self._player.powers.get(debuff_id, 0)
-            if delta > 0:
-                self._player.powers[stat_id] = self._player.powers.get(stat_id, 0) - delta
-                self._player.powers.pop(debuff_id, None)
-                self._player.powers_applied_on_turn.pop(debuff_id, None)
-                self._player.powers_applied_phase.pop(debuff_id, None)
-                self._hooks.dispatch("on_power_applied", {
-                    "actor": "player",
-                    "source_card_id": None,
-                    "source_move_id": None,
-                    "target": self._player,
-                    "power_id": stat_id,
-                    "amount": -delta,
-                })
-
-    def _power_tick_hp_lost(self, payload: dict[str, Any]) -> None:
-        del payload
-        rup = self._player.powers.get("rupture", 0)
-        if rup > 0:
-            self._v_apply_power(
-                {"power_id": "strength", "amount": rup, "target_scope": "self"},
-                _EffectContext(actor="player"),
-            )
-
-    def _power_tick_card_exhausted(self, payload: dict[str, Any]) -> None:
-        del payload
-        de = self._player.powers.get("dark_embrace", 0)
-        if de > 0:
-            self._draw_cards(de)
-        fnp = self._player.powers.get("feel_no_pain", 0)
-        if fnp > 0:
-            self._v_gain_block(
-                {"amount": fnp, "target_scope": "self"},
-                _EffectContext(actor="player"),
-            )
-
-    def _power_tick_card_played(self, payload: dict[str, Any]) -> None:
-        """Enemy-side on-skill-played reactions (Gremlin Nob's Enrage).
-
-        Fires for every card the player plays; filters by card_type to
-        act only on skills, then iterates alive monsters so a hypothetical
-        encounter with multiple Enrage-bearing enemies covers them all.
-        """
-
-        card_id = payload.get("card_id")
-        if card_id is None:
-            return
-        card = self._card_defs.get(card_id)
-        if card is None or card.card_type != "skill":
-            return
-        for monster in self.combat.monsters:
-            if not monster.alive:
-                continue
-            enrage = monster.powers.get("enrage", 0)
-            if enrage > 0:
-                monster.powers["strength"] = monster.powers.get("strength", 0) + enrage
-                self._hooks.dispatch("on_power_applied", {
-                    "actor": "enemy",
-                    "source_card_id": None,
-                    "source_move_id": None,
-                    "target": monster,
-                    "power_id": "strength",
-                    "amount": enrage,
-                })
-
-    # ------------------------------------------------------------------
-    # Monster spawning (Phase 2c-2 Slime Boss split)
-
-    def _spawn_monster(self, enemy_id: str) -> MonsterState:
-        """Add a fresh monster to the combat mid-fight.
-
-        Called from the deal_damage pipeline when a dying monster has
-        on_death_spawn entries. The new monster:
-          * rolls HP from the `enemy_hp` stream (deterministic).
-          * inherits starting_powers.
-          * gets a `queued_move` picked immediately so the enemy phase
-            of the current/next turn has a telegraph to execute.
-
-        Returns the new MonsterState so callers can inspect it.
-        """
-
-        edef = self._enemy_defs[enemy_id]
-        hp = self._rng.stream("enemy_hp").randint(edef.hp_min, edef.hp_max)
-        monster = MonsterState(
-            monster_id=enemy_id,
-            name=edef.name,
-            hp=hp,
-            max_hp=hp,
-            slot=len(self.combat.monsters),
-        )
-        for pid, stacks in edef.starting_powers:
-            monster.powers[pid] = stacks
-            monster.powers_applied_on_turn[pid] = self.combat.turn
-            monster.powers_applied_phase[pid] = CombatPhase.START
-        self.combat.monsters.append(monster)
-        self._pick_next_move(monster)
-        self._hooks.dispatch("on_enemy_spawned", {"target": monster})
-        return monster
-
-    # ------------------------------------------------------------------
-    # Enemy move picker
-
-    def _pick_next_move(self, monster: MonsterState) -> None:
-        edef = self._enemy_defs[monster.monster_id]
-        combat = self.combat
-        last1 = monster.move_history[-1] if monster.move_history else None
-        last2 = monster.move_history[-2] if len(monster.move_history) >= 2 else None
-
-        # Collect eligible selectors by rule.
-        if combat.turn == 1:
-            firsts = [s for s in edef.movepicker if s.rule == "always_first"]
-            if firsts:
-                monster.queued_move = _weighted_pick(firsts, self._rng.stream("monster_moves"))
-                return
-        # Sequential: pick the entry whose sequence_index matches the current turn offset.
-        # Offset = number of post-first-turn actions this enemy has taken.
-        turns_after_first = len(monster.move_history)
-        if turns_after_first == 0 and combat.turn > 1:
-            turns_after_first = combat.turn - 1
-        seq_entries = [s for s in edef.movepicker if s.rule == "sequential"]
-        if seq_entries:
-            max_seq = max(s.sequence_index or 0 for s in seq_entries)
-            weighted_entries = [
-                s for s in edef.movepicker
-                if s.rule in ("weighted", "if_not_last", "if_not_two")
-            ]
-            if turns_after_first <= max_seq:
-                match = [s for s in seq_entries if s.sequence_index == turns_after_first]
-                if match:
-                    monster.queued_move = match[0].move_id
-                    return
-            elif not weighted_entries:
-                # Chain exhausted and no weighted fallback — repeat the
-                # final sequential (Cultist's Dark Strike loop).
-                match = [s for s in seq_entries if s.sequence_index == max_seq]
-                if match:
-                    monster.queued_move = match[0].move_id
-                    return
-            # Chain exhausted AND weighted alternatives exist — fall through
-            # to the weighted pool below (Lagavulin's wake-up transition).
-
-        pool: list[SelectorEntry] = []
-        for s in edef.movepicker:
-            if s.rule == "always_first":
-                continue
-            if s.rule == "sequential":
-                continue
-            if s.rule == "if_not_last" and last1 == s.move_id:
-                continue
-            if s.rule == "if_not_two" and (last1 == s.move_id or last2 == s.move_id):
-                continue
-            pool.append(s)
-        if not pool:
-            # Fallback: use any entry's move (shouldn't happen if data is sane).
-            pool = [s for s in edef.movepicker if s.rule not in ("always_first", "sequential")]
-            if not pool:
-                return
-        monster.queued_move = _weighted_pick(pool, self._rng.stream("monster_moves"))
+        keep = [m for m in self.combat.monsters if m.alive or monster_ai.keeps_corpse(m)]
+        if len(keep) != len(self.combat.monsters):
+            self.combat.monsters[:] = keep
+            self._reslot()
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-
-def _get_power(owner: Any, pid: str) -> int:
-    return owner.powers.get(pid, 0)
-
-
-def _apply_hp_loss(owner: Any, amount: int) -> None:
-    if amount <= 0:
-        return
-    owner.hp = max(0, owner.hp - amount)
-
-
-def _weighted_pick(entries: list[SelectorEntry], rng) -> str:
-    weights = [max(1, e.weight) for e in entries]
-    chosen = rng.choices(entries, weights=weights, k=1)[0]
-    return chosen.move_id
-
-
-__all__ = ["CombatContext", "CombatError"]
+__all__ = ["CombatContext", "CombatError", "MAX_HAND", "Play", "SelectionRequest"]

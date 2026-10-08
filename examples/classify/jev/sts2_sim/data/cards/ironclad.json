@@ -1,819 +1,2753 @@
 [
-  {
-    "card_id": "strike_ironclad",
-    "name": "Strike",
-    "cost": 1,
-    "card_type": "attack",
-    "rarity": "basic",
-    "target": "single_enemy",
-    "upgrade_of": "strike_ironclad+1",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 6, "target_scope": "single_enemy", "hits": 1}}
-    ]
-  },
-  {
-    "card_id": "strike_ironclad+1",
-    "name": "Strike+",
-    "cost": 1,
-    "card_type": "attack",
-    "rarity": "basic",
-    "target": "single_enemy",
-    "upgraded_from": "strike_ironclad",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 9, "target_scope": "single_enemy", "hits": 1}}
-    ]
-  },
-  {
-    "card_id": "defend_ironclad",
-    "name": "Defend",
-    "cost": 1,
-    "card_type": "skill",
-    "rarity": "basic",
-    "target": "self",
-    "upgrade_of": "defend_ironclad+1",
-    "effects": [
-      {"verb": "gain_block", "args": {"amount": 5, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "defend_ironclad+1",
-    "name": "Defend+",
-    "cost": 1,
-    "card_type": "skill",
-    "rarity": "basic",
-    "target": "self",
-    "upgraded_from": "defend_ironclad",
-    "effects": [
-      {"verb": "gain_block", "args": {"amount": 8, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "bash",
-    "name": "Bash",
-    "cost": 2,
-    "card_type": "attack",
-    "rarity": "basic",
-    "target": "single_enemy",
-    "upgrade_of": "bash+1",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 8, "target_scope": "single_enemy", "hits": 1}},
-      {"verb": "apply_power", "args": {"power_id": "vulnerable", "amount": 2, "target_scope": "single_enemy"}}
-    ]
-  },
-  {
-    "card_id": "bash+1",
-    "name": "Bash+",
-    "cost": 2,
-    "card_type": "attack",
-    "rarity": "basic",
-    "target": "single_enemy",
-    "upgraded_from": "bash",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 10, "target_scope": "single_enemy", "hits": 1}},
-      {"verb": "apply_power", "args": {"power_id": "vulnerable", "amount": 3, "target_scope": "single_enemy"}}
-    ]
-  },
-  {
-    "card_id": "anger",
-    "name": "Anger",
-    "cost": 0,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "single_enemy",
-    "upgrade_of": "anger+1",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 6, "target_scope": "single_enemy", "hits": 1}},
-      {"verb": "copy_to_discard", "args": {}}
-    ]
-  },
-  {
-    "card_id": "anger+1",
-    "name": "Anger+",
-    "cost": 0,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "single_enemy",
-    "upgraded_from": "anger",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 8, "target_scope": "single_enemy", "hits": 1}},
-      {"verb": "copy_to_discard", "args": {}}
-    ]
-  },
-  {
-    "card_id": "cleave",
-    "name": "Cleave",
-    "cost": 1,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "all_enemies",
-    "upgrade_of": "cleave+1",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 8, "target_scope": "all_enemies", "hits": 1}}
-    ]
-  },
-  {
-    "card_id": "cleave+1",
-    "name": "Cleave+",
-    "cost": 1,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "all_enemies",
-    "upgraded_from": "cleave",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 11, "target_scope": "all_enemies", "hits": 1}}
-    ]
-  },
-  {
-    "card_id": "iron_wave",
-    "name": "Iron Wave",
-    "cost": 1,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "single_enemy",
-    "upgrade_of": "iron_wave+1",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 5, "target_scope": "single_enemy", "hits": 1}},
-      {"verb": "gain_block", "args": {"amount": 5, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "iron_wave+1",
-    "name": "Iron Wave+",
-    "cost": 1,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "single_enemy",
-    "upgraded_from": "iron_wave",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 7, "target_scope": "single_enemy", "hits": 1}},
-      {"verb": "gain_block", "args": {"amount": 7, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "thunderclap",
-    "name": "Thunderclap",
-    "cost": 1,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "all_enemies",
-    "upgrade_of": "thunderclap+1",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 4, "target_scope": "all_enemies", "hits": 1}},
-      {"verb": "apply_power", "args": {"power_id": "vulnerable", "amount": 1, "target_scope": "all_enemies"}}
-    ]
-  },
-  {
-    "card_id": "thunderclap+1",
-    "name": "Thunderclap+",
-    "cost": 1,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "all_enemies",
-    "upgraded_from": "thunderclap",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 7, "target_scope": "all_enemies", "hits": 1}},
-      {"verb": "apply_power", "args": {"power_id": "vulnerable", "amount": 1, "target_scope": "all_enemies"}}
-    ]
-  },
-  {
-    "card_id": "pommel_strike",
-    "name": "Pommel Strike",
-    "cost": 1,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "single_enemy",
-    "upgrade_of": "pommel_strike+1",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 9, "target_scope": "single_enemy", "hits": 1}},
-      {"verb": "draw_cards", "args": {"amount": 1}}
-    ]
-  },
-  {
-    "card_id": "pommel_strike+1",
-    "name": "Pommel Strike+",
-    "cost": 1,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "single_enemy",
-    "upgraded_from": "pommel_strike",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 10, "target_scope": "single_enemy", "hits": 1}},
-      {"verb": "draw_cards", "args": {"amount": 2}}
-    ]
-  },
-  {
-    "card_id": "twin_strike",
-    "name": "Twin Strike",
-    "cost": 1,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "single_enemy",
-    "upgrade_of": "twin_strike+1",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 5, "target_scope": "single_enemy", "hits": 2}}
-    ]
-  },
-  {
-    "card_id": "twin_strike+1",
-    "name": "Twin Strike+",
-    "cost": 1,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "single_enemy",
-    "upgraded_from": "twin_strike",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 7, "target_scope": "single_enemy", "hits": 2}}
-    ]
-  },
-  {
-    "card_id": "shrug_it_off",
-    "name": "Shrug It Off",
-    "cost": 1,
-    "card_type": "skill",
-    "rarity": "common",
-    "target": "self",
-    "upgrade_of": "shrug_it_off+1",
-    "effects": [
-      {"verb": "gain_block", "args": {"amount": 8, "target_scope": "self"}},
-      {"verb": "draw_cards", "args": {"amount": 1}}
-    ]
-  },
-  {
-    "card_id": "shrug_it_off+1",
-    "name": "Shrug It Off+",
-    "cost": 1,
-    "card_type": "skill",
-    "rarity": "common",
-    "target": "self",
-    "upgraded_from": "shrug_it_off",
-    "effects": [
-      {"verb": "gain_block", "args": {"amount": 11, "target_scope": "self"}},
-      {"verb": "draw_cards", "args": {"amount": 1}}
-    ]
-  },
-  {
-    "card_id": "clothesline",
-    "name": "Clothesline",
-    "cost": 2,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "single_enemy",
-    "upgrade_of": "clothesline+1",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 12, "target_scope": "single_enemy", "hits": 1}},
-      {"verb": "apply_power", "args": {"power_id": "weak", "amount": 2, "target_scope": "single_enemy"}}
-    ]
-  },
-  {
-    "card_id": "clothesline+1",
-    "name": "Clothesline+",
-    "cost": 2,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "single_enemy",
-    "upgraded_from": "clothesline",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 14, "target_scope": "single_enemy", "hits": 1}},
-      {"verb": "apply_power", "args": {"power_id": "weak", "amount": 3, "target_scope": "single_enemy"}}
-    ]
-  },
-  {
-    "card_id": "perfected_strike",
-    "name": "Perfected Strike",
-    "cost": 2,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "single_enemy",
-    "upgrade_of": "perfected_strike+1",
-    "effects": [
-      {"verb": "deal_damage_strike_scaled",
-       "args": {"base": 6, "per_strike_bonus": 2, "target_scope": "single_enemy", "hits": 1}}
-    ]
-  },
-  {
-    "card_id": "perfected_strike+1",
-    "name": "Perfected Strike+",
-    "cost": 2,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "single_enemy",
-    "upgraded_from": "perfected_strike",
-    "effects": [
-      {"verb": "deal_damage_strike_scaled",
-       "args": {"base": 6, "per_strike_bonus": 3, "target_scope": "single_enemy", "hits": 1}}
-    ]
-  },
-  {
-    "card_id": "pummel",
-    "name": "Pummel",
-    "cost": 1,
-    "card_type": "attack",
-    "rarity": "uncommon",
-    "target": "single_enemy",
-    "upgrade_of": "pummel+1",
-    "exhaust_on_play": true,
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 2, "target_scope": "single_enemy", "hits": 4}}
-    ]
-  },
-  {
-    "card_id": "pummel+1",
-    "name": "Pummel+",
-    "cost": 1,
-    "card_type": "attack",
-    "rarity": "uncommon",
-    "target": "single_enemy",
-    "upgraded_from": "pummel",
-    "exhaust_on_play": true,
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 2, "target_scope": "single_enemy", "hits": 5}}
-    ]
-  },
-  {
-    "card_id": "carnage",
-    "name": "Carnage",
-    "cost": 2,
-    "card_type": "attack",
-    "rarity": "uncommon",
-    "target": "single_enemy",
-    "upgrade_of": "carnage+1",
-    "ethereal": true,
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 20, "target_scope": "single_enemy", "hits": 1}}
-    ]
-  },
-  {
-    "card_id": "carnage+1",
-    "name": "Carnage+",
-    "cost": 2,
-    "card_type": "attack",
-    "rarity": "uncommon",
-    "target": "single_enemy",
-    "upgraded_from": "carnage",
-    "ethereal": true,
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 28, "target_scope": "single_enemy", "hits": 1}}
-    ]
-  },
-  {
-    "card_id": "impervious",
-    "name": "Impervious",
-    "cost": 2,
-    "card_type": "skill",
-    "rarity": "rare",
-    "target": "self",
-    "upgrade_of": "impervious+1",
-    "exhaust_on_play": true,
-    "effects": [
-      {"verb": "gain_block", "args": {"amount": 30, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "impervious+1",
-    "name": "Impervious+",
-    "cost": 2,
-    "card_type": "skill",
-    "rarity": "rare",
-    "target": "self",
-    "upgraded_from": "impervious",
-    "exhaust_on_play": true,
-    "effects": [
-      {"verb": "gain_block", "args": {"amount": 40, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "wound",
-    "name": "Wound",
-    "cost": 0,
-    "card_type": "status",
-    "rarity": "special",
-    "target": "none",
-    "unplayable": true,
-    "effects": []
-  },
-  {
-    "card_id": "dazed",
-    "name": "Dazed",
-    "cost": 0,
-    "card_type": "status",
-    "rarity": "special",
-    "target": "none",
-    "unplayable": true,
-    "ethereal": true,
-    "effects": []
-  },
-  {
-    "card_id": "slimed",
-    "name": "Slimed",
-    "cost": 0,
-    "card_type": "status",
-    "rarity": "special",
-    "target": "none",
-    "unplayable": true,
-    "effects": []
-  },
-  {
-    "card_id": "inflame",
-    "name": "Inflame",
-    "cost": 1,
-    "card_type": "power",
-    "rarity": "uncommon",
-    "target": "self",
-    "upgrade_of": "inflame+1",
-    "effects": [
-      {"verb": "apply_power", "args": {"power_id": "strength", "amount": 2, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "inflame+1",
-    "name": "Inflame+",
-    "cost": 1,
-    "card_type": "power",
-    "rarity": "uncommon",
-    "target": "self",
-    "upgraded_from": "inflame",
-    "effects": [
-      {"verb": "apply_power", "args": {"power_id": "strength", "amount": 3, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "intimidate",
-    "name": "Intimidate",
-    "cost": 0,
-    "card_type": "skill",
-    "rarity": "uncommon",
-    "target": "all_enemies",
-    "upgrade_of": "intimidate+1",
-    "exhaust_on_play": true,
-    "effects": [
-      {"verb": "apply_power", "args": {"power_id": "weak", "amount": 1, "target_scope": "all_enemies"}}
-    ]
-  },
-  {
-    "card_id": "intimidate+1",
-    "name": "Intimidate+",
-    "cost": 0,
-    "card_type": "skill",
-    "rarity": "uncommon",
-    "target": "all_enemies",
-    "upgraded_from": "intimidate",
-    "exhaust_on_play": true,
-    "effects": [
-      {"verb": "apply_power", "args": {"power_id": "weak", "amount": 2, "target_scope": "all_enemies"}}
-    ]
-  },
-  {
-    "card_id": "uppercut",
-    "name": "Uppercut",
-    "cost": 2,
-    "card_type": "attack",
-    "rarity": "uncommon",
-    "target": "single_enemy",
-    "upgrade_of": "uppercut+1",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 13, "target_scope": "single_enemy", "hits": 1}},
-      {"verb": "apply_power", "args": {"power_id": "weak", "amount": 1, "target_scope": "single_enemy"}},
-      {"verb": "apply_power", "args": {"power_id": "vulnerable", "amount": 1, "target_scope": "single_enemy"}}
-    ]
-  },
-  {
-    "card_id": "uppercut+1",
-    "name": "Uppercut+",
-    "cost": 2,
-    "card_type": "attack",
-    "rarity": "uncommon",
-    "target": "single_enemy",
-    "upgraded_from": "uppercut",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 13, "target_scope": "single_enemy", "hits": 1}},
-      {"verb": "apply_power", "args": {"power_id": "weak", "amount": 2, "target_scope": "single_enemy"}},
-      {"verb": "apply_power", "args": {"power_id": "vulnerable", "amount": 2, "target_scope": "single_enemy"}}
-    ]
-  },
-  {
-    "card_id": "shockwave",
-    "name": "Shockwave",
-    "cost": 2,
-    "card_type": "skill",
-    "rarity": "uncommon",
-    "target": "all_enemies",
-    "upgrade_of": "shockwave+1",
-    "exhaust_on_play": true,
-    "effects": [
-      {"verb": "apply_power", "args": {"power_id": "weak", "amount": 3, "target_scope": "all_enemies"}},
-      {"verb": "apply_power", "args": {"power_id": "vulnerable", "amount": 3, "target_scope": "all_enemies"}}
-    ]
-  },
-  {
-    "card_id": "shockwave+1",
-    "name": "Shockwave+",
-    "cost": 2,
-    "card_type": "skill",
-    "rarity": "uncommon",
-    "target": "all_enemies",
-    "upgraded_from": "shockwave",
-    "exhaust_on_play": true,
-    "effects": [
-      {"verb": "apply_power", "args": {"power_id": "weak", "amount": 5, "target_scope": "all_enemies"}},
-      {"verb": "apply_power", "args": {"power_id": "vulnerable", "amount": 5, "target_scope": "all_enemies"}}
-    ]
-  },
-  {
-    "card_id": "body_slam",
-    "name": "Body Slam",
-    "cost": 1,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "single_enemy",
-    "upgrade_of": "body_slam+1",
-    "effects": [
-      {"verb": "deal_damage_equal_to_block",
-       "args": {"target_scope": "single_enemy", "hits": 1}}
-    ]
-  },
-  {
-    "card_id": "body_slam+1",
-    "name": "Body Slam+",
-    "cost": 0,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "single_enemy",
-    "upgraded_from": "body_slam",
-    "effects": [
-      {"verb": "deal_damage_equal_to_block",
-       "args": {"target_scope": "single_enemy", "hits": 1}}
-    ]
-  },
-  {
-    "card_id": "seeing_red",
-    "name": "Seeing Red",
-    "cost": 1,
-    "card_type": "skill",
-    "rarity": "uncommon",
-    "target": "self",
-    "upgrade_of": "seeing_red+1",
-    "exhaust_on_play": true,
-    "effects": [
-      {"verb": "gain_energy", "args": {"amount": 2, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "seeing_red+1",
-    "name": "Seeing Red+",
-    "cost": 0,
-    "card_type": "skill",
-    "rarity": "uncommon",
-    "target": "self",
-    "upgraded_from": "seeing_red",
-    "exhaust_on_play": true,
-    "effects": [
-      {"verb": "gain_energy", "args": {"amount": 2, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "bludgeon",
-    "name": "Bludgeon",
-    "cost": 3,
-    "card_type": "attack",
-    "rarity": "rare",
-    "target": "single_enemy",
-    "upgrade_of": "bludgeon+1",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 32, "target_scope": "single_enemy", "hits": 1}}
-    ]
-  },
-  {
-    "card_id": "bludgeon+1",
-    "name": "Bludgeon+",
-    "cost": 3,
-    "card_type": "attack",
-    "rarity": "rare",
-    "target": "single_enemy",
-    "upgraded_from": "bludgeon",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 42, "target_scope": "single_enemy", "hits": 1}}
-    ]
-  },
-  {
-    "card_id": "hemokinesis",
-    "name": "Hemokinesis",
-    "cost": 1,
-    "card_type": "attack",
-    "rarity": "uncommon",
-    "target": "single_enemy",
-    "upgrade_of": "hemokinesis+1",
-    "effects": [
-      {"verb": "lose_hp_self", "args": {"amount": 2, "target_scope": "self"}},
-      {"verb": "deal_damage", "args": {"amount": 15, "target_scope": "single_enemy", "hits": 1}}
-    ]
-  },
-  {
-    "card_id": "hemokinesis+1",
-    "name": "Hemokinesis+",
-    "cost": 1,
-    "card_type": "attack",
-    "rarity": "uncommon",
-    "target": "single_enemy",
-    "upgraded_from": "hemokinesis",
-    "effects": [
-      {"verb": "lose_hp_self", "args": {"amount": 2, "target_scope": "self"}},
-      {"verb": "deal_damage", "args": {"amount": 20, "target_scope": "single_enemy", "hits": 1}}
-    ]
-  },
-  {
-    "card_id": "reckless_charge",
-    "name": "Reckless Charge",
-    "cost": 0,
-    "card_type": "attack",
-    "rarity": "uncommon",
-    "target": "single_enemy",
-    "upgrade_of": "reckless_charge+1",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 7, "target_scope": "single_enemy", "hits": 1}},
-      {"verb": "add_card_to_pile", "args": {"card_id": "dazed", "pile": "draw", "amount": 1}}
-    ]
-  },
-  {
-    "card_id": "reckless_charge+1",
-    "name": "Reckless Charge+",
-    "cost": 0,
-    "card_type": "attack",
-    "rarity": "uncommon",
-    "target": "single_enemy",
-    "upgraded_from": "reckless_charge",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 10, "target_scope": "single_enemy", "hits": 1}},
-      {"verb": "add_card_to_pile", "args": {"card_id": "dazed", "pile": "draw", "amount": 1}}
-    ]
-  },
-  {
-    "card_id": "wild_strike",
-    "name": "Wild Strike",
-    "cost": 1,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "single_enemy",
-    "upgrade_of": "wild_strike+1",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 12, "target_scope": "single_enemy", "hits": 1}},
-      {"verb": "add_card_to_pile", "args": {"card_id": "wound", "pile": "draw", "amount": 1}}
-    ]
-  },
-  {
-    "card_id": "wild_strike+1",
-    "name": "Wild Strike+",
-    "cost": 1,
-    "card_type": "attack",
-    "rarity": "common",
-    "target": "single_enemy",
-    "upgraded_from": "wild_strike",
-    "effects": [
-      {"verb": "deal_damage", "args": {"amount": 17, "target_scope": "single_enemy", "hits": 1}},
-      {"verb": "add_card_to_pile", "args": {"card_id": "wound", "pile": "draw", "amount": 1}}
-    ]
-  },
-  {
-    "card_id": "metallicize",
-    "name": "Metallicize",
-    "cost": 1,
-    "card_type": "power",
-    "rarity": "uncommon",
-    "target": "self",
-    "upgrade_of": "metallicize+1",
-    "effects": [
-      {"verb": "apply_power", "args": {"power_id": "metallicize", "amount": 3, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "metallicize+1",
-    "name": "Metallicize+",
-    "cost": 1,
-    "card_type": "power",
-    "rarity": "uncommon",
-    "target": "self",
-    "upgraded_from": "metallicize",
-    "effects": [
-      {"verb": "apply_power", "args": {"power_id": "metallicize", "amount": 4, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "combust",
-    "name": "Combust",
-    "cost": 1,
-    "card_type": "power",
-    "rarity": "uncommon",
-    "target": "self",
-    "upgrade_of": "combust+1",
-    "effects": [
-      {"verb": "apply_power", "args": {"power_id": "combust", "amount": 5, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "combust+1",
-    "name": "Combust+",
-    "cost": 1,
-    "card_type": "power",
-    "rarity": "uncommon",
-    "target": "self",
-    "upgraded_from": "combust",
-    "effects": [
-      {"verb": "apply_power", "args": {"power_id": "combust", "amount": 7, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "rupture",
-    "name": "Rupture",
-    "cost": 1,
-    "card_type": "power",
-    "rarity": "uncommon",
-    "target": "self",
-    "upgrade_of": "rupture+1",
-    "effects": [
-      {"verb": "apply_power", "args": {"power_id": "rupture", "amount": 1, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "rupture+1",
-    "name": "Rupture+",
-    "cost": 1,
-    "card_type": "power",
-    "rarity": "uncommon",
-    "target": "self",
-    "upgraded_from": "rupture",
-    "effects": [
-      {"verb": "apply_power", "args": {"power_id": "rupture", "amount": 2, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "dark_embrace",
-    "name": "Dark Embrace",
-    "cost": 2,
-    "card_type": "power",
-    "rarity": "uncommon",
-    "target": "self",
-    "upgrade_of": "dark_embrace+1",
-    "effects": [
-      {"verb": "apply_power", "args": {"power_id": "dark_embrace", "amount": 1, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "dark_embrace+1",
-    "name": "Dark Embrace+",
-    "cost": 1,
-    "card_type": "power",
-    "rarity": "uncommon",
-    "target": "self",
-    "upgraded_from": "dark_embrace",
-    "effects": [
-      {"verb": "apply_power", "args": {"power_id": "dark_embrace", "amount": 1, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "feel_no_pain",
-    "name": "Feel No Pain",
-    "cost": 1,
-    "card_type": "power",
-    "rarity": "uncommon",
-    "target": "self",
-    "upgrade_of": "feel_no_pain+1",
-    "effects": [
-      {"verb": "apply_power", "args": {"power_id": "feel_no_pain", "amount": 3, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "feel_no_pain+1",
-    "name": "Feel No Pain+",
-    "cost": 1,
-    "card_type": "power",
-    "rarity": "uncommon",
-    "target": "self",
-    "upgraded_from": "feel_no_pain",
-    "effects": [
-      {"verb": "apply_power", "args": {"power_id": "feel_no_pain", "amount": 4, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "barricade",
-    "name": "Barricade",
-    "cost": 3,
-    "card_type": "power",
-    "rarity": "rare",
-    "target": "self",
-    "upgrade_of": "barricade+1",
-    "effects": [
-      {"verb": "apply_power", "args": {"power_id": "barricade", "amount": 1, "target_scope": "self"}}
-    ]
-  },
-  {
-    "card_id": "barricade+1",
-    "name": "Barricade+",
-    "cost": 2,
-    "card_type": "power",
-    "rarity": "rare",
-    "target": "self",
-    "upgraded_from": "barricade",
-    "effects": [
-      {"verb": "apply_power", "args": {"power_id": "barricade", "amount": 1, "target_scope": "self"}}
-    ]
-  }
+ {
+  "card_id": "bash",
+  "game_id": "BASH",
+  "name": "Bash",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "basic",
+  "target": "single_enemy",
+  "cost": 2,
+  "vars": {
+   "damage": 8,
+   "vulnerable": 2
+  },
+  "description": "Deal 8 damage. Apply 2 Vulnerable.",
+  "upgrade_of": "bash+1"
+ },
+ {
+  "card_id": "bash+1",
+  "game_id": "BASH",
+  "name": "Bash+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "basic",
+  "target": "single_enemy",
+  "cost": 2,
+  "vars": {
+   "damage": 10,
+   "vulnerable": 3
+  },
+  "description": "Deal 10 damage. Apply 3 Vulnerable.",
+  "upgraded_from": "bash"
+ },
+ {
+  "card_id": "defend_ironclad",
+  "game_id": "DEFEND_IRONCLAD",
+  "name": "Defend",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "basic",
+  "target": "self",
+  "cost": 1,
+  "tags": [
+   "defend"
+  ],
+  "vars": {
+   "block": 5
+  },
+  "description": "Gain 5 Block.",
+  "upgrade_of": "defend_ironclad+1"
+ },
+ {
+  "card_id": "defend_ironclad+1",
+  "game_id": "DEFEND_IRONCLAD",
+  "name": "Defend+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "basic",
+  "target": "self",
+  "cost": 1,
+  "tags": [
+   "defend"
+  ],
+  "vars": {
+   "block": 8
+  },
+  "description": "Gain 8 Block.",
+  "upgraded_from": "defend_ironclad"
+ },
+ {
+  "card_id": "strike_ironclad",
+  "game_id": "STRIKE_IRONCLAD",
+  "name": "Strike",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "basic",
+  "target": "single_enemy",
+  "cost": 1,
+  "tags": [
+   "strike"
+  ],
+  "vars": {
+   "damage": 6
+  },
+  "description": "Deal 6 damage.",
+  "upgrade_of": "strike_ironclad+1"
+ },
+ {
+  "card_id": "strike_ironclad+1",
+  "game_id": "STRIKE_IRONCLAD",
+  "name": "Strike+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "basic",
+  "target": "single_enemy",
+  "cost": 1,
+  "tags": [
+   "strike"
+  ],
+  "vars": {
+   "damage": 9
+  },
+  "description": "Deal 9 damage.",
+  "upgraded_from": "strike_ironclad"
+ },
+ {
+  "card_id": "anger",
+  "game_id": "ANGER",
+  "name": "Anger",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 0,
+  "vars": {
+   "damage": 6
+  },
+  "description": "Deal 6 damage. Add a copy of this card into your Discard Pile.",
+  "upgrade_of": "anger+1"
+ },
+ {
+  "card_id": "anger+1",
+  "game_id": "ANGER",
+  "name": "Anger+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 0,
+  "vars": {
+   "damage": 8
+  },
+  "description": "Deal 8 damage. Add a copy of this card into your Discard Pile.",
+  "upgraded_from": "anger"
+ },
+ {
+  "card_id": "armaments",
+  "game_id": "ARMAMENTS",
+  "name": "Armaments",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "common",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "block": 5
+  },
+  "description": "Gain 5 Block. Upgrade a card in your Hand.",
+  "upgrade_of": "armaments+1"
+ },
+ {
+  "card_id": "armaments+1",
+  "game_id": "ARMAMENTS",
+  "name": "Armaments+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "common",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "block": 5
+  },
+  "description": "Gain 5 Block. Upgrade ALL cards in your Hand.",
+  "upgraded_from": "armaments"
+ },
+ {
+  "card_id": "bloodletting",
+  "game_id": "BLOODLETTING",
+  "name": "Bloodletting",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "common",
+  "target": "self",
+  "cost": 0,
+  "vars": {
+   "hp_loss": 3,
+   "energy": 2
+  },
+  "description": "Lose 3 HP. Gain 2 Energy.",
+  "upgrade_of": "bloodletting+1"
+ },
+ {
+  "card_id": "bloodletting+1",
+  "game_id": "BLOODLETTING",
+  "name": "Bloodletting+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "common",
+  "target": "self",
+  "cost": 0,
+  "vars": {
+   "hp_loss": 3,
+   "energy": 3
+  },
+  "description": "Lose 3 HP. Gain 3 Energy.",
+  "upgraded_from": "bloodletting"
+ },
+ {
+  "card_id": "blood_wall",
+  "game_id": "BLOOD_WALL",
+  "name": "Blood Wall",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "common",
+  "target": "self",
+  "cost": 2,
+  "vars": {
+   "hp_loss": 2,
+   "block": 16
+  },
+  "description": "Lose 2 HP. Gain 16 Block.",
+  "upgrade_of": "blood_wall+1"
+ },
+ {
+  "card_id": "blood_wall+1",
+  "game_id": "BLOOD_WALL",
+  "name": "Blood Wall+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "common",
+  "target": "self",
+  "cost": 2,
+  "vars": {
+   "hp_loss": 2,
+   "block": 20
+  },
+  "description": "Lose 2 HP. Gain 20 Block.",
+  "upgraded_from": "blood_wall"
+ },
+ {
+  "card_id": "body_slam",
+  "game_id": "BODY_SLAM",
+  "name": "Body Slam",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "calculation_base": 0,
+   "extra_damage": 1,
+   "calculated_damage": 0
+  },
+  "description": "Deal damage equal to your Block.",
+  "upgrade_of": "body_slam+1"
+ },
+ {
+  "card_id": "body_slam+1",
+  "game_id": "BODY_SLAM",
+  "name": "Body Slam+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 0,
+  "vars": {
+   "calculation_base": 0,
+   "extra_damage": 1,
+   "calculated_damage": 0
+  },
+  "description": "Deal damage equal to your Block.",
+  "upgraded_from": "body_slam"
+ },
+ {
+  "card_id": "breakthrough",
+  "game_id": "BREAKTHROUGH",
+  "name": "Breakthrough",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "all_enemies",
+  "cost": 1,
+  "vars": {
+   "damage": 9,
+   "hp_loss": 1
+  },
+  "description": "Lose 1 HP. Deal 9 damage to ALL enemies.",
+  "upgrade_of": "breakthrough+1"
+ },
+ {
+  "card_id": "breakthrough+1",
+  "game_id": "BREAKTHROUGH",
+  "name": "Breakthrough+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "all_enemies",
+  "cost": 1,
+  "vars": {
+   "damage": 13,
+   "hp_loss": 1
+  },
+  "description": "Lose 1 HP. Deal 13 damage to ALL enemies.",
+  "upgraded_from": "breakthrough"
+ },
+ {
+  "card_id": "cinder",
+  "game_id": "CINDER",
+  "name": "Cinder",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 2,
+  "vars": {
+   "damage": 18
+  },
+  "description": "Deal 18 damage. Exhaust 1 card at random.",
+  "upgrade_of": "cinder+1"
+ },
+ {
+  "card_id": "cinder+1",
+  "game_id": "CINDER",
+  "name": "Cinder+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 2,
+  "vars": {
+   "damage": 24
+  },
+  "description": "Deal 24 damage. Exhaust 1 card at random.",
+  "upgraded_from": "cinder"
+ },
+ {
+  "card_id": "havoc",
+  "game_id": "HAVOC",
+  "name": "Havoc",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "common",
+  "target": "self",
+  "cost": 1,
+  "description": "Play the top card of your Draw Pile and Exhaust it.",
+  "upgrade_of": "havoc+1"
+ },
+ {
+  "card_id": "havoc+1",
+  "game_id": "HAVOC",
+  "name": "Havoc+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "common",
+  "target": "self",
+  "cost": 0,
+  "description": "Play the top card of your Draw Pile and Exhaust it.",
+  "upgraded_from": "havoc"
+ },
+ {
+  "card_id": "headbutt",
+  "game_id": "HEADBUTT",
+  "name": "Headbutt",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 9
+  },
+  "description": "Deal 9 damage. Put a card from your Discard Pile on top of your Draw Pile.",
+  "upgrade_of": "headbutt+1"
+ },
+ {
+  "card_id": "headbutt+1",
+  "game_id": "HEADBUTT",
+  "name": "Headbutt+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 12
+  },
+  "description": "Deal 12 damage. Put a card from your Discard Pile on top of your Draw Pile.",
+  "upgraded_from": "headbutt"
+ },
+ {
+  "card_id": "iron_wave",
+  "game_id": "IRON_WAVE",
+  "name": "Iron Wave",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 5,
+   "block": 5
+  },
+  "description": "Gain 5 Block. Deal 5 damage.",
+  "upgrade_of": "iron_wave+1"
+ },
+ {
+  "card_id": "iron_wave+1",
+  "game_id": "IRON_WAVE",
+  "name": "Iron Wave+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 7,
+   "block": 7
+  },
+  "description": "Gain 7 Block. Deal 7 damage.",
+  "upgraded_from": "iron_wave"
+ },
+ {
+  "card_id": "molten_fist",
+  "game_id": "MOLTEN_FIST",
+  "name": "Molten Fist",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "damage": 10
+  },
+  "description": "Deal 10 damage. Double the enemy's Vulnerable.",
+  "upgrade_of": "molten_fist+1"
+ },
+ {
+  "card_id": "molten_fist+1",
+  "game_id": "MOLTEN_FIST",
+  "name": "Molten Fist+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "damage": 14
+  },
+  "description": "Deal 14 damage. Double the enemy's Vulnerable.",
+  "upgraded_from": "molten_fist"
+ },
+ {
+  "card_id": "perfected_strike",
+  "game_id": "PERFECTED_STRIKE",
+  "name": "Perfected Strike",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 2,
+  "tags": [
+   "strike"
+  ],
+  "vars": {
+   "calculation_base": 6,
+   "extra_damage": 2,
+   "calculated_damage": 6
+  },
+  "description": "Deal 6 damage. Deals 2 additional damage for ALL your cards containing “Strike”.",
+  "upgrade_of": "perfected_strike+1"
+ },
+ {
+  "card_id": "perfected_strike+1",
+  "game_id": "PERFECTED_STRIKE",
+  "name": "Perfected Strike+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 2,
+  "tags": [
+   "strike"
+  ],
+  "vars": {
+   "calculation_base": 6,
+   "extra_damage": 3,
+   "calculated_damage": 6
+  },
+  "description": "Deal 6 damage. Deals 3 additional damage for ALL your cards containing “Strike”.",
+  "upgraded_from": "perfected_strike"
+ },
+ {
+  "card_id": "pommel_strike",
+  "game_id": "POMMEL_STRIKE",
+  "name": "Pommel Strike",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 1,
+  "tags": [
+   "strike"
+  ],
+  "vars": {
+   "damage": 9,
+   "cards": 1
+  },
+  "description": "Deal 9 damage. Draw 1 card.",
+  "upgrade_of": "pommel_strike+1"
+ },
+ {
+  "card_id": "pommel_strike+1",
+  "game_id": "POMMEL_STRIKE",
+  "name": "Pommel Strike+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 1,
+  "tags": [
+   "strike"
+  ],
+  "vars": {
+   "damage": 10,
+   "cards": 2
+  },
+  "description": "Deal 10 damage. Draw 2 cards.",
+  "upgraded_from": "pommel_strike"
+ },
+ {
+  "card_id": "setup_strike",
+  "game_id": "SETUP_STRIKE",
+  "name": "Setup Strike",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 1,
+  "tags": [
+   "strike"
+  ],
+  "vars": {
+   "damage": 7,
+   "strength": 2
+  },
+  "description": "Deal 7 damage. Gain 2 Strength this turn.",
+  "upgrade_of": "setup_strike+1"
+ },
+ {
+  "card_id": "setup_strike+1",
+  "game_id": "SETUP_STRIKE",
+  "name": "Setup Strike+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 1,
+  "tags": [
+   "strike"
+  ],
+  "vars": {
+   "damage": 9,
+   "strength": 3
+  },
+  "description": "Deal 9 damage. Gain 3 Strength this turn.",
+  "upgraded_from": "setup_strike"
+ },
+ {
+  "card_id": "shrug_it_off",
+  "game_id": "SHRUG_IT_OFF",
+  "name": "Shrug It Off",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "common",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "block": 8,
+   "cards": 1
+  },
+  "description": "Gain 8 Block. Draw 1 card.",
+  "upgrade_of": "shrug_it_off+1"
+ },
+ {
+  "card_id": "shrug_it_off+1",
+  "game_id": "SHRUG_IT_OFF",
+  "name": "Shrug It Off+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "common",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "block": 11,
+   "cards": 1
+  },
+  "description": "Gain 11 Block. Draw 1 card.",
+  "upgraded_from": "shrug_it_off"
+ },
+ {
+  "card_id": "sword_boomerang",
+  "game_id": "SWORD_BOOMERANG",
+  "name": "Sword Boomerang",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "random_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 3,
+   "repeat": 3
+  },
+  "description": "Deal 3 damage to a random enemy 3 times.",
+  "upgrade_of": "sword_boomerang+1"
+ },
+ {
+  "card_id": "sword_boomerang+1",
+  "game_id": "SWORD_BOOMERANG",
+  "name": "Sword Boomerang+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "random_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 3,
+   "repeat": 4
+  },
+  "description": "Deal 3 damage to a random enemy 4 times.",
+  "upgraded_from": "sword_boomerang"
+ },
+ {
+  "card_id": "thunderclap",
+  "game_id": "THUNDERCLAP",
+  "name": "Thunderclap",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "all_enemies",
+  "cost": 1,
+  "vars": {
+   "damage": 4,
+   "vulnerable": 1
+  },
+  "description": "Deal 4 damage and apply 1 Vulnerable to ALL enemies.",
+  "upgrade_of": "thunderclap+1"
+ },
+ {
+  "card_id": "thunderclap+1",
+  "game_id": "THUNDERCLAP",
+  "name": "Thunderclap+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "all_enemies",
+  "cost": 1,
+  "vars": {
+   "damage": 7,
+   "vulnerable": 1
+  },
+  "description": "Deal 7 damage and apply 1 Vulnerable to ALL enemies.",
+  "upgraded_from": "thunderclap"
+ },
+ {
+  "card_id": "tremble",
+  "game_id": "TREMBLE",
+  "name": "Tremble",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "vulnerable": 3
+  },
+  "description": "Apply 3 Vulnerable.",
+  "upgrade_of": "tremble+1"
+ },
+ {
+  "card_id": "tremble+1",
+  "game_id": "TREMBLE",
+  "name": "Tremble+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "vulnerable": 4
+  },
+  "description": "Apply 4 Vulnerable.",
+  "upgraded_from": "tremble"
+ },
+ {
+  "card_id": "true_grit",
+  "game_id": "TRUE_GRIT",
+  "name": "True Grit",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "common",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "block": 7
+  },
+  "description": "Gain 7 Block. Exhaust 1 card at random.",
+  "upgrade_of": "true_grit+1"
+ },
+ {
+  "card_id": "true_grit+1",
+  "game_id": "TRUE_GRIT",
+  "name": "True Grit+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "common",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "block": 9
+  },
+  "description": "Gain 9 Block. Exhaust 1 card.",
+  "upgraded_from": "true_grit"
+ },
+ {
+  "card_id": "twin_strike",
+  "game_id": "TWIN_STRIKE",
+  "name": "Twin Strike",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 1,
+  "tags": [
+   "strike"
+  ],
+  "vars": {
+   "damage": 5
+  },
+  "description": "Deal 5 damage twice.",
+  "upgrade_of": "twin_strike+1"
+ },
+ {
+  "card_id": "twin_strike+1",
+  "game_id": "TWIN_STRIKE",
+  "name": "Twin Strike+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "common",
+  "target": "single_enemy",
+  "cost": 1,
+  "tags": [
+   "strike"
+  ],
+  "vars": {
+   "damage": 7
+  },
+  "description": "Deal 7 damage twice.",
+  "upgraded_from": "twin_strike"
+ },
+ {
+  "card_id": "ashen_strike",
+  "game_id": "ASHEN_STRIKE",
+  "name": "Ashen Strike",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "tags": [
+   "strike"
+  ],
+  "vars": {
+   "calculation_base": 6,
+   "extra_damage": 3,
+   "calculated_damage": 6
+  },
+  "description": "Deal 6 damage. Deals 3 additional damage for each card in your Exhaust Pile.",
+  "upgrade_of": "ashen_strike+1"
+ },
+ {
+  "card_id": "ashen_strike+1",
+  "game_id": "ASHEN_STRIKE",
+  "name": "Ashen Strike+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "tags": [
+   "strike"
+  ],
+  "vars": {
+   "calculation_base": 6,
+   "extra_damage": 4,
+   "calculated_damage": 6
+  },
+  "description": "Deal 6 damage. Deals 4 additional damage for each card in your Exhaust Pile.",
+  "upgraded_from": "ashen_strike"
+ },
+ {
+  "card_id": "battle_trance",
+  "game_id": "BATTLE_TRANCE",
+  "name": "Battle Trance",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "vars": {
+   "cards": 3
+  },
+  "description": "Draw 3 cards. You cannot draw additional cards this turn.",
+  "upgrade_of": "battle_trance+1"
+ },
+ {
+  "card_id": "battle_trance+1",
+  "game_id": "BATTLE_TRANCE",
+  "name": "Battle Trance+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "vars": {
+   "cards": 4
+  },
+  "description": "Draw 4 cards. You cannot draw additional cards this turn.",
+  "upgraded_from": "battle_trance"
+ },
+ {
+  "card_id": "bludgeon",
+  "game_id": "BLUDGEON",
+  "name": "Bludgeon",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 3,
+  "vars": {
+   "damage": 32
+  },
+  "description": "Deal 32 damage.",
+  "upgrade_of": "bludgeon+1"
+ },
+ {
+  "card_id": "bludgeon+1",
+  "game_id": "BLUDGEON",
+  "name": "Bludgeon+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 3,
+  "vars": {
+   "damage": 42
+  },
+  "description": "Deal 42 damage.",
+  "upgraded_from": "bludgeon"
+ },
+ {
+  "card_id": "bully",
+  "game_id": "BULLY",
+  "name": "Bully",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 0,
+  "vars": {
+   "calculation_base": 4,
+   "extra_damage": 2,
+   "calculated_damage": 4
+  },
+  "description": "Deal 4 damage. Deals 2 additional damage for each Vulnerable on the enemy.",
+  "upgrade_of": "bully+1"
+ },
+ {
+  "card_id": "bully+1",
+  "game_id": "BULLY",
+  "name": "Bully+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 0,
+  "vars": {
+   "calculation_base": 4,
+   "extra_damage": 3,
+   "calculated_damage": 4
+  },
+  "description": "Deal 4 damage. Deals 3 additional damage for each Vulnerable on the enemy.",
+  "upgraded_from": "bully"
+ },
+ {
+  "card_id": "burning_pact",
+  "game_id": "BURNING_PACT",
+  "name": "Burning Pact",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "cards": 2
+  },
+  "description": "Exhaust 1 card. Draw 2 cards.",
+  "upgrade_of": "burning_pact+1"
+ },
+ {
+  "card_id": "burning_pact+1",
+  "game_id": "BURNING_PACT",
+  "name": "Burning Pact+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "cards": 3
+  },
+  "description": "Exhaust 1 card. Draw 3 cards.",
+  "upgraded_from": "burning_pact"
+ },
+ {
+  "card_id": "colossus",
+  "game_id": "COLOSSUS",
+  "name": "Colossus",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "colossus": 1,
+   "block": 5
+  },
+  "description": "Gain 5 Block. You receive 50% less damage from Vulnerable enemies this turn.",
+  "upgrade_of": "colossus+1"
+ },
+ {
+  "card_id": "colossus+1",
+  "game_id": "COLOSSUS",
+  "name": "Colossus+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "colossus": 1,
+   "block": 8
+  },
+  "description": "Gain 8 Block. You receive 50% less damage from Vulnerable enemies this turn.",
+  "upgraded_from": "colossus"
+ },
+ {
+  "card_id": "demonic_shield",
+  "game_id": "DEMONIC_SHIELD",
+  "name": "Demonic Shield",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "ally",
+  "cost": 0,
+  "keywords": [
+   "exhaust"
+  ],
+  "multiplayer_only": true,
+  "vars": {
+   "calculation_base": 0,
+   "hp_loss": 1,
+   "calculation_extra": 1
+  },
+  "description": "Lose 1 HP. Give another player Block equal to your Block.",
+  "upgrade_of": "demonic_shield+1"
+ },
+ {
+  "card_id": "demonic_shield+1",
+  "game_id": "DEMONIC_SHIELD",
+  "name": "Demonic Shield+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "ally",
+  "cost": 0,
+  "multiplayer_only": true,
+  "vars": {
+   "calculation_base": 0,
+   "hp_loss": 1,
+   "calculation_extra": 1
+  },
+  "description": "Lose 1 HP. Give another player Block equal to your Block.",
+  "upgraded_from": "demonic_shield"
+ },
+ {
+  "card_id": "dismantle",
+  "game_id": "DISMANTLE",
+  "name": "Dismantle",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 8
+  },
+  "description": "Deal 8 damage. If the enemy is Vulnerable, hits twice.",
+  "upgrade_of": "dismantle+1"
+ },
+ {
+  "card_id": "dismantle+1",
+  "game_id": "DISMANTLE",
+  "name": "Dismantle+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 10
+  },
+  "description": "Deal 10 damage. If the enemy is Vulnerable, hits twice.",
+  "upgraded_from": "dismantle"
+ },
+ {
+  "card_id": "dominate",
+  "game_id": "DOMINATE",
+  "name": "Dominate",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "strength_per_vulnerable": 1,
+   "vulnerable": 1
+  },
+  "description": "Apply 1 Vulnerable. Gain 1 Strength for each Vulnerable on the enemy.",
+  "upgrade_of": "dominate+1"
+ },
+ {
+  "card_id": "dominate+1",
+  "game_id": "DOMINATE",
+  "name": "Dominate+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "strength_per_vulnerable": 1,
+   "vulnerable": 2
+  },
+  "description": "Apply 2 Vulnerable. Gain 1 Strength for each Vulnerable on the enemy.",
+  "upgraded_from": "dominate"
+ },
+ {
+  "card_id": "drum_of_battle",
+  "game_id": "DRUM_OF_BATTLE",
+  "name": "Drum of Battle",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "cards": 2,
+   "energy": 2
+  },
+  "description": "Draw 2 cards. When this card is Exhausted, gain 2 Energy.",
+  "upgrade_of": "drum_of_battle+1"
+ },
+ {
+  "card_id": "drum_of_battle+1",
+  "game_id": "DRUM_OF_BATTLE",
+  "name": "Drum of Battle+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "cards": 2,
+   "energy": 3
+  },
+  "description": "Draw 2 cards. When this card is Exhausted, gain 3 Energy.",
+  "upgraded_from": "drum_of_battle"
+ },
+ {
+  "card_id": "evil_eye",
+  "game_id": "EVIL_EYE",
+  "name": "Evil Eye",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "block": 8
+  },
+  "description": "Gain 8 Block. Gain another 8 Block if you have Exhausted a card this turn.",
+  "upgrade_of": "evil_eye+1"
+ },
+ {
+  "card_id": "evil_eye+1",
+  "game_id": "EVIL_EYE",
+  "name": "Evil Eye+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "block": 11
+  },
+  "description": "Gain 11 Block. Gain another 11 Block if you have Exhausted a card this turn.",
+  "upgraded_from": "evil_eye"
+ },
+ {
+  "card_id": "expect_a_fight",
+  "game_id": "EXPECT_A_FIGHT",
+  "name": "Expect a Fight",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 2,
+  "vars": {
+   "energy": 0,
+   "calculation_base": 0,
+   "calculation_extra": 1
+  },
+  "description": "Gain 1 Energy for each Attack in your Hand. You cannot gain additional Energy this turn.",
+  "upgrade_of": "expect_a_fight+1"
+ },
+ {
+  "card_id": "expect_a_fight+1",
+  "game_id": "EXPECT_A_FIGHT",
+  "name": "Expect a Fight+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "energy": 0,
+   "calculation_base": 0,
+   "calculation_extra": 1
+  },
+  "description": "Gain 1 Energy for each Attack in your Hand. You cannot gain additional Energy this turn.",
+  "upgraded_from": "expect_a_fight"
+ },
+ {
+  "card_id": "feel_no_pain",
+  "game_id": "FEEL_NO_PAIN",
+  "name": "Feel No Pain",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "power": 3
+  },
+  "description": "Whenever a card is Exhausted, gain 3 Block.",
+  "upgrade_of": "feel_no_pain+1"
+ },
+ {
+  "card_id": "feel_no_pain+1",
+  "game_id": "FEEL_NO_PAIN",
+  "name": "Feel No Pain+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "power": 4
+  },
+  "description": "Whenever a card is Exhausted, gain 4 Block.",
+  "upgraded_from": "feel_no_pain"
+ },
+ {
+  "card_id": "fight_me",
+  "game_id": "FIGHT_ME",
+  "name": "Fight Me!",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 2,
+  "vars": {
+   "enemy_strength": 1,
+   "damage": 5,
+   "repeat": 2,
+   "strength": 3
+  },
+  "description": "Deal 5 damage twice. Gain 3 Strength. The enemy gains 1 Strength.",
+  "upgrade_of": "fight_me+1"
+ },
+ {
+  "card_id": "fight_me+1",
+  "game_id": "FIGHT_ME",
+  "name": "Fight Me!+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 2,
+  "vars": {
+   "enemy_strength": 1,
+   "damage": 6,
+   "repeat": 2,
+   "strength": 4
+  },
+  "description": "Deal 6 damage twice. Gain 4 Strength. The enemy gains 1 Strength.",
+  "upgraded_from": "fight_me"
+ },
+ {
+  "card_id": "flame_barrier",
+  "game_id": "FLAME_BARRIER",
+  "name": "Flame Barrier",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 2,
+  "vars": {
+   "damage_back": 4,
+   "block": 12
+  },
+  "description": "Gain 12 Block. Whenever you are attacked this turn, deal 4 damage back.",
+  "upgrade_of": "flame_barrier+1"
+ },
+ {
+  "card_id": "flame_barrier+1",
+  "game_id": "FLAME_BARRIER",
+  "name": "Flame Barrier+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 2,
+  "vars": {
+   "damage_back": 6,
+   "block": 16
+  },
+  "description": "Gain 16 Block. Whenever you are attacked this turn, deal 6 damage back.",
+  "upgraded_from": "flame_barrier"
+ },
+ {
+  "card_id": "forgotten_ritual",
+  "game_id": "FORGOTTEN_RITUAL",
+  "name": "Forgotten Ritual",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "energy": 3
+  },
+  "description": "If you Exhausted a card this turn, gain 3 Energy.",
+  "upgrade_of": "forgotten_ritual+1"
+ },
+ {
+  "card_id": "forgotten_ritual+1",
+  "game_id": "FORGOTTEN_RITUAL",
+  "name": "Forgotten Ritual+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "energy": 4
+  },
+  "description": "If you Exhausted a card this turn, gain 4 Energy.",
+  "upgraded_from": "forgotten_ritual"
+ },
+ {
+  "card_id": "hemokinesis",
+  "game_id": "HEMOKINESIS",
+  "name": "Hemokinesis",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "hp_loss": 2,
+   "damage": 15
+  },
+  "description": "Lose 2 HP. Deal 15 damage.",
+  "upgrade_of": "hemokinesis+1"
+ },
+ {
+  "card_id": "hemokinesis+1",
+  "game_id": "HEMOKINESIS",
+  "name": "Hemokinesis+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "hp_loss": 2,
+   "damage": 20
+  },
+  "description": "Lose 2 HP. Deal 20 damage.",
+  "upgraded_from": "hemokinesis"
+ },
+ {
+  "card_id": "howl_from_beyond",
+  "game_id": "HOWL_FROM_BEYOND",
+  "name": "Howl from Beyond",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "all_enemies",
+  "cost": 3,
+  "vars": {
+   "damage": 16
+  },
+  "description": "Deal 16 damage to ALL enemies. At the end of your turn, if this is in your Exhaust Pile, play it.",
+  "upgrade_of": "howl_from_beyond+1"
+ },
+ {
+  "card_id": "howl_from_beyond+1",
+  "game_id": "HOWL_FROM_BEYOND",
+  "name": "Howl from Beyond+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "all_enemies",
+  "cost": 3,
+  "vars": {
+   "damage": 21
+  },
+  "description": "Deal 21 damage to ALL enemies. At the end of your turn, if this is in your Exhaust Pile, play it.",
+  "upgraded_from": "howl_from_beyond"
+ },
+ {
+  "card_id": "infernal_blade",
+  "game_id": "INFERNAL_BLADE",
+  "name": "Infernal Blade",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "description": "Add a random Attack into your Hand. It's free to play this turn.",
+  "upgrade_of": "infernal_blade+1"
+ },
+ {
+  "card_id": "infernal_blade+1",
+  "game_id": "INFERNAL_BLADE",
+  "name": "Infernal Blade+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "exhaust"
+  ],
+  "description": "Add a random Attack into your Hand. It's free to play this turn.",
+  "upgraded_from": "infernal_blade"
+ },
+ {
+  "card_id": "inferno",
+  "game_id": "INFERNO",
+  "name": "Inferno",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "inferno": 6
+  },
+  "description": "At the start of your turn, lose 1 HP. Whenever you lose HP on your turn, deal 6 damage to ALL enemies.",
+  "upgrade_of": "inferno+1"
+ },
+ {
+  "card_id": "inferno+1",
+  "game_id": "INFERNO",
+  "name": "Inferno+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "inferno": 9
+  },
+  "description": "At the start of your turn, lose 1 HP. Whenever you lose HP on your turn, deal 9 damage to ALL enemies.",
+  "upgraded_from": "inferno"
+ },
+ {
+  "card_id": "inflame",
+  "game_id": "INFLAME",
+  "name": "Inflame",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "strength": 2
+  },
+  "description": "Gain 2 Strength.",
+  "upgrade_of": "inflame+1"
+ },
+ {
+  "card_id": "inflame+1",
+  "game_id": "INFLAME",
+  "name": "Inflame+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "strength": 3
+  },
+  "description": "Gain 3 Strength.",
+  "upgraded_from": "inflame"
+ },
+ {
+  "card_id": "juggling",
+  "game_id": "JUGGLING",
+  "name": "Juggling",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "description": "Add a copy of the third Attack you play each turn into your Hand.",
+  "upgrade_of": "juggling+1"
+ },
+ {
+  "card_id": "juggling+1",
+  "game_id": "JUGGLING",
+  "name": "Juggling+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "description": "Add a copy of the third Attack you play each turn into your Hand.",
+  "keywords": [
+   "innate"
+  ],
+  "upgraded_from": "juggling"
+ },
+ {
+  "card_id": "pillage",
+  "game_id": "PILLAGE",
+  "name": "Pillage",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 6
+  },
+  "description": "Deal 6 damage. Draw cards until you draw a non-Attack card.",
+  "upgrade_of": "pillage+1"
+ },
+ {
+  "card_id": "pillage+1",
+  "game_id": "PILLAGE",
+  "name": "Pillage+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 9
+  },
+  "description": "Deal 9 damage. Draw cards until you draw a non-Attack card.",
+  "upgraded_from": "pillage"
+ },
+ {
+  "card_id": "rage",
+  "game_id": "RAGE",
+  "name": "Rage",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "vars": {
+   "power": 3
+  },
+  "description": "Whenever you play an Attack this turn, gain 3 Block.",
+  "upgrade_of": "rage+1"
+ },
+ {
+  "card_id": "rage+1",
+  "game_id": "RAGE",
+  "name": "Rage+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "vars": {
+   "power": 5
+  },
+  "description": "Whenever you play an Attack this turn, gain 5 Block.",
+  "upgraded_from": "rage"
+ },
+ {
+  "card_id": "rampage",
+  "game_id": "RAMPAGE",
+  "name": "Rampage",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "increase": 5,
+   "damage": 9
+  },
+  "description": "Deal 9 damage. Increase this card's damage by 5 this combat.",
+  "upgrade_of": "rampage+1"
+ },
+ {
+  "card_id": "rampage+1",
+  "game_id": "RAMPAGE",
+  "name": "Rampage+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "increase": 9,
+   "damage": 9
+  },
+  "description": "Deal 9 damage. Increase this card's damage by 9 this combat.",
+  "upgraded_from": "rampage"
+ },
+ {
+  "card_id": "rupture",
+  "game_id": "RUPTURE",
+  "name": "Rupture",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "strength": 1
+  },
+  "description": "Whenever you lose HP on your turn, gain 1 Strength.",
+  "upgrade_of": "rupture+1"
+ },
+ {
+  "card_id": "rupture+1",
+  "game_id": "RUPTURE",
+  "name": "Rupture+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "strength": 2
+  },
+  "description": "Whenever you lose HP on your turn, gain 2 Strength.",
+  "upgraded_from": "rupture"
+ },
+ {
+  "card_id": "second_wind",
+  "game_id": "SECOND_WIND",
+  "name": "Second Wind",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "block": 5
+  },
+  "description": "Exhaust all non-Attack cards in your Hand. Gain 5 Block for each card Exhausted.",
+  "upgrade_of": "second_wind+1"
+ },
+ {
+  "card_id": "second_wind+1",
+  "game_id": "SECOND_WIND",
+  "name": "Second Wind+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "block": 7
+  },
+  "description": "Exhaust all non-Attack cards in your Hand. Gain 7 Block for each card Exhausted.",
+  "upgraded_from": "second_wind"
+ },
+ {
+  "card_id": "spite",
+  "game_id": "SPITE",
+  "name": "Spite",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 0,
+  "vars": {
+   "damage": 5,
+   "repeat": 2
+  },
+  "description": "Deal 5 damage. If you lost HP this turn, hits 2 times.",
+  "upgrade_of": "spite+1"
+ },
+ {
+  "card_id": "spite+1",
+  "game_id": "SPITE",
+  "name": "Spite+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 0,
+  "vars": {
+   "damage": 5,
+   "repeat": 3
+  },
+  "description": "Deal 5 damage. If you lost HP this turn, hits 3 times.",
+  "upgraded_from": "spite"
+ },
+ {
+  "card_id": "stampede",
+  "game_id": "STAMPEDE",
+  "name": "Stampede",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 2,
+  "vars": {
+   "power": 1
+  },
+  "description": "At the end of your turn, 1 random Attack in your Hand is played against a random enemy.",
+  "upgrade_of": "stampede+1"
+ },
+ {
+  "card_id": "stampede+1",
+  "game_id": "STAMPEDE",
+  "name": "Stampede+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "power": 1
+  },
+  "description": "At the end of your turn, 1 random Attack in your Hand is played against a random enemy.",
+  "upgraded_from": "stampede"
+ },
+ {
+  "card_id": "stomp",
+  "game_id": "STOMP",
+  "name": "Stomp",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "all_enemies",
+  "cost": 3,
+  "vars": {
+   "damage": 12
+  },
+  "description": "Deal 12 damage to ALL enemies. Costs 1 less Energy for each Attack played this turn.",
+  "upgrade_of": "stomp+1"
+ },
+ {
+  "card_id": "stomp+1",
+  "game_id": "STOMP",
+  "name": "Stomp+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "all_enemies",
+  "cost": 3,
+  "vars": {
+   "damage": 15
+  },
+  "description": "Deal 15 damage to ALL enemies. Costs 1 less Energy for each Attack played this turn.",
+  "upgraded_from": "stomp"
+ },
+ {
+  "card_id": "stone_armor",
+  "game_id": "STONE_ARMOR",
+  "name": "Stone Armor",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "plating": 4
+  },
+  "description": "Gain 4 Plating.",
+  "upgrade_of": "stone_armor+1"
+ },
+ {
+  "card_id": "stone_armor+1",
+  "game_id": "STONE_ARMOR",
+  "name": "Stone Armor+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "plating": 6
+  },
+  "description": "Gain 6 Plating.",
+  "upgraded_from": "stone_armor"
+ },
+ {
+  "card_id": "taunt",
+  "game_id": "TAUNT",
+  "name": "Taunt",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "block": 7,
+   "vulnerable": 1
+  },
+  "description": "Gain 7 Block. Apply 1 Vulnerable.",
+  "upgrade_of": "taunt+1"
+ },
+ {
+  "card_id": "taunt+1",
+  "game_id": "TAUNT",
+  "name": "Taunt+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "block": 8,
+   "vulnerable": 2
+  },
+  "description": "Gain 8 Block. Apply 2 Vulnerable.",
+  "upgraded_from": "taunt"
+ },
+ {
+  "card_id": "unrelenting",
+  "game_id": "UNRELENTING",
+  "name": "Unrelenting",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 2,
+  "vars": {
+   "damage": 14
+  },
+  "description": "Deal 14 damage. The next Attack you play costs 0 Energy.",
+  "upgrade_of": "unrelenting+1"
+ },
+ {
+  "card_id": "unrelenting+1",
+  "game_id": "UNRELENTING",
+  "name": "Unrelenting+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 2,
+  "vars": {
+   "damage": 20
+  },
+  "description": "Deal 20 damage. The next Attack you play costs 0 Energy.",
+  "upgraded_from": "unrelenting"
+ },
+ {
+  "card_id": "uppercut",
+  "game_id": "UPPERCUT",
+  "name": "Uppercut",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 2,
+  "vars": {
+   "power": 1,
+   "damage": 13
+  },
+  "description": "Deal 13 damage. Apply 1 Weak. Apply 1 Vulnerable.",
+  "upgrade_of": "uppercut+1"
+ },
+ {
+  "card_id": "uppercut+1",
+  "game_id": "UPPERCUT",
+  "name": "Uppercut+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 2,
+  "vars": {
+   "power": 2,
+   "damage": 13
+  },
+  "description": "Deal 13 damage. Apply 2 Weak. Apply 2 Vulnerable.",
+  "upgraded_from": "uppercut"
+ },
+ {
+  "card_id": "vicious",
+  "game_id": "VICIOUS",
+  "name": "Vicious",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "cards": 1
+  },
+  "description": "Whenever you apply Vulnerable, draw 1 card.",
+  "upgrade_of": "vicious+1"
+ },
+ {
+  "card_id": "vicious+1",
+  "game_id": "VICIOUS",
+  "name": "Vicious+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "cards": 2
+  },
+  "description": "Whenever you apply Vulnerable, draw 2 cards.",
+  "upgraded_from": "vicious"
+ },
+ {
+  "card_id": "whirlwind",
+  "game_id": "WHIRLWIND",
+  "name": "Whirlwind",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "all_enemies",
+  "cost": 0,
+  "x_cost": true,
+  "vars": {
+   "damage": 5
+  },
+  "description": "Deal 5 damage to ALL enemies X times.",
+  "upgrade_of": "whirlwind+1"
+ },
+ {
+  "card_id": "whirlwind+1",
+  "game_id": "WHIRLWIND",
+  "name": "Whirlwind+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "all_enemies",
+  "cost": 0,
+  "x_cost": true,
+  "vars": {
+   "damage": 8
+  },
+  "description": "Deal 8 damage to ALL enemies X times.",
+  "upgraded_from": "whirlwind"
+ },
+ {
+  "card_id": "aggression",
+  "game_id": "AGGRESSION",
+  "name": "Aggression",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "description": "At the start of your turn, put a random Attack from your Discard Pile into your Hand and Upgrade it.",
+  "upgrade_of": "aggression+1"
+ },
+ {
+  "card_id": "aggression+1",
+  "game_id": "AGGRESSION",
+  "name": "Aggression+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "description": "At the start of your turn, put a random Attack from your Discard Pile into your Hand and Upgrade it.",
+  "keywords": [
+   "innate"
+  ],
+  "upgraded_from": "aggression"
+ },
+ {
+  "card_id": "barricade",
+  "game_id": "BARRICADE",
+  "name": "Barricade",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 3,
+  "description": "Block is not removed at the start of your turn.",
+  "upgrade_of": "barricade+1"
+ },
+ {
+  "card_id": "barricade+1",
+  "game_id": "BARRICADE",
+  "name": "Barricade+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 2,
+  "description": "Block is not removed at the start of your turn.",
+  "upgraded_from": "barricade"
+ },
+ {
+  "card_id": "brand",
+  "game_id": "BRAND",
+  "name": "Brand",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 0,
+  "vars": {
+   "hp_loss": 1,
+   "strength": 1
+  },
+  "description": "Lose 1 HP. Exhaust 1 card. Gain 1 Strength.",
+  "upgrade_of": "brand+1"
+ },
+ {
+  "card_id": "brand+1",
+  "game_id": "BRAND",
+  "name": "Brand+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 0,
+  "vars": {
+   "hp_loss": 1,
+   "strength": 2
+  },
+  "description": "Lose 1 HP. Exhaust 1 card. Gain 2 Strength.",
+  "upgraded_from": "brand"
+ },
+ {
+  "card_id": "cascade",
+  "game_id": "CASCADE",
+  "name": "Cascade",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 0,
+  "x_cost": true,
+  "description": "Play the top X cards of your Draw Pile.",
+  "upgrade_of": "cascade+1"
+ },
+ {
+  "card_id": "cascade+1",
+  "game_id": "CASCADE",
+  "name": "Cascade+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 0,
+  "x_cost": true,
+  "description": "Play the top X+1 cards of your Draw Pile.",
+  "upgraded_from": "cascade"
+ },
+ {
+  "card_id": "conflagration",
+  "game_id": "CONFLAGRATION",
+  "name": "Conflagration",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "all_enemies",
+  "cost": 1,
+  "vars": {
+   "damage": 2,
+   "repeat": 4
+  },
+  "description": "Deal 2 damage to ALL enemies 4 times.",
+  "upgrade_of": "conflagration+1"
+ },
+ {
+  "card_id": "conflagration+1",
+  "game_id": "CONFLAGRATION",
+  "name": "Conflagration+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "all_enemies",
+  "cost": 1,
+  "vars": {
+   "damage": 2,
+   "repeat": 5
+  },
+  "description": "Deal 2 damage to ALL enemies 5 times.",
+  "upgraded_from": "conflagration"
+ },
+ {
+  "card_id": "crimson_mantle",
+  "game_id": "CRIMSON_MANTLE",
+  "name": "Crimson Mantle",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "crimson_mantle": 8
+  },
+  "description": "At the start of your turn, lose 1 HP and gain 8 Block.",
+  "upgrade_of": "crimson_mantle+1"
+ },
+ {
+  "card_id": "crimson_mantle+1",
+  "game_id": "CRIMSON_MANTLE",
+  "name": "Crimson Mantle+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "crimson_mantle": 10
+  },
+  "description": "At the start of your turn, lose 1 HP and gain 10 Block.",
+  "upgraded_from": "crimson_mantle"
+ },
+ {
+  "card_id": "cruelty",
+  "game_id": "CRUELTY",
+  "name": "Cruelty",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "cruelty": 25
+  },
+  "description": "Vulnerable enemies take an additional 25% damage.",
+  "upgrade_of": "cruelty+1"
+ },
+ {
+  "card_id": "cruelty+1",
+  "game_id": "CRUELTY",
+  "name": "Cruelty+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "cruelty": 50
+  },
+  "description": "Vulnerable enemies take an additional 50% damage.",
+  "upgraded_from": "cruelty"
+ },
+ {
+  "card_id": "dark_embrace",
+  "game_id": "DARK_EMBRACE",
+  "name": "Dark Embrace",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 2,
+  "description": "Whenever a card is Exhausted, draw 1 card.",
+  "upgrade_of": "dark_embrace+1"
+ },
+ {
+  "card_id": "dark_embrace+1",
+  "game_id": "DARK_EMBRACE",
+  "name": "Dark Embrace+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "description": "Whenever a card is Exhausted, draw 1 card.",
+  "upgraded_from": "dark_embrace"
+ },
+ {
+  "card_id": "demon_form",
+  "game_id": "DEMON_FORM",
+  "name": "Demon Form",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 3,
+  "vars": {
+   "strength": 2
+  },
+  "description": "At the start of your turn, gain 2 Strength.",
+  "upgrade_of": "demon_form+1"
+ },
+ {
+  "card_id": "demon_form+1",
+  "game_id": "DEMON_FORM",
+  "name": "Demon Form+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 3,
+  "vars": {
+   "strength": 3
+  },
+  "description": "At the start of your turn, gain 3 Strength.",
+  "upgraded_from": "demon_form"
+ },
+ {
+  "card_id": "feed",
+  "game_id": "FEED",
+  "name": "Feed",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "generated_in_combat": false,
+  "vars": {
+   "damage": 10,
+   "max_hp": 3
+  },
+  "description": "Deal 10 damage. If Fatal, raise your Max HP by 3.",
+  "upgrade_of": "feed+1"
+ },
+ {
+  "card_id": "feed+1",
+  "game_id": "FEED",
+  "name": "Feed+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "generated_in_combat": false,
+  "vars": {
+   "damage": 12,
+   "max_hp": 4
+  },
+  "description": "Deal 12 damage. If Fatal, raise your Max HP by 4.",
+  "upgraded_from": "feed"
+ },
+ {
+  "card_id": "fiend_fire",
+  "game_id": "FIEND_FIRE",
+  "name": "Fiend Fire",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 2,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "damage": 7
+  },
+  "description": "Exhaust your Hand. Deal 7 damage for each card Exhausted.",
+  "upgrade_of": "fiend_fire+1"
+ },
+ {
+  "card_id": "fiend_fire+1",
+  "game_id": "FIEND_FIRE",
+  "name": "Fiend Fire+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 2,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "damage": 10
+  },
+  "description": "Exhaust your Hand. Deal 10 damage for each card Exhausted.",
+  "upgraded_from": "fiend_fire"
+ },
+ {
+  "card_id": "hellraiser",
+  "game_id": "HELLRAISER",
+  "name": "Hellraiser",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 2,
+  "description": "Whenever you draw a card containing “Strike”, it is played against a random enemy.",
+  "upgrade_of": "hellraiser+1"
+ },
+ {
+  "card_id": "hellraiser+1",
+  "game_id": "HELLRAISER",
+  "name": "Hellraiser+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "description": "Whenever you draw a card containing “Strike”, it is played against a random enemy.",
+  "upgraded_from": "hellraiser"
+ },
+ {
+  "card_id": "impervious",
+  "game_id": "IMPERVIOUS",
+  "name": "Impervious",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 2,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "block": 30
+  },
+  "description": "Gain 30 Block.",
+  "upgrade_of": "impervious+1"
+ },
+ {
+  "card_id": "impervious+1",
+  "game_id": "IMPERVIOUS",
+  "name": "Impervious+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 2,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "block": 40
+  },
+  "description": "Gain 40 Block.",
+  "upgraded_from": "impervious"
+ },
+ {
+  "card_id": "juggernaut",
+  "game_id": "JUGGERNAUT",
+  "name": "Juggernaut",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 2,
+  "vars": {
+   "juggernaut": 6
+  },
+  "description": "Whenever you gain Block, deal 6 damage to a random enemy.",
+  "upgrade_of": "juggernaut+1"
+ },
+ {
+  "card_id": "juggernaut+1",
+  "game_id": "JUGGERNAUT",
+  "name": "Juggernaut+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 2,
+  "vars": {
+   "juggernaut": 8
+  },
+  "description": "Whenever you gain Block, deal 8 damage to a random enemy.",
+  "upgraded_from": "juggernaut"
+ },
+ {
+  "card_id": "mangle",
+  "game_id": "MANGLE",
+  "name": "Mangle",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 3,
+  "vars": {
+   "strength_loss": 10,
+   "damage": 15
+  },
+  "description": "Deal 15 damage. Enemy loses 10 Strength this turn.",
+  "upgrade_of": "mangle+1"
+ },
+ {
+  "card_id": "mangle+1",
+  "game_id": "MANGLE",
+  "name": "Mangle+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 3,
+  "vars": {
+   "strength_loss": 15,
+   "damage": 20
+  },
+  "description": "Deal 20 damage. Enemy loses 15 Strength this turn.",
+  "upgraded_from": "mangle"
+ },
+ {
+  "card_id": "not_yet",
+  "game_id": "NOT_YET",
+  "name": "Not Yet",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 2,
+  "keywords": [
+   "exhaust"
+  ],
+  "generated_in_combat": false,
+  "vars": {
+   "heal": 10
+  },
+  "description": "Heal 10 HP.",
+  "upgrade_of": "not_yet+1"
+ },
+ {
+  "card_id": "not_yet+1",
+  "game_id": "NOT_YET",
+  "name": "Not Yet+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 2,
+  "keywords": [
+   "exhaust"
+  ],
+  "generated_in_combat": false,
+  "vars": {
+   "heal": 13
+  },
+  "description": "Heal 13 HP.",
+  "upgraded_from": "not_yet"
+ },
+ {
+  "card_id": "offering",
+  "game_id": "OFFERING",
+  "name": "Offering",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "hp_loss": 6,
+   "energy": 2,
+   "cards": 3
+  },
+  "description": "Lose 6 HP. Gain 2 Energy. Draw 3 cards.",
+  "upgrade_of": "offering+1"
+ },
+ {
+  "card_id": "offering+1",
+  "game_id": "OFFERING",
+  "name": "Offering+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "hp_loss": 6,
+   "energy": 2,
+   "cards": 5
+  },
+  "description": "Lose 6 HP. Gain 2 Energy. Draw 5 cards.",
+  "upgraded_from": "offering"
+ },
+ {
+  "card_id": "one_two_punch",
+  "game_id": "ONE_TWO_PUNCH",
+  "name": "One-Two Punch",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "attacks": 1
+  },
+  "description": "This turn, your next Attack is played an extra time.",
+  "upgrade_of": "one_two_punch+1"
+ },
+ {
+  "card_id": "one_two_punch+1",
+  "game_id": "ONE_TWO_PUNCH",
+  "name": "One-Two Punch+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "attacks": 2
+  },
+  "description": "This turn, your next 2 Attacks are played an extra time.",
+  "upgraded_from": "one_two_punch"
+ },
+ {
+  "card_id": "pacts_end",
+  "game_id": "PACTS_END",
+  "name": "Pact's End",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "all_enemies",
+  "cost": 0,
+  "vars": {
+   "damage": 17,
+   "cards": 3
+  },
+  "description": "If you have 3 or more cards in your Exhaust Pile, deal 17 damage to ALL enemies.",
+  "upgrade_of": "pacts_end+1"
+ },
+ {
+  "card_id": "pacts_end+1",
+  "game_id": "PACTS_END",
+  "name": "Pact's End+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "all_enemies",
+  "cost": 0,
+  "vars": {
+   "damage": 23,
+   "cards": 3
+  },
+  "description": "If you have 3 or more cards in your Exhaust Pile, deal 23 damage to ALL enemies.",
+  "upgraded_from": "pacts_end"
+ },
+ {
+  "card_id": "primal_force",
+  "game_id": "PRIMAL_FORCE",
+  "name": "Primal Force",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 0,
+  "description": "Transform all Attacks in your Hand into Giant Rock.",
+  "upgrade_of": "primal_force+1"
+ },
+ {
+  "card_id": "primal_force+1",
+  "game_id": "PRIMAL_FORCE",
+  "name": "Primal Force+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 0,
+  "description": "Transform all Attacks in your Hand into Giant Rock+.",
+  "upgraded_from": "primal_force"
+ },
+ {
+  "card_id": "pyre",
+  "game_id": "PYRE",
+  "name": "Pyre",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 2,
+  "vars": {
+   "energy": 1
+  },
+  "description": "Gain 1 Energy at the start of each turn.",
+  "upgrade_of": "pyre+1"
+ },
+ {
+  "card_id": "pyre+1",
+  "game_id": "PYRE",
+  "name": "Pyre+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 2,
+  "vars": {
+   "energy": 2
+  },
+  "description": "Gain 2 Energy at the start of each turn.",
+  "upgraded_from": "pyre"
+ },
+ {
+  "card_id": "stoke",
+  "game_id": "STOKE",
+  "name": "Stoke",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "description": "Exhaust your Hand. Add 1 random card into your Hand for each card Exhausted.",
+  "upgrade_of": "stoke+1"
+ },
+ {
+  "card_id": "stoke+1",
+  "game_id": "STOKE",
+  "name": "Stoke+",
+  "color": "ironclad",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "description": "Exhaust your Hand. Add 1 random Upgraded card into your Hand for each card Exhausted.",
+  "upgraded_from": "stoke"
+ },
+ {
+  "card_id": "tank",
+  "game_id": "TANK",
+  "name": "Tank",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "multiplayer_only": true,
+  "description": "Take double damage from enemies. Allies take half damage from enemies.",
+  "upgrade_of": "tank+1"
+ },
+ {
+  "card_id": "tank+1",
+  "game_id": "TANK",
+  "name": "Tank+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 0,
+  "multiplayer_only": true,
+  "description": "Take double damage from enemies. Allies take half damage from enemies.",
+  "upgraded_from": "tank"
+ },
+ {
+  "card_id": "tear_asunder",
+  "game_id": "TEAR_ASUNDER",
+  "name": "Tear Asunder",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 2,
+  "vars": {
+   "damage": 5,
+   "repeat": 1,
+   "calculation_base": 0,
+   "calculation_extra": 1
+  },
+  "description": "Deal 5 damage. Hits an additional time for each time you lost HP this combat.",
+  "upgrade_of": "tear_asunder+1"
+ },
+ {
+  "card_id": "tear_asunder+1",
+  "game_id": "TEAR_ASUNDER",
+  "name": "Tear Asunder+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 2,
+  "vars": {
+   "damage": 7,
+   "repeat": 1,
+   "calculation_base": 0,
+   "calculation_extra": 1
+  },
+  "description": "Deal 7 damage. Hits an additional time for each time you lost HP this combat.",
+  "upgraded_from": "tear_asunder"
+ },
+ {
+  "card_id": "thrash",
+  "game_id": "THRASH",
+  "name": "Thrash",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 4
+  },
+  "description": "Deal 4 damage twice. Exhaust a random Attack in your Hand and add its damage to this card.",
+  "upgrade_of": "thrash+1"
+ },
+ {
+  "card_id": "thrash+1",
+  "game_id": "THRASH",
+  "name": "Thrash+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 6
+  },
+  "description": "Deal 6 damage twice. Exhaust a random Attack in your Hand and add its damage to this card.",
+  "upgraded_from": "thrash"
+ },
+ {
+  "card_id": "unmovable",
+  "game_id": "UNMOVABLE",
+  "name": "Unmovable",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 2,
+  "description": "The first time you gain Block from a card each turn, double the amount gained.",
+  "upgrade_of": "unmovable+1"
+ },
+ {
+  "card_id": "unmovable+1",
+  "game_id": "UNMOVABLE",
+  "name": "Unmovable+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "description": "The first time you gain Block from a card each turn, double the amount gained.",
+  "upgraded_from": "unmovable"
+ },
+ {
+  "card_id": "break",
+  "game_id": "BREAK",
+  "name": "Break",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "ancient",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 20,
+   "vulnerable": 5
+  },
+  "description": "Deal 20 damage. Apply 5 Vulnerable.",
+  "upgrade_of": "break+1"
+ },
+ {
+  "card_id": "break+1",
+  "game_id": "BREAK",
+  "name": "Break+",
+  "color": "ironclad",
+  "card_type": "attack",
+  "rarity": "ancient",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 30,
+   "vulnerable": 7
+  },
+  "description": "Deal 30 damage. Apply 7 Vulnerable.",
+  "upgraded_from": "break"
+ },
+ {
+  "card_id": "corruption",
+  "game_id": "CORRUPTION",
+  "name": "Corruption",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "ancient",
+  "target": "self",
+  "cost": 3,
+  "vars": {
+   "power": 1
+  },
+  "description": "Skills cost 0 Energy. Whenever you play a Skill, Exhaust it.",
+  "upgrade_of": "corruption+1"
+ },
+ {
+  "card_id": "corruption+1",
+  "game_id": "CORRUPTION",
+  "name": "Corruption+",
+  "color": "ironclad",
+  "card_type": "power",
+  "rarity": "ancient",
+  "target": "self",
+  "cost": 2,
+  "vars": {
+   "power": 1
+  },
+  "description": "Skills cost 0 Energy. Whenever you play a Skill, Exhaust it.",
+  "upgraded_from": "corruption"
+ }
 ]

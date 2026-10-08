@@ -38,7 +38,7 @@ class CapabilitiesTest(unittest.TestCase):
         caps = self.shim.Sts2SimBackend().capabilities()
         self.assertEqual(caps["backend"], "sts2-sim")
         self.assertEqual(caps["characters"], ["ironclad"])
-        self.assertEqual(caps["ascensions"], [0])
+        self.assertEqual(caps["ascensions"], list(range(11)))
         self.assertIn("full_run", caps["episode_scopes"])
         self.assertTrue(caps["paired_seed_bit_exact"])
         self.assertFalse(caps["supports_snapshot"])
@@ -59,7 +59,7 @@ class ResetValidationTest(unittest.TestCase):
 
     def test_rejects_unsupported_ascension(self) -> None:
         with self.assertRaisesRegex(ValueError, "ascension"):
-            self.backend.reset({"character": "ironclad", "ascension": 5, "episode_scope": "full_run"})
+            self.backend.reset({"character": "ironclad", "ascension": 11, "episode_scope": "full_run"})
 
     def test_missing_fields_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "missing required fields"):

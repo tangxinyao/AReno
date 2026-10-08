@@ -11,9 +11,10 @@ is importable from any CWD and does not require `examples` to be a
 Python package. Keep the public StatePacket shape 1:1 with
 `examples/classify/jev/operator.schema.json`.
 
-Phase 1 scope: ironclad A0, single Jaw Worm combat (full_run scope is
-reported in StatePacket.info for schema compatibility — later phases
-will fill in map / shops / events to make the full-run claim honest).
+Scope: Ironclad, ascension 0-10, one Act 1 combat (Overgrowth or
+Underdocks weak pool) per episode. full_run scope is reported in
+StatePacket.info for schema compatibility; map / rewards / shops / events
+are not simulated yet.
 """
 
 from __future__ import annotations
@@ -65,43 +66,98 @@ def _stable_seed(label: str) -> int:
     return int.from_bytes(digest, "big") & ((1 << 63) - 1)
 
 
-def _render_state_text(state: Any) -> str:
-    """Short, stable text digest for Jev's score head.
+_INTENT_LABEL = {
+    "attack": "Attack", "defend": "Defend", "buff": "Buff", "debuff": "Debuff",
+    "strong_debuff": "StrongDebuff", "status": "Status", "card_debuff": "CardDebuff",
+    "summon": "Summon", "heal": "Heal", "stun": "Stun", "sleep": "Sleep",
+    "escape": "Escape", "death_blow": "DeathBlow", "unknown": "Unknown",
+}
 
-    Keep this tight — the reference backbone budgets ~1536 tokens for
-    the full prompt and the state is only a small slice of that. Expand
-    only when a decision point proves ambiguous without more context.
+
+def _intent_text(loop: Any, monster: Any) -> str:
+    """Intent readout in the live adapter's `type label` shape ("Attack 7x2")."""
+
+    move_id = monster.queued_move
+    if move_id in (None, "__reviving__"):
+        return "Heal" if move_id else "?"
+    if move_id == "__stunned__":
+        return "Stun"
+    mdef = loop.monsters[monster.monster_id]
+    move = mdef.moves[move_id]
+    ctx = loop.combat_ctx
+    parts = []
+    for intent in move.intents:
+        label = _INTENT_LABEL[intent]
+        if intent == "attack":
+            step = next((s for s in move.effects if s.verb == "attack"), None)
+            if step is not None:
+                base = _sim_value(ctx, step.args["damage"])
+                hits = _sim_value(ctx, step.args.get("hits", 1))
+                per_hit = ctx._powered_amount(base, monster, ctx.player)
+                label += f" {per_hit}" + (f"x{hits}" if hits > 1 else "")
+        parts.append(label)
+    return "/".join(parts)
+
+
+def _sim_value(ctx: Any, raw: Any) -> int:
+    if isinstance(raw, list):
+        base, asc, level = raw
+        return int(asc if ctx.ascension >= level else base)
+    return int(raw)
+
+
+def _powers_text(powers: dict[str, int], defs: dict[str, Any]) -> str:
+    out = []
+    for pid, amount in powers.items():
+        name = defs[pid].name if pid in defs else pid
+        out.append(f"{name}={amount}")
+    return ", ".join(out)
+
+
+def _render_state_text(loop: Any) -> str:
+    """Compact digest for Jev's score head, shaped like the live adapter's.
+
+    Same line layout as `sts2mcp_live.render_state_text` so a policy trained
+    on the sim reads the live game the same way.
     """
 
+    state = loop.state
     player = state.player
     combat = state.combat
+    screen = state.screen
+    if screen == "combat" and state.encounter_id is not None:
+        screen = loop._encounters[state.encounter_id].room_type
     lines: list[str] = [
-        f"screen={state.screen}",
-        f"hp={player.hp}/{player.max_hp}" if player is not None else "hp=?",
+        f"screen={screen} act={state.act} floor={state.floor}",
+        f"hp={player.hp}/{player.max_hp} gold={player.gold}" if player is not None else "hp=?",
     ]
-    if player is not None:
-        lines.append(f"gold={player.gold}")
-    if combat is not None:
-        lines.append(f"turn={combat.turn} energy={player.energy if player else '?'} block={player.block if player else 0}")
-        alive = [m for m in combat.monsters if m.alive]
-        if alive:
-            enemy_strs = [
-                f"{m.name}#{pos}[{m.hp}/{m.max_hp} block={m.block} intent={m.queued_move or '?'}]"
-                for pos, m in enumerate(alive)
-            ]
-            lines.append("enemies=" + ", ".join(enemy_strs))
-        else:
-            lines.append("enemies=none")
-        if player is not None and player.hand:
-            # Collapse by card_id so a hand of five Strikes reads as
-            # "strike x5" rather than filling the budget.
+    if combat is not None and player is not None and combat.outcome is None:
+        lines.append(f"round={combat.turn} energy={player.energy}/{player.max_energy} block={player.block}")
+        status = _powers_text(player.powers, loop.powers)
+        if status:
+            lines.append("player_status=" + status)
+        enemy_strs = []
+        for pos, m in enumerate(m for m in combat.monsters if m.alive):
+            powers = _powers_text(m.powers, loop.powers)
+            enemy_strs.append(
+                f"{m.name}#{pos}[{m.hp}/{m.max_hp} block={m.block} intent={_intent_text(loop, m)}"
+                f"{(' ' + powers) if powers else ''}]"
+            )
+        lines.append("enemies=" + (", ".join(enemy_strs) if enemy_strs else "none"))
+        if player.hand:
+            # Collapse by card_id so a hand of five Strikes reads as "x5".
             counts: dict[str, int] = {}
             for cid in player.hand:
                 counts[cid] = counts.get(cid, 0) + 1
-            hand_strs = [
-                (f"{cid} x{n}" if n > 1 else cid) for cid, n in counts.items()
-            ]
-            lines.append("hand=" + ", ".join(hand_strs))
+            lines.append("hand=" + ", ".join(f"{cid} x{n}" if n > 1 else cid for cid, n in counts.items()))
+        lines.append(
+            f"piles draw={len(player.draw_pile)} discard={len(player.discard_pile)} "
+            f"exhaust={len(player.exhaust_pile)}"
+        )
+        sel = combat.pending_selection
+        if sel is not None:
+            verb = {"exhaust": "Exhaust", "upgrade": "Upgrade", "to_draw_top": "Put on top of your Draw Pile"}
+            lines.append(f"prompt=Choose {sel.max_count} card(s) to {verb.get(sel.purpose, sel.purpose)}.")
     return "\n".join(lines)
 
 
@@ -114,8 +170,8 @@ class Sts2SimBackend:
     """
 
     BACKEND_ID = "sts2-sim"
-    BACKEND_VERSION = "phase1"
-    GAME_VERSION = "sts2-sim@phase1"
+    BACKEND_VERSION = "act1-v0.107.1"
+    GAME_VERSION = "sts2-sim@v0.107.1"
 
     def __init__(self) -> None:
         self._loops: dict[str, RunLoop] = {}
@@ -129,7 +185,7 @@ class Sts2SimBackend:
             "backend": self.BACKEND_ID,
             "backend_version": self.BACKEND_VERSION,
             "characters": ["ironclad"],
-            "ascensions": [0],
+            "ascensions": list(range(11)),
             "episode_scopes": ["full_run"],
             "game_versions": [self.GAME_VERSION],
             "supports_snapshot": False,
@@ -137,8 +193,9 @@ class Sts2SimBackend:
             "approx_step_latency_ms": None,
             "max_parallel_episodes": None,
             "notes": (
-                "In-house Python simulator; Phase 1 covers a single Jaw Worm "
-                "combat for Ironclad A0. Later phases extend to full Act 1-3 runs."
+                "In-house Python simulator of STS2 v0.107.1 combat: all Ironclad "
+                "cards and every Act 1 monster/encounter; one weak-pool fight per "
+                "episode (no map, rewards, shops or events yet)."
             ),
         }
 
@@ -149,8 +206,8 @@ class Sts2SimBackend:
         if request["episode_scope"] != "full_run":
             raise ValueError("sts2-sim only supports the full_run scope")
         ascension = int(request["ascension"])
-        if ascension != 0:
-            raise ValueError("sts2-sim Phase 1 only supports ascension 0")
+        if not 0 <= ascension <= 10:
+            raise ValueError("sts2-sim supports ascension 0-10")
 
         episode_id = request.get("episode_id") or str(uuid.uuid4())
         seed_label = str(request.get("seed") or f"STS2SIM-{episode_id[:8].upper()}")
@@ -227,7 +284,7 @@ class Sts2SimBackend:
             "done": packet["done"],
             "reward": reward,
             "decision_point": packet["decision_point"],
-            "state_text": _render_state_text(state),
+            "state_text": _render_state_text(loop),
             "state_struct": None,
             "candidates": packet["candidates"],
             "info": info,

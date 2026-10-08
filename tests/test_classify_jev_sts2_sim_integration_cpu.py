@@ -1,9 +1,9 @@
-"""Phase 1 closure: RunLoop + CombatContext integration tests.
+"""RunLoop + CombatContext integration tests.
 
 Drives the whole stack via `RunLoop.reset()` + `RunLoop.step(action_id)`
-only, with no direct CombatContext access, to prove the Jev-side
-operator contract works end-to-end: Neow -> combat_play candidates ->
-play/end_turn -> victory -> game_over.
+to prove the Jev-side operator contract works end-to-end: Neow -> an Act 1
+weak-pool combat -> play / select / end_turn -> victory or death ->
+game_over.
 """
 
 from __future__ import annotations
@@ -43,14 +43,23 @@ class NeowToCombatTest(unittest.TestCase):
             ["choose_event_option:0"],
         )
 
-    def test_skip_enters_combat_with_jaw_worm(self) -> None:
+    def test_skip_enters_an_act1_weak_pool_combat(self) -> None:
         packet = self.loop.step("choose_event_option:0")
         self.assertEqual(packet["screen"], self.sim.Screen.COMBAT)
         self.assertEqual(packet["decision_point"], self.sim.DecisionPoint.COMBAT_PLAY)
-        combat = self.loop.state.combat
-        self.assertIsNotNone(combat)
-        self.assertEqual(len(combat.monsters), 1)
-        self.assertEqual(combat.monsters[0].monster_id, "jaw_worm")
+        enc = self.loop._encounters[self.loop.state.encounter_id]
+        self.assertEqual(enc.pool, "weak")
+        self.assertIn(enc.act, ("overgrowth", "underdocks"))
+        self.assertTrue(self.loop.state.combat.monsters)
+
+    def test_both_act1_variants_are_drawn(self) -> None:
+        acts = set()
+        for seed in range(30):
+            loop = self.sim.RunLoop(seed=seed)
+            loop.reset()
+            loop.step("choose_event_option:0")
+            acts.add(loop._encounters[loop.state.encounter_id].act)
+        self.assertEqual(acts, {"overgrowth", "underdocks"})
 
     def test_initial_combat_candidates_include_strikes_defends_bash_and_end_turn(self) -> None:
         packet = self.loop.step("choose_event_option:0")
@@ -70,7 +79,7 @@ class CombatControlTest(unittest.TestCase):
 
     def setUp(self) -> None:
         self.sim = _import_sim()
-        self.loop = self.sim.RunLoop(seed=42)
+        self.loop = self.sim.RunLoop(seed=42, encounter="nibbits_weak")
         self.loop.reset()
         self.loop.step("choose_event_option:0")
 
@@ -79,7 +88,7 @@ class CombatControlTest(unittest.TestCase):
         packet = self.loop.step("end_turn")
         self.assertEqual(packet["screen"], self.sim.Screen.COMBAT)
         self.assertFalse(packet["done"])
-        self.assertLess(self.loop.state.player.hp, hp_before)  # Jaw Worm chomped
+        self.assertLess(self.loop.state.player.hp, hp_before)  # a lone Nibbit opens on Butt
         self.assertEqual(self.loop.state.combat.phase, self.sim.CombatPhase.PLAYER)
 
     def test_bogus_action_rejected(self) -> None:
@@ -92,12 +101,12 @@ class CombatControlTest(unittest.TestCase):
 
 
 class CombatToVictoryTest(unittest.TestCase):
-    """Force-win by draining Jaw Worm HP via direct state mutation, then
+    """Force-win by draining the Nibbit's HP via direct state mutation, then
     play through the engine to confirm the transition finalizes."""
 
     def setUp(self) -> None:
         self.sim = _import_sim()
-        self.loop = self.sim.RunLoop(seed=42)
+        self.loop = self.sim.RunLoop(seed=42, encounter="nibbits_weak")
         self.loop.reset()
         self.loop.step("choose_event_option:0")
 
@@ -130,17 +139,17 @@ class CombatToVictoryTest(unittest.TestCase):
 
 
 class CombatToDefeatTest(unittest.TestCase):
-    """Force defeat by capping player HP so Jaw Worm's Chomp kills in one hit."""
+    """Force defeat by capping player HP so the Nibbit's Butt kills in one hit."""
 
     def setUp(self) -> None:
         self.sim = _import_sim()
-        self.loop = self.sim.RunLoop(seed=42)
+        self.loop = self.sim.RunLoop(seed=42, encounter="nibbits_weak")
         self.loop.reset()
         self.loop.state.player.hp = 5
         self.loop.state.player.max_hp = 5
         self.loop.step("choose_event_option:0")
 
-    def test_end_turn_lethal_chomp_sets_defeat(self) -> None:
+    def test_end_turn_lethal_butt_sets_defeat(self) -> None:
         packet = self.loop.step("end_turn")
         self.assertTrue(packet["done"])
         self.assertEqual(packet["screen"], self.sim.Screen.GAME_OVER)
@@ -152,7 +161,7 @@ class CandidateFilteringTest(unittest.TestCase):
 
     def setUp(self) -> None:
         self.sim = _import_sim()
-        self.loop = self.sim.RunLoop(seed=42)
+        self.loop = self.sim.RunLoop(seed=42, encounter="nibbits_weak")
         self.loop.reset()
         self.loop.step("choose_event_option:0")
 
@@ -204,15 +213,11 @@ class AliveTargetPositionTest(unittest.TestCase):
 
     def test_position_shifts_after_first_enemy_dies(self) -> None:
         sim = _import_sim()
-        run_mod = sys.modules[sim.__name__ + ".run"]
-        loop = sim.RunLoop(seed=3)
+        loop = sim.RunLoop(seed=3, encounter=["nibbit", "nibbit"])
         loop.reset()
-        original = run_mod.PHASE1_FIRST_COMBAT
-        run_mod.PHASE1_FIRST_COMBAT = ("red_louse", "green_louse")
-        try:
-            packet = loop.step(sim.actions.NEOW_SKIP)
-        finally:
-            run_mod.PHASE1_FIRST_COMBAT = original
+        packet = loop.step(sim.actions.NEOW_SKIP)
+        loop.state.player.hand[:] = ["strike_ironclad"]
+        packet = loop._packet()
         ids = {c["id"] for c in packet["candidates"]}
         self.assertIn("play_card:strike_ironclad:1", ids)
 
@@ -226,6 +231,41 @@ class AliveTargetPositionTest(unittest.TestCase):
         hp_before = second.hp
         loop.step("play_card:strike_ironclad:0")
         self.assertLess(second.hp, hp_before)
+
+
+class CardSelectionFlowTest(unittest.TestCase):
+    """Mid-card choices surface as STS2MCP hand_select / card_select screens."""
+
+    def setUp(self) -> None:
+        self.sim = _import_sim()
+        self.loop = self.sim.RunLoop(seed=5, encounter="nibbits_weak")
+        self.loop.reset()
+        self.loop.step(self.sim.actions.NEOW_SKIP)
+
+    def test_burning_pact_hand_select(self) -> None:
+        self.loop.state.player.hand[:] = ["burning_pact", "wound", "strike_ironclad"]
+        self.loop.state.player.energy = 3
+        packet = self.loop.step("play_card:burning_pact")
+        self.assertEqual(packet["decision_point"], "hand_select")
+        ids = [c["id"] for c in packet["candidates"]]
+        self.assertEqual(ids, ["combat_select_card:0", "combat_select_card:1"])
+        self.assertIn("Wound", packet["candidates"][0]["text"])
+        packet = self.loop.step("combat_select_card:0")
+        self.assertEqual([c["id"] for c in packet["candidates"]], ["combat_confirm_selection"])
+        packet = self.loop.step("combat_confirm_selection")
+        self.assertEqual(packet["decision_point"], self.sim.DecisionPoint.COMBAT_PLAY)
+        self.assertIn("wound", self.loop.state.player.exhaust_pile)
+
+    def test_headbutt_card_select(self) -> None:
+        self.loop.state.player.hand[:] = ["headbutt"]
+        self.loop.state.player.discard_pile[:] = ["bash", "defend_ironclad"]
+        self.loop.state.player.energy = 3
+        packet = self.loop.step("play_card:headbutt:0")
+        self.assertEqual(packet["decision_point"], "card_select")
+        self.assertEqual([c["id"] for c in packet["candidates"]], ["select_card:0", "select_card:1"])
+        self.loop.step("select_card:1")
+        self.loop.step("confirm_selection")
+        self.assertEqual(self.loop.state.player.draw_pile[-1], "defend_ironclad")
 
 
 if __name__ == "__main__":

@@ -1,114 +1,59 @@
 [
-  {
-    "power_id": "strength",
-    "name": "Strength",
-    "kind": "buff",
-    "duration": "permanent",
-    "stacks": true
-  },
-  {
-    "power_id": "dexterity",
-    "name": "Dexterity",
-    "kind": "buff",
-    "duration": "permanent",
-    "stacks": true
-  },
-  {
-    "power_id": "vulnerable",
-    "name": "Vulnerable",
-    "kind": "debuff",
-    "duration": "turns",
-    "stacks": true
-  },
-  {
-    "power_id": "weak",
-    "name": "Weak",
-    "kind": "debuff",
-    "duration": "turns",
-    "stacks": true
-  },
-  {
-    "power_id": "frail",
-    "name": "Frail",
-    "kind": "debuff",
-    "duration": "turns",
-    "stacks": true
-  },
-  {
-    "power_id": "ritual",
-    "name": "Ritual",
-    "kind": "buff",
-    "duration": "end_of_turn_tick",
-    "stacks": true
-  },
-  {
-    "power_id": "metallicize",
-    "name": "Metallicize",
-    "kind": "buff",
-    "duration": "permanent",
-    "stacks": true
-  },
-  {
-    "power_id": "combust",
-    "name": "Combust",
-    "kind": "buff",
-    "duration": "permanent",
-    "stacks": true
-  },
-  {
-    "power_id": "rupture",
-    "name": "Rupture",
-    "kind": "buff",
-    "duration": "permanent",
-    "stacks": true
-  },
-  {
-    "power_id": "dark_embrace",
-    "name": "Dark Embrace",
-    "kind": "buff",
-    "duration": "permanent",
-    "stacks": true
-  },
-  {
-    "power_id": "feel_no_pain",
-    "name": "Feel No Pain",
-    "kind": "buff",
-    "duration": "permanent",
-    "stacks": true
-  },
-  {
-    "power_id": "barricade",
-    "name": "Barricade",
-    "kind": "buff",
-    "duration": "permanent",
-    "stacks": true
-  },
-  {
-    "power_id": "enrage",
-    "name": "Enrage",
-    "kind": "buff",
-    "duration": "permanent",
-    "stacks": true
-  },
-  {
-    "power_id": "strength_down",
-    "name": "Strength Down",
-    "kind": "debuff",
-    "duration": "permanent",
-    "stacks": true
-  },
-  {
-    "power_id": "dexterity_down",
-    "name": "Dexterity Down",
-    "kind": "debuff",
-    "duration": "permanent",
-    "stacks": true
-  },
-  {
-    "power_id": "hex_charge",
-    "name": "Hex Charge",
-    "kind": "buff",
-    "duration": "permanent",
-    "stacks": true
-  }
+ {"power_id": "strength", "name": "Strength", "kind": "buff", "stack": "counter", "description": "Increases attack damage by {amount}."},
+ {"power_id": "dexterity", "name": "Dexterity", "kind": "buff", "stack": "counter", "description": "Increases Block gained from cards by {amount}."},
+ {"power_id": "vigor", "name": "Vigor", "kind": "buff", "stack": "counter", "description": "This creature's next Attack deals {amount} additional damage."},
+ {"power_id": "artifact", "name": "Artifact", "kind": "buff", "stack": "counter", "description": "Negates the next {amount} debuffs."},
+ {"power_id": "plating", "name": "Plating", "kind": "buff", "stack": "counter", "description": "At the end of its turn, gain {amount} Block. Plating is reduced by 1 at the start of its turn."},
+ {"power_id": "intangible", "name": "Intangible", "kind": "buff", "stack": "counter", "description": "Reduce all damage taken and HP loss to 1 for {amount} turns."},
+ {"power_id": "thorns", "name": "Thorns", "kind": "buff", "stack": "counter", "description": "When hit by an attack, deal {amount} damage back."},
+ {"power_id": "ritual", "name": "Ritual", "kind": "buff", "stack": "counter", "description": "Gain {amount} Strength at the end of its turn."},
+ {"power_id": "vulnerable", "name": "Vulnerable", "kind": "debuff", "stack": "counter", "description": "Receive 50% more damage from Attacks for {amount} turns."},
+ {"power_id": "weak", "name": "Weak", "kind": "debuff", "stack": "counter", "description": "Deal 25% less damage with Attacks for {amount} turns."},
+ {"power_id": "frail", "name": "Frail", "kind": "debuff", "stack": "counter", "description": "Gain 25% less Block from cards for {amount} turns."},
+ {"power_id": "shrink", "name": "Shrink", "kind": "debuff", "stack": "none", "description": "This creature's Attacks deal 30% less damage."},
+ {"power_id": "constrict", "name": "Constrict", "kind": "debuff", "stack": "counter", "description": "While the Slithering Strangler is alive, at the end of your turn, take {amount} damage."},
+ {"power_id": "tangled", "name": "Tangled", "kind": "debuff", "stack": "counter", "description": "Attacks cost {amount} additional Energy this turn."},
+ {"power_id": "smoggy", "name": "Smoggy", "kind": "debuff", "stack": "single", "description": "You can only play 1 Skill per turn."},
+ {"power_id": "ringing", "name": "Ringing", "kind": "debuff", "stack": "single", "description": "You can only play 1 card this turn."},
+ {"power_id": "no_draw", "name": "No Draw", "kind": "debuff", "stack": "single", "description": "You may not draw any more cards this turn."},
+ {"power_id": "no_energy_gain", "name": "No Energy Gain", "kind": "debuff", "stack": "single", "description": "You cannot gain additional Energy this turn."},
+ {"power_id": "barricade", "name": "Barricade", "kind": "buff", "stack": "single", "description": "Block is not removed at the start of your turn."},
+ {"power_id": "demon_form", "name": "Demon Form", "kind": "buff", "stack": "counter", "description": "At the start of your turn, gain {amount} Strength."},
+ {"power_id": "feel_no_pain", "name": "Feel No Pain", "kind": "buff", "stack": "counter", "description": "Whenever a card is Exhausted, gain {amount} Block."},
+ {"power_id": "dark_embrace", "name": "Dark Embrace", "kind": "buff", "stack": "counter", "description": "Whenever a card is Exhausted, draw {amount} card(s)."},
+ {"power_id": "rupture", "name": "Rupture", "kind": "buff", "stack": "counter", "description": "Whenever you lose HP on your turn, gain {amount} Strength."},
+ {"power_id": "inferno", "name": "Inferno", "kind": "buff", "stack": "counter", "description": "At the start of your turn, lose 1 HP. Whenever you lose HP on your turn, deal {amount} damage to ALL enemies."},
+ {"power_id": "juggernaut", "name": "Juggernaut", "kind": "buff", "stack": "counter", "description": "Whenever you gain Block, deal {amount} damage to a random enemy."},
+ {"power_id": "cruelty", "name": "Cruelty", "kind": "buff", "stack": "counter", "description": "Vulnerable enemies take an additional {amount}% damage."},
+ {"power_id": "crimson_mantle", "name": "Crimson Mantle", "kind": "buff", "stack": "counter", "description": "At the start of your turn, lose HP and gain {amount} Block."},
+ {"power_id": "crimson_mantle_hp", "name": "Crimson Mantle (HP loss)", "kind": "buff", "stack": "counter", "description": "Crimson Mantle loses {amount} HP at the start of your turn."},
+ {"power_id": "pyre", "name": "Pyre", "kind": "buff", "stack": "counter", "description": "Gain {amount} Energy at the start of each turn."},
+ {"power_id": "corruption", "name": "Corruption", "kind": "buff", "stack": "single", "description": "Skills cost 0. Whenever you play a Skill, Exhaust it."},
+ {"power_id": "rage", "name": "Rage", "kind": "buff", "stack": "counter", "description": "Whenever you play an Attack this turn, gain {amount} Block."},
+ {"power_id": "vicious", "name": "Vicious", "kind": "buff", "stack": "counter", "description": "Whenever you apply Vulnerable, draw {amount} card(s)."},
+ {"power_id": "flame_barrier", "name": "Flame Barrier", "kind": "buff", "stack": "counter", "description": "Whenever you are attacked this turn, deal {amount} damage back."},
+ {"power_id": "unmovable", "name": "Unmovable", "kind": "buff", "stack": "counter", "description": "The first {amount} time(s) you gain Block from a card each turn, double the amount gained."},
+ {"power_id": "aggression", "name": "Aggression", "kind": "buff", "stack": "counter", "description": "At the start of your turn, put {amount} random Attack(s) from your Discard Pile into your Hand and Upgrade it for the rest of combat."},
+ {"power_id": "hellraiser", "name": "Hellraiser", "kind": "buff", "stack": "single", "description": "Whenever you draw a card containing \"Strike\", it is played against a random enemy."},
+ {"power_id": "stampede", "name": "Stampede", "kind": "buff", "stack": "counter", "description": "At the end of your turn, {amount} random Attack(s) in your Hand are played against a random enemy."},
+ {"power_id": "juggling", "name": "Juggling", "kind": "buff", "stack": "counter", "description": "Add a copy of the third Attack you play each turn into your Hand."},
+ {"power_id": "colossus", "name": "Colossus", "kind": "buff", "stack": "counter", "description": "You receive 50% less damage from Vulnerable enemies."},
+ {"power_id": "one_two_punch", "name": "One-Two Punch", "kind": "buff", "stack": "counter", "description": "Your next {amount} Attack(s) are played an extra time this turn."},
+ {"power_id": "free_attack", "name": "Free Attack", "kind": "buff", "stack": "counter", "description": "Your next {amount} Attack(s) cost 0 Energy."},
+ {"power_id": "temporary_strength", "name": "Temporary Strength", "kind": "buff", "stack": "counter", "description": "Lose {amount} Strength at the end of your turn."},
+ {"power_id": "slippery", "name": "Slippery", "kind": "buff", "stack": "counter", "description": "The next {amount} times this creature loses HP, it only loses 1 HP instead."},
+ {"power_id": "hardened_shell", "name": "Hardened Shell", "kind": "buff", "stack": "counter", "description": "This creature cannot lose more than {amount} HP each turn."},
+ {"power_id": "asleep", "name": "Asleep", "kind": "buff", "stack": "counter", "description": "Awakens upon losing HP or after {amount} turns."},
+ {"power_id": "minion", "name": "Minion", "kind": "buff", "stack": "single", "description": "Minions abandon combat without their leader."},
+ {"power_id": "illusion", "name": "Illusion", "kind": "buff", "stack": "single", "description": "When this dies, it revives next turn at full HP."},
+ {"power_id": "infested", "name": "Infested", "kind": "buff", "stack": "single", "description": "Upon dying, summons 4 Wrigglers."},
+ {"power_id": "territorial", "name": "Territorial", "kind": "buff", "stack": "counter", "description": "At the end of this creature's turn, it gains {amount} Strength."},
+ {"power_id": "ravenous", "name": "Ravenous", "kind": "buff", "stack": "counter", "description": "When an enemy dies, Corpse Slug immediately eats it, becoming Stunned and gaining {amount} Strength."},
+ {"power_id": "suck", "name": "Suck", "kind": "buff", "stack": "counter", "description": "Whenever this creature deals unblocked attack damage, it gains {amount} Strength."},
+ {"power_id": "surprise", "name": "Surprise", "kind": "buff", "stack": "single", "description": "Something is off about this creature... (on death, a Sneaky Gremlin and a Fat Gremlin appear)."},
+ {"power_id": "skittish", "name": "Skittish", "kind": "buff", "stack": "counter", "description": "The first time this creature is hit each turn, it gains {amount} Block."},
+ {"power_id": "shriek", "name": "Shriek", "kind": "debuff", "stack": "counter", "description": "The first time this creature's HP reaches {amount} or below, it becomes Stunned."},
+ {"power_id": "plow", "name": "Plow", "kind": "debuff", "stack": "counter", "description": "The first time this creature's HP reaches {amount} or below, it becomes Stunned and loses all its Strength."},
+ {"power_id": "steam_eruption", "name": "Steam Eruption", "kind": "buff", "stack": "counter", "description": "When killed, deals {amount} damage at the end of your next turn."},
+ {"power_id": "slow", "name": "Slow", "kind": "debuff", "stack": "counter", "description": "Whenever you play a card, this enemy receives 10% more damage from Attacks this turn."}
 ]

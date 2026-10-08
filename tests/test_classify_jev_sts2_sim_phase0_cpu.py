@@ -179,7 +179,7 @@ class RunLoopTest(unittest.TestCase):
         self.assertEqual([c["id"] for c in packet["candidates"]], ["choose_event_option:0"])
 
     def test_skip_transitions_to_combat(self) -> None:
-        """Phase 1 behavior: skip Neow now enters a Jaw Worm combat."""
+        """Skipping Neow enters an Act 1 weak-pool combat."""
 
         loop = self._loop()
         loop.reset()

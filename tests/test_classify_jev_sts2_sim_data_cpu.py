@@ -1,19 +1,16 @@
-"""Phase 1 data-contract tests: schemas, loader validation, data sanity.
+"""sts2_sim data-contract tests: loader validation and content accuracy.
 
-These tests do NOT exercise the engine (there is none yet). They only verify
-that the authored JSON matches the schemas module's allowed vocabulary and
-that every cross-reference (power ids, upgrade links, enemy move ids) is
-resolved.
-
-Author-level regressions ("Cultist's first move must be Incantation",
-"Strike base damage is 6") live here because they catch bad hand-edits
-before the engine ever sees them.
+Content targets STS2 v0.107.1. The spot checks below pin numbers, costs,
+rarities and keywords to the game's own values (cross-checked against the
+game's data via Spire Codex and r33hab/sts2 when the data was built), so a
+bad hand-edit fails here before the engine sees it.
 """
 
 from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -36,511 +33,290 @@ def _import_sim():
     return module
 
 
-class PowersLoadingTest(unittest.TestCase):
-    def setUp(self) -> None:
-        self.sim = _import_sim()
-        self.powers = self.sim.load_powers()
-
-    def test_phase2_powers_present(self) -> None:
-        self.assertEqual(
-            set(self.powers.keys()),
-            {
-                "strength", "dexterity", "vulnerable", "weak", "frail", "ritual",
-                "metallicize", "combust", "rupture", "dark_embrace",
-                "feel_no_pain", "barricade",
-                "enrage", "strength_down", "dexterity_down",
-                "hex_charge",
-            },
-        )
-
-    def test_vulnerable_is_turn_scoped_debuff(self) -> None:
-        v = self.powers["vulnerable"]
-        self.assertEqual(v.kind, "debuff")
-        self.assertEqual(v.duration, "turns")
-
-    def test_ritual_ticks_at_end_of_turn(self) -> None:
-        r = self.powers["ritual"]
-        self.assertEqual(r.kind, "buff")
-        self.assertEqual(r.duration, "end_of_turn_tick")
+class _Data(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.sim = _import_sim()
+        cls.powers, cls.cards, cls.monsters = cls.sim.load_all()
+        cls.encounters = cls.sim.load_encounters(monster_ids=set(cls.monsters))
 
 
-class CardsLoadingTest(unittest.TestCase):
-    def setUp(self) -> None:
-        self.sim = _import_sim()
-        powers = self.sim.load_powers()
-        self.power_ids = set(powers.keys())
-        self.cards = self.sim.load_cards(power_ids=self.power_ids)
+class CardCatalogTest(_Data):
+    def ironclad(self):
+        return {cid: c for cid, c in self.cards.items() if c.color == "ironclad"}
 
-    def test_card_entry_count(self) -> None:
-        # 31 base cards + 31 upgrades + 3 statuses (Wound, Dazed, Slimed)
-        # after Phase 2c-2.
-        self.assertEqual(len(self.cards), 65)
+    def test_all_87_ironclad_cards_with_upgrades(self) -> None:
+        base = [c for c in self.ironclad().values() if not c.upgraded]
+        self.assertEqual(len(base), 87)
+        for c in base:
+            self.assertIn(c.upgrade_of, self.cards, c.card_id)
+            self.assertEqual(self.cards[c.upgrade_of].game_id, c.game_id)
 
-    def test_each_regular_base_card_has_upgrade_link(self) -> None:
-        bases = [
-            c for c in self.cards.values()
-            if c.upgraded_from is None and c.card_type not in ("status", "curse")
+    def test_ids_are_lowercased_game_ids(self) -> None:
+        for cid, c in self.cards.items():
+            self.assertEqual(cid.removesuffix("+1"), c.game_id.lower())
+
+    def test_every_playable_ironclad_card_has_an_effect(self) -> None:
+        from importlib import import_module
+
+        effects = import_module(self.sim.__name__ + ".card_effects").CARD_EFFECTS
+        missing = sorted({c.game_id for c in self.ironclad().values()
+                          if not c.multiplayer_only and c.game_id not in effects})
+        self.assertEqual(missing, [])
+
+    def test_descriptions_present_and_numbers_match_vars(self) -> None:
+        # Vars that are not printed as a number in the text.
+        unprinted = {"calculation_base", "calculation_extra", "calculated_damage", "colossus",
+                     "repeat", "power", "attacks", "energy"}
+        for cid, c in self.ironclad().items():
+            self.assertTrue(c.description, cid)
+            self.assertNotIn("[", c.description, cid)
+            nums = {int(n) for n in re.findall(r"\d+", c.description)}
+            for k, v in c.vars.items():
+                if k in unprinted or v == 0:
+                    continue
+                if k == "extra_damage" and c.vars.get("calculation_base") == 0:
+                    continue  # Body Slam: a multiplier on Block, not a printed number
+                self.assertIn(v, nums, f"{cid}: var {k}={v} not in {c.description!r}")
+
+    def test_spot_values(self) -> None:
+        # (card_id, cost, type, rarity, target, vars subset)
+        spots = [
+            ("strike_ironclad", 1, "attack", "basic", "single_enemy", {"damage": 6}),
+            ("strike_ironclad+1", 1, "attack", "basic", "single_enemy", {"damage": 9}),
+            ("defend_ironclad+1", 1, "skill", "basic", "self", {"block": 8}),
+            ("bash", 2, "attack", "basic", "single_enemy", {"damage": 8, "vulnerable": 2}),
+            ("bash+1", 2, "attack", "basic", "single_enemy", {"damage": 10, "vulnerable": 3}),
+            ("bloodletting", 0, "skill", "common", "self", {"hp_loss": 3, "energy": 2}),
+            ("bloodletting+1", 0, "skill", "common", "self", {"energy": 3}),
+            ("hemokinesis", 1, "attack", "uncommon", "single_enemy", {"hp_loss": 2, "damage": 15}),
+            ("cinder", 2, "attack", "common", "single_enemy", {"damage": 18}),
+            ("break", 1, "attack", "ancient", "single_enemy", {"damage": 20, "vulnerable": 5}),
+            ("corruption", 3, "power", "ancient", "self", {}),
+            ("corruption+1", 2, "power", "ancient", "self", {}),
+            ("body_slam+1", 0, "attack", "common", "single_enemy", {}),
+            ("barricade+1", 2, "power", "rare", "self", {}),
+            ("whirlwind", 0, "attack", "uncommon", "all_enemies", {"damage": 5}),
+            ("sword_boomerang", 1, "attack", "common", "random_enemy", {"damage": 3, "repeat": 3}),
+            ("shrug_it_off+1", 1, "skill", "common", "self", {"block": 11, "cards": 1}),
+            ("perfected_strike", 2, "attack", "common", "single_enemy",
+             {"calculation_base": 6, "extra_damage": 2}),
+            ("unrelenting", 2, "attack", "uncommon", "single_enemy", {"damage": 14}),
+            ("demon_form+1", 3, "power", "rare", "self", {"strength": 3}),
+            ("crimson_mantle", 1, "power", "rare", "self", {"crimson_mantle": 8}),
         ]
-        self.assertEqual(len(bases), 31)
-        for base in bases:
-            self.assertIsNotNone(base.upgrade_of, f"{base.card_id} missing upgrade_of")
-            upgraded = self.cards[base.upgrade_of]
-            self.assertEqual(upgraded.upgraded_from, base.card_id)
+        for cid, cost, ctype, rarity, target, vars_ in spots:
+            card = self.cards[cid]
+            self.assertEqual((card.cost, card.card_type, card.rarity, card.target),
+                             (cost, ctype, rarity, target), cid)
+            for k, v in vars_.items():
+                self.assertEqual(card.vars[k], v, f"{cid}.{k}")
+        self.assertTrue(self.cards["whirlwind"].x_cost)
+        self.assertTrue(self.cards["cascade"].x_cost)
 
-    def test_status_cards_have_no_upgrade_links(self) -> None:
-        statuses = [c for c in self.cards.values() if c.card_type == "status"]
-        self.assertGreaterEqual(len(statuses), 1)
-        for s in statuses:
-            self.assertIsNone(s.upgrade_of, f"{s.card_id} should not declare upgrade_of")
-            self.assertIsNone(s.upgraded_from, f"{s.card_id} should not declare upgraded_from")
+    def test_keywords_and_restrictions(self) -> None:
+        c = self.cards
+        self.assertTrue(c["impervious"].exhausts)
+        self.assertTrue(c["offering"].exhausts)
+        self.assertTrue(c["dominate"].exhausts)
+        self.assertIn("innate", c["aggression+1"].keywords)
+        self.assertNotIn("innate", c["aggression"].keywords)
+        self.assertFalse(c["feed"].generated_in_combat)
+        self.assertTrue(c["tank"].multiplayer_only)
+        self.assertTrue(c["demonic_shield"].multiplayer_only)
+        self.assertFalse(c["demonic_shield+1"].exhausts, "Demonic Shield+ loses Exhaust")
+        self.assertIn("strike", c["pommel_strike"].tags)
 
-    def test_wound_is_unplayable_zero_cost_status(self) -> None:
-        wound = self.cards["wound"]
-        self.assertEqual(wound.card_type, "status")
-        self.assertEqual(wound.cost, 0)
-        self.assertTrue(wound.unplayable)
-        self.assertEqual(wound.effects, ())
-
-    def test_pummel_exhausts_on_play(self) -> None:
-        self.assertTrue(self.cards["pummel"].exhaust_on_play)
-        self.assertTrue(self.cards["pummel+1"].exhaust_on_play)
-
-    def test_carnage_is_ethereal(self) -> None:
-        self.assertTrue(self.cards["carnage"].ethereal)
-        self.assertTrue(self.cards["carnage+1"].ethereal)
-
-    def test_strike_damage_six(self) -> None:
-        strike = self.cards["strike_ironclad"]
-        self.assertEqual(strike.cost, 1)
-        self.assertEqual(strike.card_type, "attack")
-        self.assertEqual(strike.effects[0].verb, "deal_damage")
-        self.assertEqual(strike.effects[0].args["amount"], 6)
-
-    def test_strike_plus_upgrades_to_nine(self) -> None:
-        self.assertEqual(self.cards["strike_ironclad+1"].effects[0].args["amount"], 9)
-
-    def test_bash_applies_vulnerable(self) -> None:
-        bash = self.cards["bash"]
-        self.assertEqual(len(bash.effects), 2)
-        self.assertEqual(bash.effects[1].verb, "apply_power")
-        self.assertEqual(bash.effects[1].args["power_id"], "vulnerable")
-        self.assertEqual(bash.effects[1].args["amount"], 2)
-
-    def test_cleave_is_aoe(self) -> None:
-        cleave = self.cards["cleave"]
-        self.assertEqual(cleave.target, "all_enemies")
-        self.assertEqual(cleave.effects[0].args["target_scope"], "all_enemies")
-
-    def test_twin_strike_is_two_hits(self) -> None:
-        self.assertEqual(self.cards["twin_strike"].effects[0].args["hits"], 2)
-
-    def test_anger_uses_copy_to_discard(self) -> None:
-        verbs = [e.verb for e in self.cards["anger"].effects]
-        self.assertIn("copy_to_discard", verbs)
+    def test_status_and_curse_cards(self) -> None:
+        c = self.cards
+        self.assertTrue(c["wound"].unplayable)
+        self.assertTrue(c["dazed"].unplayable and c["dazed"].ethereal)
+        self.assertEqual((c["slimed"].cost, c["slimed"].exhausts), (1, True))
+        self.assertTrue(c["burn"].unplayable)
+        self.assertEqual(c["infection"].description,
+                         "At the end of your turn, if this is in your Hand, take 3 damage.")
+        self.assertEqual(c["beckon"].cost, 1)
+        for cid, card in c.items():
+            if card.card_type in ("status", "curse"):
+                self.assertIsNone(card.upgrade_of, cid)
 
 
-class EnemiesLoadingTest(unittest.TestCase):
-    def setUp(self) -> None:
-        self.sim = _import_sim()
-        powers = self.sim.load_powers()
-        self.enemies = self.sim.load_enemies(power_ids=set(powers.keys()))
-
-    def test_act1_enemies_present(self) -> None:
-        self.assertEqual(
-            set(self.enemies.keys()),
-            {
-                "jaw_worm", "cultist", "red_louse", "green_louse", "acid_slime_m",
-                "blue_slaver", "red_slaver", "fungi_beast",
-                "gremlin_nob", "lagavulin", "sentry",
-                "spike_slime_m", "hexaghost", "slime_boss", "the_guardian",
-            },
-        )
-
-    def test_slime_boss_splits_into_two_medium_slimes(self) -> None:
-        sb = self.enemies["slime_boss"]
-        self.assertEqual(sb.on_death_spawn, ("acid_slime_m", "spike_slime_m"))
-
-    def test_lagavulin_has_starting_metallicize(self) -> None:
-        lagavulin = self.enemies["lagavulin"]
-        self.assertEqual(dict(lagavulin.starting_powers), {"metallicize": 8})
-
-    def test_gremlin_nob_bellow_applies_enrage(self) -> None:
-        nob = self.enemies["gremlin_nob"]
-        bellow = nob.moves["bellow"]
-        self.assertEqual(bellow.effects[0].verb, "apply_power")
-        self.assertEqual(bellow.effects[0].args["power_id"], "enrage")
-        self.assertEqual(bellow.effects[0].args["amount"], 2)
-
-    def test_sentry_bolt_adds_dazed_to_draw(self) -> None:
-        sentry = self.enemies["sentry"]
-        bolt = sentry.moves["bolt"]
-        self.assertEqual(bolt.effects[0].verb, "add_card_to_pile")
-        self.assertEqual(bolt.effects[0].args["card_id"], "dazed")
-        self.assertEqual(bolt.effects[0].args["pile"], "draw")
-
-    def test_cultist_first_move_is_incantation(self) -> None:
-        cultist = self.enemies["cultist"]
-        first = cultist.movepicker[0]
-        self.assertEqual(first.move_id, "incantation")
-        self.assertEqual(first.rule, "always_first")
-        # Incantation must apply ritual, not deal damage.
-        inc = cultist.moves["incantation"]
-        self.assertEqual(inc.effects[0].verb, "apply_power")
-        self.assertEqual(inc.effects[0].args["power_id"], "ritual")
-
-    def test_jaw_worm_first_move_is_chomp(self) -> None:
-        picker = self.enemies["jaw_worm"].movepicker
-        first = [s for s in picker if s.rule == "always_first"]
-        self.assertEqual(len(first), 1)
-        self.assertEqual(first[0].move_id, "chomp")
-
-    def test_acid_slime_m_has_three_moves(self) -> None:
-        slime = self.enemies["acid_slime_m"]
-        self.assertEqual(set(slime.moves.keys()), {"corrosive_spit", "tackle", "lick"})
-
-    def test_corrosive_spit_applies_weak(self) -> None:
-        slime = self.enemies["acid_slime_m"]
-        spit = slime.moves["corrosive_spit"]
-        self.assertEqual(spit.intent, "attack_debuff")
-        verbs = [e.verb for e in spit.effects]
-        self.assertEqual(verbs, ["deal_damage", "apply_power"])
-        self.assertEqual(spit.effects[1].args["power_id"], "weak")
-
-
-class LoadAllTest(unittest.TestCase):
-    def setUp(self) -> None:
-        self.sim = _import_sim()
-
-    def test_load_all_cross_resolves_power_ids(self) -> None:
-        powers, cards, enemies = self.sim.load_all()
-        self.assertEqual(len(powers), 16)
-        self.assertEqual(len(cards), 65)
-        self.assertEqual(len(enemies), 15)
-        # No cross-ref error means every apply_power / add_card_to_pile /
-        # on_death_spawn reference points to a real power / card / enemy.
-
-
-class EngineContractDocsTest(unittest.TestCase):
-    """Guards the engine-development contract — each verb/rule must have
-    a non-trivial doc, and the doc keys must track EFFECT_VERBS / MOVE_RULES
-    exactly. If someone adds a verb without a doc the Phase 1 engine
-    author would silently miss semantics; this test fails loudly instead.
-    """
-
-    def setUp(self) -> None:
-        self.sim = _import_sim()
-        from classify_jev_sts2_sim_for_tests import schemas  # type: ignore
-        self.schemas = schemas
-
-    def test_verb_docs_cover_every_effect_verb(self) -> None:
-        self.assertEqual(set(self.schemas.VERB_DOCS.keys()), set(self.schemas.EFFECT_VERBS.keys()))
-
-    def test_move_rule_docs_cover_every_move_rule(self) -> None:
-        self.assertEqual(set(self.schemas.MOVE_RULE_DOCS.keys()), set(self.schemas.MOVE_RULES))
-
-    def test_each_verb_doc_names_hooks_and_pipeline(self) -> None:
-        """Soft content-check: every verb doc must mention 'pipeline' and
-        hook names so the engine author has something to grep for."""
-
-        for verb, doc in self.schemas.VERB_DOCS.items():
-            self.assertGreater(len(doc), 200, f"{verb} doc looks like a stub")
-            self.assertIn("pipeline", doc.lower(), f"{verb} doc missing resolution pipeline")
-
-    def test_deal_damage_doc_covers_all_scaling_terms(self) -> None:
-        doc = self.schemas.VERB_DOCS["deal_damage"].lower()
-        for term in ("strength", "weak", "vulnerable", "block"):
-            self.assertIn(term, doc, f"deal_damage doc missing {term!r}")
-
-    def test_apply_power_doc_covers_ritual_tick_delay(self) -> None:
-        doc = self.schemas.VERB_DOCS["apply_power"].lower()
-        self.assertIn("ritual", doc)
-        self.assertIn("applied_on_turn", doc, "ritual tick-delay rule missing")
-
-    def test_module_docstring_covers_dead_target_rule(self) -> None:
-        flat = " ".join((self.schemas.__doc__ or "").split())
-        self.assertIn("Dead-target", flat)
-        self.assertIn("no-ops silently", flat)
-
-
-class LoaderValidationTest(unittest.TestCase):
-    """Each case writes a bad JSON blob to a temp dir and asserts the loader rejects it."""
-
-    def setUp(self) -> None:
-        self.sim = _import_sim()
-        self.tmp = tempfile.TemporaryDirectory()
-        self.root = Path(self.tmp.name)
-
-    def tearDown(self) -> None:
-        self.tmp.cleanup()
-
-    def _write(self, name: str, content) -> Path:
-        path = self.root / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(content), encoding="utf-8")
-        return path
-
-    def test_rejects_unknown_verb(self) -> None:
-        path = self._write(
-            "cards.json",
-            [{
-                "card_id": "junk", "name": "Junk", "cost": 1,
-                "card_type": "attack", "rarity": "common", "target": "single_enemy",
-                "upgrade_of": "junk+1",
-                "effects": [{"verb": "pay_coffee", "args": {}}],
-            }, {
-                "card_id": "junk+1", "name": "Junk+", "cost": 1,
-                "card_type": "attack", "rarity": "common", "target": "single_enemy",
-                "upgraded_from": "junk",
-                "effects": [],
-            }],
-        )
-        with self.assertRaisesRegex(self.sim.SimDataError, "verb unknown"):
-            self.sim.load_cards(path)
-
-    def test_rejects_bad_target_scope(self) -> None:
-        path = self._write(
-            "cards.json",
-            [{
-                "card_id": "weird", "name": "Weird", "cost": 1,
-                "card_type": "attack", "rarity": "common", "target": "single_enemy",
-                "upgrade_of": "weird+1",
-                "effects": [{"verb": "deal_damage", "args": {"amount": 3, "target_scope": "moon", "hits": 1}}],
-            }, {
-                "card_id": "weird+1", "name": "Weird+", "cost": 1,
-                "card_type": "attack", "rarity": "common", "target": "single_enemy",
-                "upgraded_from": "weird",
-                "effects": [],
-            }],
-        )
-        with self.assertRaisesRegex(self.sim.SimDataError, "not allowed for verb"):
-            self.sim.load_cards(path)
-
-    def test_rejects_card_targeting_player(self) -> None:
-        """Only enemies can target the player; cards must not."""
-
-        path = self._write(
-            "cards.json",
-            [{
-                "card_id": "selfhit", "name": "SelfHit", "cost": 0,
-                "card_type": "attack", "rarity": "common", "target": "single_enemy",
-                "upgrade_of": "selfhit+1",
-                "effects": [{"verb": "deal_damage", "args": {"amount": 1, "target_scope": "player", "hits": 1}}],
-            }, {
-                "card_id": "selfhit+1", "name": "SelfHit+", "cost": 0,
-                "card_type": "attack", "rarity": "common", "target": "single_enemy",
-                "upgraded_from": "selfhit",
-                "effects": [],
-            }],
-        )
-        with self.assertRaisesRegex(self.sim.SimDataError, "cards cannot target 'player'"):
-            self.sim.load_cards(path)
-
-    def test_rejects_duplicate_card_id(self) -> None:
-        path = self._write(
-            "cards.json",
-            [
-                {"card_id": "a", "name": "A", "cost": 1, "card_type": "attack",
-                 "rarity": "common", "target": "single_enemy", "upgrade_of": "a+1",
-                 "effects": []},
-                {"card_id": "a", "name": "A again", "cost": 1, "card_type": "attack",
-                 "rarity": "common", "target": "single_enemy", "upgrade_of": "a+1",
-                 "effects": []},
-            ],
-        )
-        with self.assertRaisesRegex(self.sim.SimDataError, "duplicate id"):
-            self.sim.load_cards(path)
-
-    def test_rejects_broken_upgrade_link(self) -> None:
-        path = self._write(
-            "cards.json",
-            [{
-                "card_id": "lonely", "name": "Lonely", "cost": 1,
-                "card_type": "attack", "rarity": "common", "target": "single_enemy",
-                "upgrade_of": "ghost",   # ghost not defined
-                "effects": [],
-            }],
-        )
-        with self.assertRaisesRegex(self.sim.SimDataError, "not found"):
-            self.sim.load_cards(path)
-
-    def test_rejects_card_apply_power_to_unknown_power(self) -> None:
-        path = self._write(
-            "cards.json",
-            [{
-                "card_id": "mystic", "name": "Mystic", "cost": 1,
-                "card_type": "attack", "rarity": "common", "target": "single_enemy",
-                "upgrade_of": "mystic+1",
-                "effects": [{"verb": "apply_power",
-                             "args": {"power_id": "chronoflux", "amount": 1, "target_scope": "single_enemy"}}],
-            }, {
-                "card_id": "mystic+1", "name": "Mystic+", "cost": 1,
-                "card_type": "attack", "rarity": "common", "target": "single_enemy",
-                "upgraded_from": "mystic",
-                "effects": [],
-            }],
-        )
-        with self.assertRaisesRegex(self.sim.SimDataError, "unknown power"):
-            self.sim.load_cards(path, power_ids={"strength"})
-
-    def test_rejects_enemy_move_targeting_other_enemies(self) -> None:
-        """Enemy moves in Phase 1 may not target other enemies."""
-
-        path = self._write(
-            "enemies.json",
-            [{
-                "enemy_id": "bad", "name": "Bad", "hp_min": 10, "hp_max": 10,
-                "moves": {
-                    "friendly_fire": {
-                        "intent": "attack",
-                        "effects": [
-                            {"verb": "deal_damage", "args": {"amount": 1, "target_scope": "single_enemy", "hits": 1}}
-                        ],
-                    }
-                },
-                "movepicker": [{"move_id": "friendly_fire", "rule": "always_first"}],
-            }],
-        )
-        with self.assertRaisesRegex(self.sim.SimDataError, "cannot target other enemies"):
-            self.sim.load_enemies(path, power_ids={"strength"})
-
-    def test_rejects_movepicker_referencing_unknown_move(self) -> None:
-        path = self._write(
-            "enemies.json",
-            [{
-                "enemy_id": "x", "name": "X", "hp_min": 5, "hp_max": 5,
-                "moves": {
-                    "bite": {"intent": "attack",
-                             "effects": [{"verb": "deal_damage",
-                                          "args": {"amount": 1, "target_scope": "player", "hits": 1}}]},
-                },
-                "movepicker": [{"move_id": "nope", "rule": "always_first"}],
-            }],
-        )
-        with self.assertRaisesRegex(self.sim.SimDataError, "unknown move"):
-            self.sim.load_enemies(path, power_ids=set())
-
-    def test_rejects_bad_pile_for_add_card_to_pile(self) -> None:
-        path = self._write(
-            "cards.json",
-            [{
-                "card_id": "shuffler", "name": "Shuffler", "cost": 0,
-                "card_type": "attack", "rarity": "common", "target": "single_enemy",
-                "upgrade_of": "shuffler+1",
-                "effects": [{"verb": "add_card_to_pile",
-                             "args": {"card_id": "shuffler+1", "pile": "void", "amount": 1}}],
-            }, {
-                "card_id": "shuffler+1", "name": "Shuffler+", "cost": 0,
-                "card_type": "attack", "rarity": "common", "target": "single_enemy",
-                "upgraded_from": "shuffler",
-                "effects": [],
-            }],
-        )
-        with self.assertRaisesRegex(self.sim.SimDataError, "pile"):
-            self.sim.load_cards(path)
-
-    def test_rejects_add_card_to_pile_with_unknown_card_id(self) -> None:
-        path = self._write(
-            "cards.json",
-            [{
-                "card_id": "noper", "name": "Noper", "cost": 0,
-                "card_type": "attack", "rarity": "common", "target": "single_enemy",
-                "upgrade_of": "noper+1",
-                "effects": [{"verb": "add_card_to_pile",
-                             "args": {"card_id": "chrono_curse", "pile": "draw", "amount": 1}}],
-            }, {
-                "card_id": "noper+1", "name": "Noper+", "cost": 0,
-                "card_type": "attack", "rarity": "common", "target": "single_enemy",
-                "upgraded_from": "noper",
-                "effects": [],
-            }],
-        )
-        with self.assertRaisesRegex(self.sim.SimDataError, "unknown card"):
-            self.sim.load_cards(path)
-
-    def test_rejects_status_card_with_upgrade_of(self) -> None:
-        path = self._write(
-            "cards.json",
-            [{
-                "card_id": "fake_status", "name": "FakeStatus", "cost": 0,
-                "card_type": "status", "rarity": "special", "target": "none",
-                "unplayable": True,
-                "upgrade_of": "fake_status+1",
-                "effects": [],
-            }, {
-                "card_id": "fake_status+1", "name": "FakeStatus+", "cost": 0,
-                "card_type": "attack", "rarity": "common", "target": "single_enemy",
-                "upgraded_from": "fake_status",
-                "effects": [],
-            }],
-        )
-        with self.assertRaisesRegex(self.sim.SimDataError, "must not declare upgrade_of"):
-            self.sim.load_cards(path)
-
-    def test_rejects_on_death_spawn_unknown_enemy(self) -> None:
-        path = self._write(
-            "enemies.json",
-            [{
-                "enemy_id": "big", "name": "Big", "hp_min": 10, "hp_max": 10,
-                "on_death_spawn": ["ghost_enemy"],
-                "moves": {
-                    "hit": {"intent": "attack",
-                            "effects": [{"verb": "deal_damage",
-                                         "args": {"amount": 1, "target_scope": "player", "hits": 1}}]},
-                },
-                "movepicker": [{"move_id": "hit", "rule": "always_first"}],
-            }],
-        )
-        with self.assertRaisesRegex(self.sim.SimDataError, "on_death_spawn"):
-            self.sim.load_enemies(path, power_ids=set())
-
-    def test_rejects_sequential_without_sequence_index(self) -> None:
-        path = self._write(
-            "enemies.json",
-            [{
-                "enemy_id": "y", "name": "Y", "hp_min": 5, "hp_max": 5,
-                "moves": {
-                    "hit": {"intent": "attack",
-                            "effects": [{"verb": "deal_damage",
-                                         "args": {"amount": 1, "target_scope": "player", "hits": 1}}]},
-                },
-                "movepicker": [{"move_id": "hit", "rule": "sequential"}],
-            }],
-        )
-        with self.assertRaisesRegex(self.sim.SimDataError, "sequence_index required"):
-            self.sim.load_enemies(path, power_ids=set())
-
-
-class Sts2CardIdAlignmentTest(unittest.TestCase):
+class Sts2CardIdAlignmentTest(_Data):
     """Sim card ids must be real STS2 ids (lower-cased) so live STS2MCP
-    candidates (`play_card:<id>`) line up with sim candidates. Cards that
-    only exist in STS1 are listed explicitly until they are replaced."""
+    candidates (`play_card:<id>`) line up with sim candidates."""
 
-    STS1_ONLY = frozenset({
-        "carnage", "cleave", "clothesline", "combust", "intimidate", "metallicize",
-        "pummel", "reckless_charge", "seeing_red", "wild_strike",
-    })
-
-    def setUp(self) -> None:
-        import json
-
-        sim = _import_sim()
-        self.sts2 = json.loads((sim.DATA_ROOT / "sts2_card_ids.json").read_text())
-        _, self.cards, _ = sim.load_all()
-        self.sim = sim
-
-    def test_every_sim_card_is_sts2_or_listed_sts1_only(self) -> None:
-        known = set(self.sts2["all"])
+    def test_every_sim_card_is_an_sts2_id(self) -> None:
+        sts2 = json.loads((self.sim.DATA_ROOT / "sts2_card_ids.json").read_text())
         bases = {cid.removesuffix("+1") for cid in self.cards}
-        unknown = sorted(bases - known - self.STS1_ONLY)
-        self.assertEqual(unknown, [], "add the STS2 id or list the card as STS1-only")
-        stale = sorted(self.STS1_ONLY & known)
-        self.assertEqual(stale, [], "these are real STS2 ids; drop them from STS1_ONLY")
+        self.assertEqual(sorted(bases - set(sts2["all"])), [])
 
     def test_starting_deck_uses_sts2_ironclad_ids(self) -> None:
         from importlib import import_module
 
         run = import_module(self.sim.__name__ + ".run")
-        self.assertLessEqual(set(run.IRONCLAD_STARTING_DECK), set(self.sts2["ironclad"]))
+        self.assertEqual(sorted(set(run.IRONCLAD_STARTING_DECK)), ["bash", "defend_ironclad", "strike_ironclad"])
+
+
+class PowerCatalogTest(_Data):
+    def test_every_referenced_power_exists(self) -> None:
+        for m in self.monsters.values():
+            for pid, *_ in m.innate_powers:
+                self.assertIn(pid, self.powers)
+            for move in m.moves.values():
+                for step in move.effects:
+                    if step.verb == "apply_power":
+                        self.assertIn(step.args["power"], self.powers)
+
+    def test_kinds(self) -> None:
+        self.assertEqual(self.powers["vulnerable"].kind, "debuff")
+        self.assertEqual(self.powers["artifact"].kind, "buff")
+        self.assertIn("{amount}", self.powers["demon_form"].description)
+
+
+class MonsterCatalogTest(_Data):
+    def test_act1_roster(self) -> None:
+        self.assertEqual(len(self.monsters), 51)
+        for mid in ("nibbit", "vantom", "ceremonial_beast", "kin_priest", "lagavulin_matriarch",
+                    "soul_fysh", "waterfall_giant", "terror_eel"):
+            self.assertIn(mid, self.monsters)
+
+    def test_spot_values(self) -> None:
+        m = self.monsters
+        self.assertEqual((m["nibbit"].hp, m["nibbit"].hp_asc), ((42, 46), (44, 48)))
+        self.assertEqual(m["vantom"].hp, (173, 173))
+        self.assertEqual(m["vantom"].innate_powers, (("slippery", 8, 9, 8),))
+        self.assertEqual(m["nibbit"].moves["BUTT"].effects[0].args["damage"], [12, 13, 9])
+        lash = m["phrog_parasite"].moves["LASH"].effects[0]
+        self.assertEqual((lash.args["damage"], lash.args["hits"]), ([4, 5, 9], 4))
+        self.assertEqual(m["lagavulin_matriarch"].starting_block, 12)
+        self.assertEqual(m["terror_eel"].innate_powers, (("shriek", 70, 75, 8),))
+        self.assertEqual(m["nibbit"].moves["SLICE"].intents, ("attack", "defend"))
+
+    def test_every_move_reachable(self) -> None:
+        stun_targets = {"ceremonial_beast": {"BEAST_CRY"}, "terror_eel": {"TERROR"},
+                        "waterfall_giant": {"ABOUT_TO_BLOW"}}
+        for mid, m in self.monsters.items():
+            seen: set[str] = set()
+            todo = [m.ai_initial, *stun_targets.get(mid, ())]
+            while todo:
+                nid = todo.pop()
+                if nid in seen:
+                    continue
+                seen.add(nid)
+                node = m.ai_nodes[nid]
+                if node.next:
+                    todo.append(node.next)
+                todo.extend(b.target for b in node.branches)
+            reached = {m.ai_nodes[n].move for n in seen if m.ai_nodes[n].node_type == "move"}
+            self.assertEqual(reached, set(m.moves), mid)
+
+
+class EncounterCatalogTest(_Data):
+    def test_pools_per_act(self) -> None:
+        counts: dict[tuple[str, str], int] = {}
+        for e in self.encounters.values():
+            counts[(e.act, e.pool)] = counts.get((e.act, e.pool), 0) + 1
+        self.assertEqual(counts, {
+            ("overgrowth", "weak"): 4, ("overgrowth", "normal"): 12,
+            ("overgrowth", "elite"): 3, ("overgrowth", "boss"): 3,
+            ("underdocks", "weak"): 4, ("underdocks", "normal"): 10,
+            ("underdocks", "elite"): 3, ("underdocks", "boss"): 3,
+        })
+
+    def test_generated_rosters_use_known_monsters(self) -> None:
+        import random
+        from importlib import import_module
+
+        build = import_module(self.sim.__name__ + ".encounters").build_roster
+        for e in self.encounters.values():
+            for seed in range(5):
+                roster = build(e, random.Random(seed))
+                self.assertTrue(roster, e.encounter_id)
+                for mid, _flags in roster:
+                    self.assertIn(mid, self.monsters)
+
+
+class LoaderValidationTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.sim = _import_sim()
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def _write(self, name: str, payload) -> Path:
+        path = self.root / name
+        path.write_text(json.dumps(payload))
+        return path
+
+    @staticmethod
+    def _card(**kw):
+        base = {"card_id": "x", "game_id": "X", "name": "X", "color": "ironclad", "card_type": "attack",
+                "rarity": "common", "target": "single_enemy", "cost": 1, "description": "Deal 1 damage."}
+        base.update(kw)
+        return base
+
+    @staticmethod
+    def _monster(**kw):
+        base = {"monster_id": "m", "game_id": "M", "name": "M", "kind": "normal", "hp": [5, 6], "hp_asc": [6, 7],
+                "moves": {"HIT": {"name": "Hit", "intents": ["attack"],
+                                  "effects": [{"verb": "attack", "args": {"damage": 3}}]}},
+                "ai": {"initial": "HIT", "nodes": {"HIT": {"type": "move", "move": "HIT", "next": "HIT"}}}}
+        base.update(kw)
+        return base
+
+    def test_accepts_minimal_card_and_monster(self) -> None:
+        self.sim.load_cards([self._write("c.json", [self._card()])])
+        self.sim.load_monsters([self._write("m.json", [self._monster()])], power_ids=set(), card_ids=set())
+
+    def test_rejects_unknown_card_type_and_keyword(self) -> None:
+        with self.assertRaisesRegex(self.sim.SimDataError, "card_type"):
+            self.sim.load_cards([self._write("c.json", [self._card(card_type="spell")])])
+        with self.assertRaisesRegex(self.sim.SimDataError, "keywords"):
+            self.sim.load_cards([self._write("c.json", [self._card(keywords=["fleeting"])])])
+
+    def test_rejects_duplicate_and_broken_upgrade_link(self) -> None:
+        with self.assertRaisesRegex(self.sim.SimDataError, "duplicate"):
+            self.sim.load_cards([self._write("c.json", [self._card(), self._card()])])
+        with self.assertRaisesRegex(self.sim.SimDataError, "upgrade_of"):
+            self.sim.load_cards([self._write("c.json", [self._card(upgrade_of="x+1")])])
+
+    def test_rejects_status_with_upgrade(self) -> None:
+        cards = [self._card(card_type="status", upgrade_of="x+1"),
+                 self._card(card_id="x+1", upgraded_from="x")]
+        with self.assertRaisesRegex(self.sim.SimDataError, "must not declare upgrade_of"):
+            self.sim.load_cards([self._write("c.json", cards)])
+
+    def test_rejects_unknown_monster_verb_and_bad_state(self) -> None:
+        bad_verb = self._monster(moves={"HIT": {"name": "Hit", "intents": ["attack"],
+                                                "effects": [{"verb": "lasers", "args": {}}]}})
+        with self.assertRaisesRegex(self.sim.SimDataError, "verb unknown"):
+            self.sim.load_monsters([self._write("m.json", [bad_verb])], power_ids=set(), card_ids=set())
+        bad_next = self._monster(ai={"initial": "HIT", "nodes": {"HIT": {"type": "move", "move": "HIT",
+                                                                        "next": "NOPE"}}})
+        with self.assertRaisesRegex(self.sim.SimDataError, "unknown state"):
+            self.sim.load_monsters([self._write("m.json", [bad_next])], power_ids=set(), card_ids=set())
+
+    def test_rejects_unknown_power_card_and_ascension_shape(self) -> None:
+        pw = self._monster(moves={"HIT": {"name": "Hit", "intents": ["buff"], "effects": [
+            {"verb": "apply_power", "args": {"power": "zeal", "amount": 1, "target": "self"}}]}})
+        with self.assertRaisesRegex(self.sim.SimDataError, "power unknown"):
+            self.sim.load_monsters([self._write("m.json", [pw])], power_ids={"strength"}, card_ids=set())
+        cd = self._monster(moves={"HIT": {"name": "Hit", "intents": ["status"], "effects": [
+            {"verb": "add_card", "args": {"card": "goo", "pile": "discard", "count": 1}}]}})
+        with self.assertRaisesRegex(self.sim.SimDataError, "card unknown"):
+            self.sim.load_monsters([self._write("m.json", [cd])], power_ids=set(), card_ids={"wound"})
+        asc = self._monster(moves={"HIT": {"name": "Hit", "intents": ["attack"], "effects": [
+            {"verb": "attack", "args": {"damage": [3, 4, 7]}}]}})
+        with self.assertRaisesRegex(self.sim.SimDataError, "ascension"):
+            self.sim.load_monsters([self._write("m.json", [asc])], power_ids=set(), card_ids=set())
+
+    def test_rejects_encounter_with_unknown_monster(self) -> None:
+        enc = [{"encounter_id": "e", "name": "E", "act": "overgrowth", "pool": "weak", "room_type": "monster",
+                "monsters": ["ghost"]}]
+        with self.assertRaisesRegex(self.sim.SimDataError, "unknown monster"):
+            self.sim.load_encounters(self._write("e.json", enc), monster_ids={"nibbit"})
 
 
 if __name__ == "__main__":

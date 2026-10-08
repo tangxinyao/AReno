@@ -1,0 +1,461 @@
+[
+ {
+  "encounter_id": "fuzzy_wurm_crawler_weak",
+  "game_id": "FUZZY_WURM_CRAWLER_WEAK",
+  "name": "Fuzzy Wurm Crawler",
+  "act": "overgrowth",
+  "pool": "weak",
+  "room_type": "monster",
+  "monsters": [
+   "fuzzy_wurm_crawler"
+  ]
+ },
+ {
+  "encounter_id": "nibbits_weak",
+  "game_id": "NIBBITS_WEAK",
+  "name": "A Lone Nibbit",
+  "act": "overgrowth",
+  "pool": "weak",
+  "room_type": "monster",
+  "monsters": [
+   "nibbit"
+  ]
+ },
+ {
+  "encounter_id": "shrinker_beetle_weak",
+  "game_id": "SHRINKER_BEETLE_WEAK",
+  "name": "Shrinker Beetle",
+  "act": "overgrowth",
+  "pool": "weak",
+  "room_type": "monster",
+  "monsters": [
+   "shrinker_beetle"
+  ]
+ },
+ {
+  "encounter_id": "slimes_weak",
+  "game_id": "SLIMES_WEAK",
+  "name": "Group of Slimes",
+  "act": "overgrowth",
+  "pool": "weak",
+  "room_type": "monster",
+  "generator": "slimes_weak"
+ },
+ {
+  "encounter_id": "cubex_construct_normal",
+  "game_id": "CUBEX_CONSTRUCT_NORMAL",
+  "name": "Cubex Construct",
+  "act": "overgrowth",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "cubex_construct"
+  ]
+ },
+ {
+  "encounter_id": "flyconid_normal",
+  "game_id": "FLYCONID_NORMAL",
+  "name": "Shroom and Slime",
+  "act": "overgrowth",
+  "pool": "normal",
+  "room_type": "monster",
+  "generator": "flyconid_normal"
+ },
+ {
+  "encounter_id": "fogmog_normal",
+  "game_id": "FOGMOG_NORMAL",
+  "name": "Fogmog",
+  "act": "overgrowth",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "fogmog"
+  ]
+ },
+ {
+  "encounter_id": "inklets_normal",
+  "game_id": "INKLETS_NORMAL",
+  "name": "Inklets",
+  "act": "overgrowth",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "inklet",
+   "inklet",
+   "inklet"
+  ]
+ },
+ {
+  "encounter_id": "mawler_normal",
+  "game_id": "MAWLER_NORMAL",
+  "name": "Mawler",
+  "act": "overgrowth",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "mawler"
+  ]
+ },
+ {
+  "encounter_id": "nibbits_normal",
+  "game_id": "NIBBITS_NORMAL",
+  "name": "A Pair of Nibbits",
+  "act": "overgrowth",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "nibbit",
+   "nibbit"
+  ]
+ },
+ {
+  "encounter_id": "overgrowth_crawlers",
+  "game_id": "OVERGROWTH_CRAWLERS",
+  "name": "Overgrowth Crawlers",
+  "act": "overgrowth",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "shrinker_beetle",
+   "fuzzy_wurm_crawler"
+  ]
+ },
+ {
+  "encounter_id": "ruby_raiders_normal",
+  "game_id": "RUBY_RAIDERS_NORMAL",
+  "name": "Ruby Raiders",
+  "act": "overgrowth",
+  "pool": "normal",
+  "room_type": "monster",
+  "generator": "ruby_raiders"
+ },
+ {
+  "encounter_id": "slimes_normal",
+  "game_id": "SLIMES_NORMAL",
+  "name": "Swarm of Slimes",
+  "act": "overgrowth",
+  "pool": "normal",
+  "room_type": "monster",
+  "generator": "slimes_normal"
+ },
+ {
+  "encounter_id": "slithering_strangler_normal",
+  "game_id": "SLITHERING_STRANGLER_NORMAL",
+  "name": "Strangler and Friend",
+  "act": "overgrowth",
+  "pool": "normal",
+  "room_type": "monster",
+  "generator": "slithering_strangler"
+ },
+ {
+  "encounter_id": "snapping_jaxfruit_normal",
+  "game_id": "SNAPPING_JAXFRUIT_NORMAL",
+  "name": "Overgrowth Flora",
+  "act": "overgrowth",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "snapping_jaxfruit",
+   "flyconid"
+  ]
+ },
+ {
+  "encounter_id": "vine_shambler_normal",
+  "game_id": "VINE_SHAMBLER_NORMAL",
+  "name": "Vine Shambler",
+  "act": "overgrowth",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "vine_shambler"
+  ]
+ },
+ {
+  "encounter_id": "bygone_effigy_elite",
+  "game_id": "BYGONE_EFFIGY_ELITE",
+  "name": "Bygone Effigy",
+  "act": "overgrowth",
+  "pool": "elite",
+  "room_type": "elite",
+  "monsters": [
+   "bygone_effigy"
+  ]
+ },
+ {
+  "encounter_id": "byrdonis_elite",
+  "game_id": "BYRDONIS_ELITE",
+  "name": "Byrdonis",
+  "act": "overgrowth",
+  "pool": "elite",
+  "room_type": "elite",
+  "monsters": [
+   "byrdonis"
+  ]
+ },
+ {
+  "encounter_id": "phrog_parasite_elite",
+  "game_id": "PHROG_PARASITE_ELITE",
+  "name": "Phrog Parasite",
+  "act": "overgrowth",
+  "pool": "elite",
+  "room_type": "elite",
+  "monsters": [
+   "phrog_parasite"
+  ]
+ },
+ {
+  "encounter_id": "ceremonial_beast_boss",
+  "game_id": "CEREMONIAL_BEAST_BOSS",
+  "name": "Ceremonial Beast",
+  "act": "overgrowth",
+  "pool": "boss",
+  "room_type": "boss",
+  "monsters": [
+   "ceremonial_beast"
+  ]
+ },
+ {
+  "encounter_id": "the_kin_boss",
+  "game_id": "THE_KIN_BOSS",
+  "name": "The Kin",
+  "act": "overgrowth",
+  "pool": "boss",
+  "room_type": "boss",
+  "monsters": [
+   "kin_follower",
+   "kin_follower",
+   "kin_priest"
+  ]
+ },
+ {
+  "encounter_id": "vantom_boss",
+  "game_id": "VANTOM_BOSS",
+  "name": "Vantom",
+  "act": "overgrowth",
+  "pool": "boss",
+  "room_type": "boss",
+  "monsters": [
+   "vantom"
+  ]
+ },
+ {
+  "encounter_id": "corpse_slugs_weak",
+  "game_id": "CORPSE_SLUGS_WEAK",
+  "name": "Corpse Slugs",
+  "act": "underdocks",
+  "pool": "weak",
+  "room_type": "monster",
+  "generator": "corpse_slugs_2"
+ },
+ {
+  "encounter_id": "seapunk_weak",
+  "game_id": "SEAPUNK_WEAK",
+  "name": "Seapunk",
+  "act": "underdocks",
+  "pool": "weak",
+  "room_type": "monster",
+  "monsters": [
+   "seapunk"
+  ]
+ },
+ {
+  "encounter_id": "sludge_spinner_weak",
+  "game_id": "SLUDGE_SPINNER_WEAK",
+  "name": "Sludge Spinner",
+  "act": "underdocks",
+  "pool": "weak",
+  "room_type": "monster",
+  "monsters": [
+   "sludge_spinner"
+  ]
+ },
+ {
+  "encounter_id": "toadpoles_weak",
+  "game_id": "TOADPOLES_WEAK",
+  "name": "Toadpoles",
+  "act": "underdocks",
+  "pool": "weak",
+  "room_type": "monster",
+  "monsters": [
+   "toadpole",
+   "toadpole"
+  ]
+ },
+ {
+  "encounter_id": "corpse_slugs_normal",
+  "game_id": "CORPSE_SLUGS_NORMAL",
+  "name": "Many Corpse Slugs",
+  "act": "underdocks",
+  "pool": "normal",
+  "room_type": "monster",
+  "generator": "corpse_slugs_3"
+ },
+ {
+  "encounter_id": "cultists_normal",
+  "game_id": "CULTISTS_NORMAL",
+  "name": "Cultists",
+  "act": "underdocks",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "calcified_cultist",
+   "damp_cultist"
+  ]
+ },
+ {
+  "encounter_id": "fossil_stalker_normal",
+  "game_id": "FOSSIL_STALKER_NORMAL",
+  "name": "Fossil Stalker",
+  "act": "underdocks",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "fossil_stalker"
+  ]
+ },
+ {
+  "encounter_id": "gremlin_merc_normal",
+  "game_id": "GREMLIN_MERC_NORMAL",
+  "name": "Two Gremlins in a Trenchcoat",
+  "act": "underdocks",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "gremlin_merc"
+  ]
+ },
+ {
+  "encounter_id": "haunted_ship_normal",
+  "game_id": "HAUNTED_SHIP_NORMAL",
+  "name": "Haunted Ship",
+  "act": "underdocks",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "haunted_ship"
+  ]
+ },
+ {
+  "encounter_id": "living_fog_normal",
+  "game_id": "LIVING_FOG_NORMAL",
+  "name": "Living Fog",
+  "act": "underdocks",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "living_fog"
+  ]
+ },
+ {
+  "encounter_id": "punch_construct_normal",
+  "game_id": "PUNCH_CONSTRUCT_NORMAL",
+  "name": "Punch Construct",
+  "act": "underdocks",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "punch_construct"
+  ]
+ },
+ {
+  "encounter_id": "seapunk_normal",
+  "game_id": "SEAPUNK_NORMAL",
+  "name": "Underdocks Wildlife",
+  "act": "underdocks",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "calcified_cultist",
+   "seapunk"
+  ]
+ },
+ {
+  "encounter_id": "sewer_clam_normal",
+  "game_id": "SEWER_CLAM_NORMAL",
+  "name": "Sewer Clam",
+  "act": "underdocks",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "sewer_clam"
+  ]
+ },
+ {
+  "encounter_id": "two_tailed_rats_normal",
+  "game_id": "TWO_TAILED_RATS_NORMAL",
+  "name": "Two-Tailed Rats",
+  "act": "underdocks",
+  "pool": "normal",
+  "room_type": "monster",
+  "generator": "two_tailed_rats"
+ },
+ {
+  "encounter_id": "phantasmal_gardeners_elite",
+  "game_id": "PHANTASMAL_GARDENERS_ELITE",
+  "name": "Phantasmal Gardeners",
+  "act": "underdocks",
+  "pool": "elite",
+  "room_type": "elite",
+  "monsters": [
+   "phantasmal_gardener",
+   "phantasmal_gardener",
+   "phantasmal_gardener",
+   "phantasmal_gardener"
+  ]
+ },
+ {
+  "encounter_id": "skulking_colony_elite",
+  "game_id": "SKULKING_COLONY_ELITE",
+  "name": "Skulking Colony",
+  "act": "underdocks",
+  "pool": "elite",
+  "room_type": "elite",
+  "monsters": [
+   "skulking_colony"
+  ]
+ },
+ {
+  "encounter_id": "terror_eel_elite",
+  "game_id": "TERROR_EEL_ELITE",
+  "name": "Terror Eel",
+  "act": "underdocks",
+  "pool": "elite",
+  "room_type": "elite",
+  "monsters": [
+   "terror_eel"
+  ]
+ },
+ {
+  "encounter_id": "lagavulin_matriarch_boss",
+  "game_id": "LAGAVULIN_MATRIARCH_BOSS",
+  "name": "Lagavulin Matriarch",
+  "act": "underdocks",
+  "pool": "boss",
+  "room_type": "boss",
+  "monsters": [
+   "lagavulin_matriarch"
+  ]
+ },
+ {
+  "encounter_id": "soul_fysh_boss",
+  "game_id": "SOUL_FYSH_BOSS",
+  "name": "Soul Fysh",
+  "act": "underdocks",
+  "pool": "boss",
+  "room_type": "boss",
+  "monsters": [
+   "soul_fysh"
+  ]
+ },
+ {
+  "encounter_id": "waterfall_giant_boss",
+  "game_id": "WATERFALL_GIANT_BOSS",
+  "name": "Waterfall Giant",
+  "act": "underdocks",
+  "pool": "boss",
+  "room_type": "boss",
+  "monsters": [
+   "waterfall_giant"
+  ]
+ }
+]

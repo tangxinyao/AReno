@@ -49,6 +49,8 @@ class DecisionPoint:
     NEOW_BONUS: Final = "neow_bonus"
     MAP_SELECT: Final = "map_select"
     COMBAT_PLAY: Final = "combat_play"
+    HAND_SELECT: Final = "hand_select"
+    CARD_SELECT: Final = "card_select"
     CARD_REWARD: Final = "card_reward"
     REST_SITE: Final = "rest_site"
     SHOP: Final = "shop"

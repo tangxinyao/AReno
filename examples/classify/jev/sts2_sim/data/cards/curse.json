@@ -1,0 +1,271 @@
+[
+ {
+  "card_id": "ascenders_bane",
+  "game_id": "ASCENDERS_BANE",
+  "name": "Ascender's Bane",
+  "color": "curse",
+  "card_type": "curse",
+  "rarity": "curse",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "keywords": [
+   "eternal",
+   "ethereal"
+  ],
+  "description": ""
+ },
+ {
+  "card_id": "bad_luck",
+  "game_id": "BAD_LUCK",
+  "name": "Bad Luck",
+  "color": "curse",
+  "card_type": "curse",
+  "rarity": "curse",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "keywords": [
+   "eternal"
+  ],
+  "vars": {
+   "hp_loss": 13
+  },
+  "description": "At the end of your turn, if this is in your Hand, lose 13 HP."
+ },
+ {
+  "card_id": "clumsy",
+  "game_id": "CLUMSY",
+  "name": "Clumsy",
+  "color": "curse",
+  "card_type": "curse",
+  "rarity": "curse",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "keywords": [
+   "ethereal"
+  ],
+  "description": ""
+ },
+ {
+  "card_id": "curse_of_the_bell",
+  "game_id": "CURSE_OF_THE_BELL",
+  "name": "Curse of the Bell",
+  "color": "curse",
+  "card_type": "curse",
+  "rarity": "curse",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "keywords": [
+   "eternal"
+  ],
+  "description": ""
+ },
+ {
+  "card_id": "debt",
+  "game_id": "DEBT",
+  "name": "Debt",
+  "color": "curse",
+  "card_type": "curse",
+  "rarity": "curse",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "vars": {
+   "gold": 10
+  },
+  "description": "At the end of your turn, if this is in your Hand, lose 10 Gold."
+ },
+ {
+  "card_id": "decay",
+  "game_id": "DECAY",
+  "name": "Decay",
+  "color": "curse",
+  "card_type": "curse",
+  "rarity": "curse",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "vars": {
+   "damage": 2
+  },
+  "description": "At the end of your turn, if this is in your Hand, take 2 damage."
+ },
+ {
+  "card_id": "doubt",
+  "game_id": "DOUBT",
+  "name": "Doubt",
+  "color": "curse",
+  "card_type": "curse",
+  "rarity": "curse",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "vars": {
+   "weak": 1
+  },
+  "description": "At the end of your turn, if this is in your Hand, gain 1 Weak."
+ },
+ {
+  "card_id": "enthralled",
+  "game_id": "ENTHRALLED",
+  "name": "Enthralled",
+  "color": "curse",
+  "card_type": "curse",
+  "rarity": "curse",
+  "target": "none",
+  "cost": 2,
+  "keywords": [
+   "eternal"
+  ],
+  "description": "If this is in your Hand, it must be played before other cards."
+ },
+ {
+  "card_id": "folly",
+  "game_id": "FOLLY",
+  "name": "Folly",
+  "color": "curse",
+  "card_type": "curse",
+  "rarity": "curse",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "keywords": [
+   "eternal",
+   "ethereal",
+   "innate"
+  ],
+  "description": ""
+ },
+ {
+  "card_id": "greed",
+  "game_id": "GREED",
+  "name": "Greed",
+  "color": "curse",
+  "card_type": "curse",
+  "rarity": "curse",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "keywords": [
+   "eternal"
+  ],
+  "description": ""
+ },
+ {
+  "card_id": "guilty",
+  "game_id": "GUILTY",
+  "name": "Guilty",
+  "color": "curse",
+  "card_type": "curse",
+  "rarity": "curse",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "vars": {
+   "combats": 5
+  },
+  "description": "Removed from your Deck after 5 combats."
+ },
+ {
+  "card_id": "injury",
+  "game_id": "INJURY",
+  "name": "Injury",
+  "color": "curse",
+  "card_type": "curse",
+  "rarity": "curse",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "description": ""
+ },
+ {
+  "card_id": "normality",
+  "game_id": "NORMALITY",
+  "name": "Normality",
+  "color": "curse",
+  "card_type": "curse",
+  "rarity": "curse",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "vars": {
+   "calculation_base": 3,
+   "num_of_cards_per_turn": 3
+  },
+  "description": "You cannot play more than 3 cards this turn."
+ },
+ {
+  "card_id": "poor_sleep",
+  "game_id": "POOR_SLEEP",
+  "name": "Poor Sleep",
+  "color": "curse",
+  "card_type": "curse",
+  "rarity": "curse",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "keywords": [
+   "retain"
+  ],
+  "description": ""
+ },
+ {
+  "card_id": "regret",
+  "game_id": "REGRET",
+  "name": "Regret",
+  "color": "curse",
+  "card_type": "curse",
+  "rarity": "curse",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "description": "At the end of your turn, if this is in your Hand, lose 1 HP for each card in your Hand."
+ },
+ {
+  "card_id": "shame",
+  "game_id": "SHAME",
+  "name": "Shame",
+  "color": "curse",
+  "card_type": "curse",
+  "rarity": "curse",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "vars": {
+   "frail": 1
+  },
+  "description": "At the end of your turn, if this is in your Hand, gain 1 Frail."
+ },
+ {
+  "card_id": "spore_mind",
+  "game_id": "SPORE_MIND",
+  "name": "Spore Mind",
+  "color": "curse",
+  "card_type": "curse",
+  "rarity": "curse",
+  "target": "none",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "description": ""
+ },
+ {
+  "card_id": "writhe",
+  "game_id": "WRITHE",
+  "name": "Writhe",
+  "color": "curse",
+  "card_type": "curse",
+  "rarity": "curse",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "keywords": [
+   "innate"
+  ],
+  "description": ""
+ }
+]

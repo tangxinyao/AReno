@@ -1,332 +1,339 @@
-"""Strict loaders for Phase 1 combat data.
+"""Strict loaders for the sim's game data.
 
-Each `load_*` reads the matching JSON file, validates every field against
-the schemas module's allowed vocabulary, and returns tuples of frozen
-dataclasses. On any violation the loader raises `SimDataError` with a path
-like `cards:anger:effects[1]:args.amount` so the author can locate the issue
-without diffing the raw file.
-
-Cross-reference checks (card.effects referencing a power_id that doesn't
-exist, enemy move referencing an undefined power) are the loader's
-responsibility — do them here so the engine can trust its inputs.
+Each `load_*` reads JSON under `data/`, validates every field against the
+vocabulary in schemas.py, and returns frozen dataclasses. Violations raise
+`SimDataError` with a path such as `cards:bash.vars.damage` or
+`monsters:nibbit.moves.SLICE.effects[1]` so authors can find the problem.
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 from .schemas import (
-    CARD_ONLY_VERBS,
+    AI_CONDITIONS,
+    AiBranch,
+    AiNode,
+    CARD_COLORS,
+    CARD_KEYWORDS,
     CARD_PILES,
     CARD_RARITIES,
     CARD_TARGETS,
     CARD_TYPES,
     CardSchema,
-    EFFECT_VERBS,
-    ENEMY_ONLY_VERBS,
     EffectStep,
-    EnemySchema,
+    EncounterSchema,
     INTENTS,
-    MOVE_RULES,
+    MONSTER_KINDS,
+    MONSTER_VERBS,
+    MonsterSchema,
     MoveSchema,
-    POWER_DURATIONS,
     POWER_KINDS,
+    POWER_STACKS,
+    POWER_TARGETS,
     PowerSchema,
-    SelectorEntry,
-    VERB_ALLOWED_SCOPES,
+    REPEAT_RULES,
 )
 
 
 DATA_ROOT = Path(__file__).resolve().parent / "data"
+CARD_FILES = ("ironclad", "status", "curse", "token")
+MONSTER_FILES = ("overgrowth", "underdocks")
+ENCOUNTER_POOLS = frozenset({"weak", "normal", "elite", "boss"})
+ACTS = frozenset({"overgrowth", "underdocks"})
+_SPECIALS = frozenset({"explode", "spike_spit", "soul_siphon", "pressure_gun", "rat_backup", "beckon"})
+_GENERATORS = frozenset({
+    "slimes_weak", "slimes_normal", "flyconid_normal", "slithering_strangler", "ruby_raiders",
+    "corpse_slugs_2", "corpse_slugs_3", "two_tailed_rats",
+})
 
 
 class SimDataError(ValueError):
-    """Raised when authored data violates the Phase 1 schemas."""
+    """Raised when authored data violates the schemas."""
 
 
 # ---------------------------------------------------------------------------
 # Public entry points
 
 def load_powers(path: Path | None = None) -> dict[str, PowerSchema]:
-    path = path or DATA_ROOT / "powers.json"
-    raw = _read_json(path)
+    raw = _read_json(path or DATA_ROOT / "powers.json")
     _require_list(raw, "powers")
     out: dict[str, PowerSchema] = {}
-    for i, entry in enumerate(raw):
-        power = _parse_power(entry, where=f"powers[{i}]")
-        _require_unique(out, power.power_id, where="powers")
-        out[power.power_id] = power
+    for i, e in enumerate(raw):
+        where = f"powers[{i}]"
+        _require_type(e, dict, where)
+        p = PowerSchema(
+            power_id=_get_str(e, "power_id", where),
+            name=_get_str(e, "name", where),
+            kind=_get_in(e, "kind", POWER_KINDS, where),
+            stack=_get_in(e, "stack", POWER_STACKS, where),
+            description=_get_str(e, "description", where),
+        )
+        _require_unique(out, p.power_id, where="powers")
+        out[p.power_id] = p
     return out
 
 
-def load_cards(
-    path: Path | None = None,
-    *,
-    power_ids: set[str] | None = None,
-) -> dict[str, CardSchema]:
-    path = path or DATA_ROOT / "cards" / "ironclad.json"
-    raw = _read_json(path)
-    _require_list(raw, "cards")
+def load_cards(paths: list[Path] | None = None) -> dict[str, CardSchema]:
+    paths = paths or [DATA_ROOT / "cards" / f"{name}.json" for name in CARD_FILES]
     out: dict[str, CardSchema] = {}
-    for i, entry in enumerate(raw):
-        card = _parse_card(entry, where=f"cards[{i}]", power_ids=power_ids)
-        _require_unique(out, card.card_id, where="cards")
-        out[card.card_id] = card
+    for path in paths:
+        raw = _read_json(path)
+        _require_list(raw, f"cards({path.name})")
+        for i, entry in enumerate(raw):
+            card = _parse_card(entry, where=f"cards({path.name})[{i}]")
+            _require_unique(out, card.card_id, where="cards")
+            out[card.card_id] = card
     _validate_upgrade_links(out)
-    _validate_add_card_refs(out)
     return out
 
 
-def load_enemies(
-    path: Path | None = None,
+def load_monsters(
+    paths: list[Path] | None = None,
     *,
     power_ids: set[str] | None = None,
-) -> dict[str, EnemySchema]:
-    path = path or DATA_ROOT / "enemies" / "act1.json"
-    raw = _read_json(path)
-    _require_list(raw, "enemies")
-    out: dict[str, EnemySchema] = {}
-    for i, entry in enumerate(raw):
-        enemy = _parse_enemy(entry, where=f"enemies[{i}]", power_ids=power_ids)
-        _require_unique(out, enemy.enemy_id, where="enemies")
-        out[enemy.enemy_id] = enemy
-    _validate_on_death_spawn_refs(out)
+    card_ids: set[str] | None = None,
+) -> dict[str, MonsterSchema]:
+    paths = paths or [DATA_ROOT / "monsters" / f"{name}.json" for name in MONSTER_FILES]
+    out: dict[str, MonsterSchema] = {}
+    for path in paths:
+        raw = _read_json(path)
+        _require_list(raw, f"monsters({path.name})")
+        for i, entry in enumerate(raw):
+            m = _parse_monster(entry, where=f"monsters({path.name})[{i}]", power_ids=power_ids, card_ids=card_ids)
+            _require_unique(out, m.monster_id, where="monsters")
+            out[m.monster_id] = m
+    for mid, m in out.items():
+        for move in m.moves.values():
+            for j, step in enumerate(move.effects):
+                if step.verb == "summon" and step.args["monster"] not in out:
+                    raise SimDataError(f"monsters:{mid}.moves.{move.move_id}.effects[{j}] summons unknown "
+                                       f"monster {step.args['monster']!r}")
     return out
 
 
-def _validate_on_death_spawn_refs(enemies: dict[str, EnemySchema]) -> None:
-    for eid, edef in enemies.items():
-        for spawn_id in edef.on_death_spawn:
-            if spawn_id not in enemies:
-                raise SimDataError(
-                    f"enemies:{eid}.on_death_spawn references unknown enemy_id {spawn_id!r}"
-                )
+def load_encounters(
+    path: Path | None = None,
+    *,
+    monster_ids: set[str] | None = None,
+) -> dict[str, EncounterSchema]:
+    raw = _read_json(path or DATA_ROOT / "encounters.json")
+    _require_list(raw, "encounters")
+    out: dict[str, EncounterSchema] = {}
+    for i, e in enumerate(raw):
+        where = f"encounters[{i}]"
+        _require_type(e, dict, where)
+        eid = _get_str(e, "encounter_id", where)
+        monsters = tuple(e.get("monsters", ()))
+        gen = e.get("generator")
+        if bool(monsters) == bool(gen):
+            raise SimDataError(f"{where}: exactly one of monsters / generator is required")
+        if gen is not None and gen not in _GENERATORS:
+            raise SimDataError(f"{where}.generator {gen!r} unknown")
+        if monster_ids is not None:
+            for mid in monsters:
+                if mid not in monster_ids:
+                    raise SimDataError(f"{where}.monsters references unknown monster {mid!r}")
+        enc = EncounterSchema(
+            encounter_id=eid,
+            name=_get_str(e, "name", where),
+            act=_get_in(e, "act", ACTS, where),
+            pool=_get_in(e, "pool", ENCOUNTER_POOLS, where),
+            room_type=_get_str(e, "room_type", where),
+            monsters=monsters,
+            generator=gen,
+        )
+        _require_unique(out, eid, where="encounters")
+        out[eid] = enc
+    return out
 
 
-def load_all() -> tuple[dict[str, PowerSchema], dict[str, CardSchema], dict[str, EnemySchema]]:
-    """Convenience: load powers first, then feed power_ids to card/enemy loaders."""
-
+def load_all() -> tuple[dict[str, PowerSchema], dict[str, CardSchema], dict[str, MonsterSchema]]:
     powers = load_powers()
-    power_ids = set(powers.keys())
-    cards = load_cards(power_ids=power_ids)
-    enemies = load_enemies(power_ids=power_ids)
-    return powers, cards, enemies
+    cards = load_cards()
+    monsters = load_monsters(power_ids=set(powers), card_ids=set(cards))
+    return powers, cards, monsters
 
 
 # ---------------------------------------------------------------------------
 # Parsers
 
-def _parse_power(entry: dict, *, where: str) -> PowerSchema:
+def _parse_card(entry: dict, *, where: str) -> CardSchema:
     _require_type(entry, dict, where)
-    power_id = _get_str(entry, "power_id", where)
-    kind = _get_str(entry, "kind", where)
-    duration = _get_str(entry, "duration", where)
-    _require_in(kind, POWER_KINDS, where=f"{where}.kind")
-    _require_in(duration, POWER_DURATIONS, where=f"{where}.duration")
-    return PowerSchema(
-        power_id=power_id,
-        name=_get_str(entry, "name", where),
-        kind=kind,
-        duration=duration,
-        stacks=bool(entry.get("stacks", True)),
-    )
-
-
-def _parse_card(entry: dict, *, where: str, power_ids: set[str] | None) -> CardSchema:
-    _require_type(entry, dict, where)
-    card_id = _get_str(entry, "card_id", where)
-    card_type = _get_str(entry, "card_type", where)
-    rarity = _get_str(entry, "rarity", where)
-    target = _get_str(entry, "target", where)
-    _require_in(card_type, CARD_TYPES, where=f"{where}.card_type")
-    _require_in(rarity, CARD_RARITIES, where=f"{where}.rarity")
-    _require_in(target, CARD_TARGETS, where=f"{where}.target")
+    cid = _get_str(entry, "card_id", where)
+    where = f"cards:{cid}"
     cost = entry.get("cost")
     if not isinstance(cost, int) or cost < 0:
         raise SimDataError(f"{where}.cost must be a non-negative int, got {cost!r}")
-
-    raw_effects = entry.get("effects", [])
-    _require_list(raw_effects, f"{where}.effects")
-    effects = tuple(
-        _parse_effect(step, where=f"{where}.effects[{j}]", source="card", power_ids=power_ids)
-        for j, step in enumerate(raw_effects)
-    )
-
+    keywords = entry.get("keywords", [])
+    _require_list(keywords, f"{where}.keywords")
+    for kw in keywords:
+        if kw not in CARD_KEYWORDS:
+            raise SimDataError(f"{where}.keywords {kw!r} not in {sorted(CARD_KEYWORDS)}")
+    raw_vars = entry.get("vars", {})
+    _require_type(raw_vars, dict, f"{where}.vars")
+    for k, v in raw_vars.items():
+        if not isinstance(v, int):
+            raise SimDataError(f"{where}.vars.{k} must be int, got {v!r}")
+    description = entry.get("description")
+    if not isinstance(description, str):
+        raise SimDataError(f"{where}.description must be a string")
     return CardSchema(
-        card_id=card_id,
+        card_id=cid,
+        game_id=_get_str(entry, "game_id", where),
         name=_get_str(entry, "name", where),
+        color=_get_in(entry, "color", CARD_COLORS, where),
+        card_type=_get_in(entry, "card_type", CARD_TYPES, where),
+        rarity=_get_in(entry, "rarity", CARD_RARITIES, where),
+        target=_get_in(entry, "target", CARD_TARGETS, where),
         cost=cost,
-        card_type=card_type,
-        rarity=rarity,
-        target=target,
-        effects=effects,
-        upgraded_from=entry.get("upgraded_from"),
-        upgrade_of=entry.get("upgrade_of"),
-        exhaust_on_play=bool(entry.get("exhaust_on_play", False)),
-        ethereal=bool(entry.get("ethereal", False)),
+        description=description,
+        vars=MappingProxyType(dict(raw_vars)),
+        keywords=frozenset(keywords),
+        tags=frozenset(entry.get("tags", [])),
+        x_cost=bool(entry.get("x_cost", False)),
         unplayable=bool(entry.get("unplayable", False)),
+        multiplayer_only=bool(entry.get("multiplayer_only", False)),
+        generated_in_combat=bool(entry.get("generated_in_combat", True)),
+        upgrade_of=entry.get("upgrade_of"),
+        upgraded_from=entry.get("upgraded_from"),
     )
 
 
-def _parse_enemy(entry: dict, *, where: str, power_ids: set[str] | None) -> EnemySchema:
+def _parse_monster(entry: dict, *, where: str, power_ids: set[str] | None,
+                   card_ids: set[str] | None) -> MonsterSchema:
     _require_type(entry, dict, where)
-    enemy_id = _get_str(entry, "enemy_id", where)
-    hp_min = entry.get("hp_min")
-    hp_max = entry.get("hp_max")
-    if not isinstance(hp_min, int) or not isinstance(hp_max, int) or hp_min <= 0 or hp_max < hp_min:
-        raise SimDataError(f"{where}.hp_min/hp_max invalid: {hp_min!r}/{hp_max!r}")
-
-    raw_moves = entry.get("moves", {})
+    mid = _get_str(entry, "monster_id", where)
+    where = f"monsters:{mid}"
+    hp = _pair(entry.get("hp"), f"{where}.hp")
+    hp_asc = _pair(entry.get("hp_asc"), f"{where}.hp_asc")
+    raw_moves = entry.get("moves")
     if not isinstance(raw_moves, dict) or not raw_moves:
         raise SimDataError(f"{where}.moves must be a non-empty object")
-
     moves: dict[str, MoveSchema] = {}
-    for move_id, move_entry in raw_moves.items():
-        move_where = f"{where}.moves.{move_id}"
-        _require_type(move_entry, dict, move_where)
-        intent = _get_str(move_entry, "intent", move_where)
-        _require_in(intent, INTENTS, where=f"{move_where}.intent")
-        raw_steps = move_entry.get("effects", [])
-        _require_list(raw_steps, f"{move_where}.effects")
-        steps = tuple(
-            _parse_effect(step, where=f"{move_where}.effects[{j}]", source="enemy", power_ids=power_ids)
-            for j, step in enumerate(raw_steps)
+    for move_id, m in raw_moves.items():
+        mw = f"{where}.moves.{move_id}"
+        _require_type(m, dict, mw)
+        intents = m.get("intents")
+        _require_list(intents, f"{mw}.intents")
+        for it in intents:
+            if it not in INTENTS:
+                raise SimDataError(f"{mw}.intents {it!r} not in {sorted(INTENTS)}")
+        steps = m.get("effects", [])
+        _require_list(steps, f"{mw}.effects")
+        moves[move_id] = MoveSchema(
+            move_id=move_id,
+            name=_get_str(m, "name", mw),
+            intents=tuple(intents),
+            effects=tuple(_parse_step(s, f"{mw}.effects[{j}]", power_ids, card_ids) for j, s in enumerate(steps)),
         )
-        moves[move_id] = MoveSchema(move_id=move_id, intent=intent, effects=steps)
-
-    raw_picker = entry.get("movepicker", [])
-    _require_list(raw_picker, f"{where}.movepicker")
-    if not raw_picker:
-        raise SimDataError(f"{where}.movepicker must have at least one entry")
-
-    picker: list[SelectorEntry] = []
-    for j, sel in enumerate(raw_picker):
-        sel_where = f"{where}.movepicker[{j}]"
-        _require_type(sel, dict, sel_where)
-        move_ref = _get_str(sel, "move_id", sel_where)
-        if move_ref not in moves:
-            raise SimDataError(f"{sel_where}.move_id references unknown move {move_ref!r}")
-        rule = _get_str(sel, "rule", sel_where)
-        _require_in(rule, MOVE_RULES, where=f"{sel_where}.rule")
-        weight = int(sel.get("weight", 1))
-        if weight < 1:
-            raise SimDataError(f"{sel_where}.weight must be >= 1")
-        seq_idx = sel.get("sequence_index")
-        if rule == "sequential" and not isinstance(seq_idx, int):
-            raise SimDataError(f"{sel_where}.sequence_index required when rule=sequential")
-        picker.append(SelectorEntry(move_id=move_ref, rule=rule, weight=weight, sequence_index=seq_idx))
-
-    raw_starting = entry.get("starting_powers", [])
-    _require_list(raw_starting, f"{where}.starting_powers")
-    starting: list[tuple[str, int]] = []
-    for j, item in enumerate(raw_starting):
-        sp_where = f"{where}.starting_powers[{j}]"
-        _require_type(item, dict, sp_where)
-        pid = _get_str(item, "power_id", sp_where)
+    ai = entry.get("ai")
+    _require_type(ai, dict, f"{where}.ai")
+    raw_nodes = ai.get("nodes")
+    _require_type(raw_nodes, dict, f"{where}.ai.nodes")
+    nodes: dict[str, AiNode] = {}
+    for nid, n in raw_nodes.items():
+        nodes[nid] = _parse_node(nid, n, f"{where}.ai.nodes.{nid}", moves)
+    initial = _get_str(ai, "initial", f"{where}.ai")
+    for nid, n in nodes.items():
+        refs = [n.next] if n.next else []
+        refs += [b.target for b in n.branches]
+        for r in refs + [initial]:
+            if r not in nodes:
+                raise SimDataError(f"{where}.ai.nodes.{nid} references unknown state {r!r}")
+    innate: list[tuple[str, int, int, int]] = []
+    for j, p in enumerate(entry.get("innate_powers", [])):
+        pw = f"{where}.innate_powers[{j}]"
+        pid = _get_str(p, "power", pw)
         if power_ids is not None and pid not in power_ids:
-            raise SimDataError(f"{sp_where}.power_id references unknown power {pid!r}")
-        stacks = item.get("stacks")
-        if not isinstance(stacks, int) or stacks <= 0:
-            raise SimDataError(f"{sp_where}.stacks must be a positive int")
-        starting.append((pid, stacks))
-
-    raw_spawn = entry.get("on_death_spawn", [])
-    _require_list(raw_spawn, f"{where}.on_death_spawn")
-    spawn: list[str] = []
-    for j, item in enumerate(raw_spawn):
-        sp_where = f"{where}.on_death_spawn[{j}]"
-        if not isinstance(item, str) or not item:
-            raise SimDataError(f"{sp_where} must be a non-empty string enemy_id")
-        spawn.append(item)
-
-    return EnemySchema(
-        enemy_id=enemy_id,
+            raise SimDataError(f"{pw}.power unknown {pid!r}")
+        base, asc, lvl = _scaled(p.get("amount"), f"{pw}.amount")
+        innate.append((pid, base, asc, lvl))
+    return MonsterSchema(
+        monster_id=mid,
+        game_id=_get_str(entry, "game_id", where),
         name=_get_str(entry, "name", where),
-        hp_min=hp_min,
-        hp_max=hp_max,
-        moves=moves,
-        movepicker=tuple(picker),
-        starting_powers=tuple(starting),
-        on_death_spawn=tuple(spawn),
+        kind=_get_in(entry, "kind", MONSTER_KINDS, where),
+        hp=hp,
+        hp_asc=hp_asc,
+        moves=MappingProxyType(moves),
+        ai_nodes=MappingProxyType(nodes),
+        ai_initial=initial,
+        innate_powers=tuple(innate),
+        starting_block=int(entry.get("starting_block", 0)),
+        notes=str(entry.get("notes", "")),
     )
 
 
-def _parse_effect(step: Any, *, where: str, source: str, power_ids: set[str] | None) -> EffectStep:
+def _parse_node(nid: str, n: Any, where: str, moves: dict[str, MoveSchema]) -> AiNode:
+    _require_type(n, dict, where)
+    ntype = n.get("type")
+    if ntype == "move":
+        move = _get_str(n, "move", where)
+        if move not in moves:
+            raise SimDataError(f"{where}.move references unknown move {move!r}")
+        return AiNode(node_id=nid, node_type="move", move=move, next=n.get("next"),
+                      must_perform_once=bool(n.get("must_perform_once", False)))
+    if ntype not in ("random", "conditional"):
+        raise SimDataError(f"{where}.type {ntype!r} invalid")
+    branches = []
+    raw = n.get("branches")
+    _require_list(raw, f"{where}.branches")
+    if not raw:
+        raise SimDataError(f"{where}.branches must not be empty")
+    for j, b in enumerate(raw):
+        bw = f"{where}.branches[{j}]"
+        repeat = b.get("repeat", "can_repeat")
+        if repeat not in REPEAT_RULES:
+            raise SimDataError(f"{bw}.repeat {repeat!r} invalid")
+        cond = b.get("if")
+        if cond is not None and cond not in AI_CONDITIONS:
+            raise SimDataError(f"{bw}.if {cond!r} not in {sorted(AI_CONDITIONS)}")
+        branches.append(AiBranch(
+            target=_get_str(b, "to", bw),
+            weight=float(b.get("weight", 1.0)),
+            repeat=repeat,
+            max_times=int(b.get("max_times", 0)),
+            cooldown=int(b.get("cooldown", 0)),
+            condition=cond,
+            condition_arg=b.get("arg"),
+        ))
+    return AiNode(node_id=nid, node_type=ntype, branches=tuple(branches))
+
+
+def _parse_step(step: Any, where: str, power_ids: set[str] | None, card_ids: set[str] | None) -> EffectStep:
     _require_type(step, dict, where)
     verb = _get_str(step, "verb", where)
-    if verb not in EFFECT_VERBS:
+    spec = MONSTER_VERBS.get(verb)
+    if spec is None:
         raise SimDataError(f"{where}.verb unknown: {verb!r}")
-    if source == "card" and verb in ENEMY_ONLY_VERBS:
-        raise SimDataError(f"{where}.verb {verb!r} is enemy-only, not allowed on cards")
-    if source == "enemy" and verb in CARD_ONLY_VERBS:
-        raise SimDataError(f"{where}.verb {verb!r} is card-only, not allowed on enemy moves")
-
     args = step.get("args", {})
-    if not isinstance(args, dict):
-        raise SimDataError(f"{where}.args must be an object")
-    spec = EFFECT_VERBS[verb]
-    for arg_name, arg_type in spec.items():
-        if arg_name == "hits":
-            # optional; default 1 is injected below
-            continue
-        if arg_name not in args:
-            raise SimDataError(f"{where}.args missing required field {arg_name!r} for verb {verb!r}")
-        if not isinstance(args[arg_name], arg_type):
-            raise SimDataError(
-                f"{where}.args.{arg_name} must be {arg_type.__name__}, got {type(args[arg_name]).__name__}"
-            )
-
-    # Fill the single optional field so engine sees a stable shape.
-    normalized = dict(args)
-    if "hits" in spec and "hits" not in normalized:
-        normalized["hits"] = 1
-
-    if "target_scope" in spec:
-        scope = normalized["target_scope"]
-        allowed = VERB_ALLOWED_SCOPES[verb]
-        if scope not in allowed:
-            raise SimDataError(
-                f"{where}.args.target_scope {scope!r} not allowed for verb {verb!r}; "
-                f"allowed = {sorted(allowed)}"
-            )
-        if source == "card" and scope == "player":
-            raise SimDataError(f"{where} cards cannot target 'player' (only enemies can)")
-        if source == "enemy" and scope in {"single_enemy", "all_enemies", "random_enemy"}:
-            raise SimDataError(
-                f"{where} enemy moves cannot target other enemies in Phase 1 (scope={scope!r})"
-            )
-
-    if verb == "apply_power" and power_ids is not None:
-        pid = normalized["power_id"]
-        if pid not in power_ids:
-            raise SimDataError(f"{where}.args.power_id references unknown power {pid!r}")
-
-    if verb == "add_card_to_pile":
-        pile = normalized.get("pile")
-        if pile not in CARD_PILES:
-            raise SimDataError(
-                f"{where}.args.pile {pile!r} not in allowed set {sorted(CARD_PILES)}"
-            )
-        # card_id cross-ref is deferred to a second pass over the full card
-        # table — see _validate_add_card_refs below.
-
-    # Numeric sanity: every int-typed arg must be >= 0, except `hits` which
-    # must be >= 1 since zero hits is nonsensical for a damage verb.
-    for arg_name, arg_type in spec.items():
-        if arg_type is not int:
-            continue
-        value = normalized.get(arg_name)
-        if value is None:
-            continue
-        if arg_name == "hits":
-            if value < 1:
-                raise SimDataError(f"{where}.args.hits must be >= 1")
-        elif value < 0:
-            raise SimDataError(f"{where}.args.{arg_name} must be >= 0")
-
-    return EffectStep(verb=verb, args=normalized)
+    _require_type(args, dict, f"{where}.args")
+    missing = spec["required"] - set(args)
+    if missing:
+        raise SimDataError(f"{where}.args missing {sorted(missing)} for verb {verb!r}")
+    extra = set(args) - spec["required"] - spec["optional"]
+    if extra:
+        raise SimDataError(f"{where}.args unexpected {sorted(extra)} for verb {verb!r}")
+    for k in ("damage", "hits", "amount", "count"):
+        if k in args:
+            _scaled(args[k], f"{where}.args.{k}")
+    if verb == "apply_power":
+        if args["target"] not in POWER_TARGETS:
+            raise SimDataError(f"{where}.args.target {args['target']!r} invalid")
+        if power_ids is not None and args["power"] not in power_ids:
+            raise SimDataError(f"{where}.args.power unknown {args['power']!r}")
+    if verb == "add_card":
+        if args["pile"] not in CARD_PILES:
+            raise SimDataError(f"{where}.args.pile {args['pile']!r} invalid")
+        if card_ids is not None and args["card"] not in card_ids:
+            raise SimDataError(f"{where}.args.card unknown {args['card']!r}")
+    if verb == "special" and args["name"] not in _SPECIALS:
+        raise SimDataError(f"{where}.args.name unknown special {args['name']!r}")
+    return EffectStep(verb=verb, args=MappingProxyType(dict(args)))
 
 
 # ---------------------------------------------------------------------------
@@ -334,45 +341,35 @@ def _parse_effect(step: Any, *, where: str, source: str, power_ids: set[str] | N
 
 def _validate_upgrade_links(cards: dict[str, CardSchema]) -> None:
     for cid, card in cards.items():
-        if card.upgrade_of is not None and card.upgrade_of not in cards:
-            raise SimDataError(f"cards:{cid}.upgrade_of {card.upgrade_of!r} not found")
+        if card.upgrade_of is not None:
+            up = cards.get(card.upgrade_of)
+            if up is None:
+                raise SimDataError(f"cards:{cid}.upgrade_of {card.upgrade_of!r} not found")
+            if up.upgraded_from != cid:
+                raise SimDataError(f"cards:{cid}.upgrade_of -> {card.upgrade_of!r}, but that card's "
+                                   f"upgraded_from = {up.upgraded_from!r}")
         if card.upgraded_from is not None and card.upgraded_from not in cards:
             raise SimDataError(f"cards:{cid}.upgraded_from {card.upgraded_from!r} not found")
-    # Base attack/skill/power cards (no upgraded_from) must point to a
-    # valid upgrade_of; and upgraded cards must point back. Status and
-    # curse cards do not upgrade and are allowed to carry neither link.
-    for cid, card in cards.items():
-        if card.upgraded_from is None:
-            if card.card_type in ("status", "curse"):
-                if card.upgrade_of is not None:
-                    raise SimDataError(
-                        f"cards:{cid} is a {card.card_type} and must not declare upgrade_of"
-                    )
-                continue
-            if card.upgrade_of is None:
-                raise SimDataError(f"cards:{cid} base card missing upgrade_of pointer")
-            upgraded = cards[card.upgrade_of]
-            if upgraded.upgraded_from != cid:
-                raise SimDataError(
-                    f"cards:{cid}.upgrade_of -> {card.upgrade_of!r}, "
-                    f"but that card's upgraded_from = {upgraded.upgraded_from!r}"
-                )
-
-
-def _validate_add_card_refs(cards: dict[str, CardSchema]) -> None:
-    for cid, card in cards.items():
-        for i, eff in enumerate(card.effects):
-            if eff.verb != "add_card_to_pile":
-                continue
-            ref = eff.args.get("card_id")
-            if ref not in cards:
-                raise SimDataError(
-                    f"cards:{cid}.effects[{i}].args.card_id references unknown card {ref!r}"
-                )
+        if card.card_type in ("status", "curse") and card.upgrade_of is not None:
+            raise SimDataError(f"cards:{cid} is a {card.card_type} and must not declare upgrade_of")
 
 
 # ---------------------------------------------------------------------------
 # Primitives
+
+def _pair(v: Any, where: str) -> tuple[int, int]:
+    if not (isinstance(v, list) and len(v) == 2 and all(isinstance(x, int) for x in v) and 0 < v[0] <= v[1]):
+        raise SimDataError(f"{where} must be [min, max] positive ints, got {v!r}")
+    return (v[0], v[1])
+
+
+def _scaled(v: Any, where: str) -> tuple[int, int, int]:
+    if isinstance(v, int):
+        return (v, v, 0)
+    if isinstance(v, list) and len(v) == 3 and all(isinstance(x, int) for x in v) and v[2] in (8, 9):
+        return (v[0], v[1], v[2])
+    raise SimDataError(f"{where} must be an int or [base, ascension_value, 8|9], got {v!r}")
+
 
 def _read_json(path: Path) -> Any:
     try:
@@ -393,11 +390,6 @@ def _require_list(value: Any, where: str) -> None:
         raise SimDataError(f"{where} must be a list, got {type(value).__name__}")
 
 
-def _require_in(value: Any, allowed: frozenset[str], *, where: str) -> None:
-    if value not in allowed:
-        raise SimDataError(f"{where} {value!r} not in allowed set {sorted(allowed)}")
-
-
 def _require_unique(mapping: dict, key: str, *, where: str) -> None:
     if key in mapping:
         raise SimDataError(f"{where}: duplicate id {key!r}")
@@ -412,11 +404,21 @@ def _get_str(entry: dict, field: str, where: str) -> str:
     return value
 
 
+def _get_in(entry: dict, field: str, allowed: frozenset[str], where: str) -> str:
+    value = _get_str(entry, field, where)
+    if value not in allowed:
+        raise SimDataError(f"{where}.{field} {value!r} not in allowed set {sorted(allowed)}")
+    return value
+
+
 __all__ = [
+    "CARD_FILES",
     "DATA_ROOT",
+    "MONSTER_FILES",
     "SimDataError",
     "load_all",
     "load_cards",
-    "load_enemies",
+    "load_encounters",
+    "load_monsters",
     "load_powers",
 ]
