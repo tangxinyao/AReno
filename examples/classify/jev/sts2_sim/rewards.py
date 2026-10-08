@@ -25,6 +25,8 @@ CARD_RARITY_BASE_OFFSET = -0.05
 CARD_RARITY_MAX_OFFSET = 0.4
 POTION_REWARD_STEP = 0.1
 POVERTY = 3
+# Splash offers Attacks from the other characters' pools, which the sim does not model.
+UNSUPPORTED_CARDS = frozenset({"splash"})
 SCARCITY = 7
 CARD_REWARD_SIZE = 3
 
@@ -40,7 +42,7 @@ def reward_pool(cards: dict[str, CardSchema], color: str = "ironclad") -> list[s
 
     return sorted(cid for cid, c in cards.items()
                   if c.color == color and not c.upgraded and not c.multiplayer_only
-                  and c.rarity in (COMMON, UNCOMMON, RARE))
+                  and cid not in UNSUPPORTED_CARDS and c.rarity in (COMMON, UNCOMMON, RARE))
 
 
 def poverty_gold(ascension: int, gold: int) -> int:
@@ -123,6 +125,25 @@ def roll_potion_drop(odds: float, room: str, rng: random.Random) -> tuple[bool, 
     return False, odds + POTION_REWARD_STEP
 
 
+def transform_options(cards: dict[str, CardSchema], card_id: str) -> list[str]:
+    """RunRewardGenerator.TransformOptionsFor: same pool, Common/Uncommon/Rare, not itself.
+
+    Ancient / Event / Token cards fall back to the Colorless pool; a Status or Curse
+    keeps every rarity (a curse transforms into another curse)."""
+
+    orig = cards[card_id]
+    base = orig.upgraded_from or orig.card_id
+    if orig.rarity in ("ancient", "event", "token"):
+        color = "colorless"
+    else:
+        color = orig.color
+    keep_all = orig.rarity in ("status", "curse")
+    return sorted(cid for cid, c in cards.items()
+                  if c.color == color and not c.upgraded and not c.multiplayer_only and cid != base
+                  and cid not in UNSUPPORTED_CARDS
+                  and (keep_all or c.rarity in (COMMON, UNCOMMON, RARE)))
+
+
 def shop_card_price(rarity: str, *, colorless: bool, rng: random.Random) -> int:
     base = {RARE: 150, UNCOMMON: 75}.get(rarity, 50)
     if colorless:
@@ -132,5 +153,6 @@ def shop_card_price(rarity: str, *, colorless: bool, rng: random.Random) -> int:
 
 __all__ = [
     "CARD_RARITY_BASE_OFFSET", "card_odds", "card_reward", "choose_card", "combat_gold", "poverty_gold",
-    "reward_pool", "roll_potion_drop", "roll_rarity", "roll_upgrade", "shop_card_price",
+    "reward_pool", "roll_potion_drop", "roll_rarity", "roll_upgrade", "shop_card_price", "transform_options",
+    "UNSUPPORTED_CARDS",
 ]

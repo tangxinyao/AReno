@@ -98,9 +98,10 @@ class ActRoomsTest(unittest.TestCase):
                 self.assertTrue(all(loop.encounters[e].pool == "normal" for e in rooms.normal[weak:]))
                 self.assertEqual(len(rooms.elite), 15)
                 for seq in (rooms.normal, rooms.elite):
-                    for a, b in zip(seq, seq[1:]):
-                        self.assertNotEqual(a, b)
-                        self.assertFalse(set(loop.encounters[a].tags) & set(loop.encounters[b].tags))
+                    # A repeat only happens when the last encounter left in a bag clashes.
+                    clashes = sum(1 for a, b in zip(seq, seq[1:])
+                                  if a == b or set(loop.encounters[a].tags) & set(loop.encounters[b].tags))
+                    self.assertLessEqual(clashes, 2, (rooms.act, seq))
             self.assertIsNotNone(acts[2].second_boss)
             self.assertNotEqual(acts[2].second_boss, acts[2].boss)
             self.assertIsNone(acts[0].second_boss)
@@ -204,6 +205,7 @@ class RunFlowTest(unittest.TestCase):
         self.assertEqual(st.player.hp, 64)
         self.assertEqual([c["id"] for c in loop._packet()["candidates"]], ["proceed"])
         st.rest_used = False
+        st.player.relic_state.pop("rest_taken")
         packet = loop.step("choose_rest_option:1")
         self.assertEqual(packet["decision_point"], "card_select")
         bash = next(i for i, c in enumerate(packet["candidates"]) if "Bash" in c["text"])
@@ -218,9 +220,14 @@ class RunFlowTest(unittest.TestCase):
         st = loop.state
         st.player.gold = 999
         loop._enter_shop()
-        cards = [i for i in st.shop if i.category == "card"]
+        cards = [i for i in st.shop if i.category == "card" and loop.cards[i.item].color == "ironclad"]
         self.assertEqual([loop.cards[i.item].card_type for i in cards],
                          ["attack", "attack", "skill", "skill", "power"])
+        colorless = [loop.cards[i.item] for i in st.shop if i.category == "card" and loop.cards[i.item].color == "colorless"]
+        self.assertEqual([c.rarity for c in colorless], ["uncommon", "rare"])
+        self.assertEqual(sum(1 for i in st.shop if i.category == "relic"), 3)
+        self.assertEqual(loop.relics[[i for i in st.shop if i.category == "relic"][-1].item].rarity, "shop")
+        self.assertEqual(sum(1 for i in st.shop if i.category == "potion"), 3)
         self.assertEqual(sum(i.on_sale for i in cards), 1)
         removal = next(i for i in st.shop if i.category == "card_removal")
         self.assertEqual(removal.price, 75)

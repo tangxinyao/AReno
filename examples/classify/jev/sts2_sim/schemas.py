@@ -41,7 +41,7 @@ CARD_TYPES: Final = frozenset({"attack", "skill", "power", "status", "curse"})
 CARD_RARITIES: Final = frozenset({
     "basic", "common", "uncommon", "rare", "ancient", "token", "status", "curse", "event", "quest",
 })
-CARD_TARGETS: Final = frozenset({"none", "self", "single_enemy", "all_enemies", "random_enemy", "ally"})
+CARD_TARGETS: Final = frozenset({"none", "self", "single_enemy", "all_enemies", "random_enemy", "ally", "all_allies"})
 CARD_KEYWORDS: Final = frozenset({"exhaust", "ethereal", "innate", "retain", "eternal", "sly"})
 CARD_COLORS: Final = frozenset({"ironclad", "status", "curse", "token", "colorless"})
 # Rarities a character's card reward / in-combat generator may roll.
@@ -109,6 +109,42 @@ class PowerSchema:
     kind: str
     stack: str
     description: str
+
+
+# ---------------------------------------------------------------------------
+# Potions / relics
+
+POTION_RARITIES: Final = frozenset({"common", "uncommon", "rare", "token", "event"})
+POTION_TARGETS: Final = frozenset({"self", "single_enemy", "all_enemies", "none"})
+RELIC_RARITIES: Final = frozenset({"starter", "common", "uncommon", "rare", "shop", "ancient", "event"})
+
+
+@dataclass(frozen=True)
+class PotionSchema:
+    """A potion; behavior is potion_effects.py keyed by `game_id`."""
+
+    potion_id: str
+    game_id: str
+    name: str
+    rarity: str
+    pool: str  # "ironclad" | "shared" | "token"
+    target: str
+    description: str
+
+
+@dataclass(frozen=True)
+class RelicSchema:
+    """A relic; behavior is relics.py keyed by `relic_id`."""
+
+    relic_id: str
+    game_id: str
+    name: str
+    rarity: str
+    pool: str  # "ironclad" | "shared"
+    description: str
+    in_shops: bool = True
+    # Gold / deck-growth relics the game stops offering after the Act 3 chest (floor 41).
+    stops_after_act3_chest: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -290,7 +326,12 @@ __all__ = [
     "POWER_KINDS",
     "POWER_STACKS",
     "POWER_TARGETS",
+    "POTION_RARITIES",
+    "POTION_TARGETS",
+    "PotionSchema",
     "PowerSchema",
+    "RELIC_RARITIES",
+    "RelicSchema",
     "REPEAT_RULES",
     "ROOM_TYPES",
 ]

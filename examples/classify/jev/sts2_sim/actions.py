@@ -23,29 +23,29 @@ from typing import Final
 
 MENU_SELECT: Final = "menu_select"                          # (*) game_over only
 PLAY_CARD: Final = "play_card"                              # (*)
-USE_POTION: Final = "use_potion"
-DISCARD_POTION: Final = "discard_potion"
+USE_POTION: Final = "use_potion"                            # (*)
+DISCARD_POTION: Final = "discard_potion"                    # (*)
 END_TURN: Final = "end_turn"                                # (*)
-CHOOSE_MAP_NODE: Final = "choose_map_node"
-CHOOSE_EVENT_OPTION: Final = "choose_event_option"          # (*) Neow stub
+CHOOSE_MAP_NODE: Final = "choose_map_node"                  # (*)
+CHOOSE_EVENT_OPTION: Final = "choose_event_option"          # (*)
 ADVANCE_DIALOGUE: Final = "advance_dialogue"
-CHOOSE_REST_OPTION: Final = "choose_rest_option"
-SHOP_PURCHASE: Final = "shop_purchase"
-CLAIM_REWARD: Final = "claim_reward"
-SELECT_CARD_REWARD: Final = "select_card_reward"
-SKIP_CARD_REWARD: Final = "skip_card_reward"
-PROCEED: Final = "proceed"
-SELECT_CARD: Final = "select_card"
-CONFIRM_SELECTION: Final = "confirm_selection"
-CANCEL_SELECTION: Final = "cancel_selection"
+CHOOSE_REST_OPTION: Final = "choose_rest_option"            # (*)
+SHOP_PURCHASE: Final = "shop_purchase"                      # (*)
+CLAIM_REWARD: Final = "claim_reward"                        # (*)
+SELECT_CARD_REWARD: Final = "select_card_reward"            # (*)
+SKIP_CARD_REWARD: Final = "skip_card_reward"                # (*)
+PROCEED: Final = "proceed"                                  # (*)
+SELECT_CARD: Final = "select_card"                          # (*)
+CONFIRM_SELECTION: Final = "confirm_selection"              # (*)
+CANCEL_SELECTION: Final = "cancel_selection"                # (*)
 SELECT_BUNDLE: Final = "select_bundle"
 CONFIRM_BUNDLE_SELECTION: Final = "confirm_bundle_selection"
 CANCEL_BUNDLE_SELECTION: Final = "cancel_bundle_selection"
-COMBAT_SELECT_CARD: Final = "combat_select_card"
-COMBAT_CONFIRM_SELECTION: Final = "combat_confirm_selection"
+COMBAT_SELECT_CARD: Final = "combat_select_card"            # (*)
+COMBAT_CONFIRM_SELECTION: Final = "combat_confirm_selection"  # (*)
 SELECT_RELIC: Final = "select_relic"
 SKIP_RELIC_SELECTION: Final = "skip_relic_selection"
-CLAIM_TREASURE_RELIC: Final = "claim_treasure_relic"
+CLAIM_TREASURE_RELIC: Final = "claim_treasure_relic"        # (*)
 CRYSTAL_SPHERE_SET_TOOL: Final = "crystal_sphere_set_tool"
 CRYSTAL_SPHERE_CLICK_CELL: Final = "crystal_sphere_click_cell"
 CRYSTAL_SPHERE_PROCEED: Final = "crystal_sphere_proceed"
@@ -61,7 +61,7 @@ MCP_ACTIONS: Final = frozenset({
     CRYSTAL_SPHERE_PROCEED,
 })
 
-# Fixed ids for the stub screens.
+# Fixed ids.
 NEOW_SKIP: Final = f"{CHOOSE_EVENT_OPTION}:0"
 GAME_OVER_MAIN_MENU: Final = f"{MENU_SELECT}:main_menu"
 

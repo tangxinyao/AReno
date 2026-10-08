@@ -9,12 +9,22 @@ the last boss or the player's death. See `NOTICE.md` for sources.
 
 from __future__ import annotations
 
-from . import actions, mapgen, rewards
+from . import actions, mapgen, potion_effects, relics, rewards
 from .combat import CombatContext, CombatError
 from .effects import Effect, EffectQueue
 from .enums import ALL_CHARACTERS, Character, CombatPhase, DecisionPoint, Outcome, Screen
 from .hooks import HookBus, HookHandler
-from .loader import DATA_ROOT, SimDataError, load_all, load_cards, load_encounters, load_monsters, load_powers
+from .loader import (
+    DATA_ROOT,
+    SimDataError,
+    load_all,
+    load_cards,
+    load_encounters,
+    load_monsters,
+    load_potions,
+    load_powers,
+    load_relics,
+)
 from .rng import Rng
 from .run import Decision, RunLoop, RunLoopError
 from .schemas import (
@@ -31,6 +41,8 @@ from .state import CardRef, CombatState, MonsterState, PlayerState, RunState
 __all__ = [
     "actions",
     "mapgen",
+    "potion_effects",
+    "relics",
     "rewards",
     "ALL_CHARACTERS",
     "Character",
@@ -66,5 +78,7 @@ __all__ = [
     "load_cards",
     "load_encounters",
     "load_monsters",
+    "load_potions",
     "load_powers",
+    "load_relics",
 ]

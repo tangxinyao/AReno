@@ -1,7 +1,7 @@
 """RunLoop: a whole Ironclad run -- Neow, three acts of map, rooms, rewards.
 
 Run structure follows r33hab/sts2's `RunEngine` / `RunMapGenerator` /
-`RunRewardGenerator` (v0.107.1):
+`RunRewardGenerator` / `RunNonCombatEffects` (v0.107.1):
 
   * Act 1 is Overgrowth or Underdocks, then the Hive, then Glory. Every act's
     encounters are rolled up front: its weak fights (3 in Act 1, 2 later),
@@ -12,10 +12,15 @@ Run structure follows r33hab/sts2's `RunEngine` / `RunMapGenerator` /
     normal encounter, Elites the next elite; Unknown rooms roll Monster 10% /
     Treasure 2% / Shop 3% / Event otherwise, the odds of the types not
     rolled growing by their base each time.
-  * Winning a fight opens the rewards screen (gold, maybe a potion, an elite
-    relic, a card reward -- see rewards.py). Rest sites heal 30% of max HP or
-    upgrade a card. Beating a boss moves to the next act, whose Ancient heals
-    the player first (80% of missing HP from Ascension 2).
+  * Winning a fight opens the rewards screen: gold, maybe a potion, an elite's
+    relic, a card reward (rewards.py; relics can add more). Rest sites heal
+    30% of max HP or upgrade a card (plus Train / Dig with Girya / Shovel).
+    Shops sell five Ironclad cards (one on sale), two Colorless cards, three
+    relics, three potions and a card removal. Treasure rooms hold gold and a
+    relic. Beating a boss moves to the next act, whose Ancient heals the
+    player first (80% of missing HP from Ascension 2).
+  * Relics come from per-run grab bags shuffled at the start: the player's bag
+    (shared + Ironclad pools) for elites and shops, the shared bag for chests.
 
 `encounter=` pins a single fight instead (Neow -> that combat -> game over),
 the scope the earlier one-combat episodes used.
@@ -23,10 +28,11 @@ the scope the earlier one-combat episodes used.
 Action ids use STS2MCP action names (see `actions.py`):
   neow / ancient:  "choose_event_option:{i}"
   map:             "choose_map_node:{i}"          (travelable nodes by column)
-  combat:          "play_card:{card_id}[:{enemy_pos}]", "end_turn"
+  combat:          "play_card:{card_id}[:{enemy_pos}]", "use_potion:{slot}[:{enemy_pos}]",
+                   "end_turn"
   hand_select:     "combat_select_card:{i}" / "combat_confirm_selection"
   card_select:     "select_card:{i}" / "confirm_selection" / "cancel_selection"
-  rewards:         "claim_reward:{i}" / "proceed"
+  rewards:         "claim_reward:{i}" / "discard_potion:{slot}" / "proceed"
   card_reward:     "select_card_reward:{i}" / "skip_card_reward"
   rest_site:       "choose_rest_option:{i}" / "proceed"
   shop:            "shop_purchase:{i}" / "proceed"
@@ -46,11 +52,14 @@ from .effects import EffectQueue
 from .encounters import build_roster
 from .enums import Character, CombatPhase, DecisionPoint, Outcome, Screen
 from .hooks import HookBus
-from .loader import load_all, load_encounters
+from .loader import load_all, load_encounters, load_potions, load_relics
+from .potion_effects import random_potion
+from .relics import RelicEngine, gold_gained
 from .rng import Rng
-from .schemas import CardSchema, EncounterSchema, MonsterSchema, PowerSchema
+from .schemas import CardSchema, EncounterSchema, MonsterSchema, PotionSchema, PowerSchema, RelicSchema
 from .state import (
     ActRooms,
+    CardRef,
     DeckSelection,
     PlayerState,
     RewardItem,
@@ -70,6 +79,8 @@ ASC_TIGHT_BELT = 4
 ASC_ASCENDERS_BANE = 5
 ASC_INFLATION = 6
 ASC_DOUBLE_BOSS = 10
+LATE_RELIC_FLOOR = 41  # RelicGrabBag.AllowedInSoloRun: after the Act 3 chest
+GIRYA_LIFTS = 3
 
 IRONCLAD_STARTING_DECK: tuple[str, ...] = (
     "strike_ironclad", "strike_ironclad", "strike_ironclad", "strike_ironclad", "strike_ironclad",
@@ -80,6 +91,8 @@ IRONCLAD_STARTING_RELIC = "burning_blood"
 ACT1_VARIANTS: tuple[str, ...] = ("overgrowth", "underdocks")
 LATER_ACTS: tuple[str, ...] = ("hive", "glory")
 FIRST_COMBAT_POOL = _WEAK_POOL
+_RELIC_RARITIES = ("common", "uncommon", "rare", "shop")
+_UNREMOVABLE = frozenset({"ascenders_bane", "curse_of_the_bell"})
 
 # Unknown map point: (room, base odds). Elite is never rolled (-1) without a relic.
 _UNKNOWN_BASE = {"monster": 0.1, "elite": -1.0, "treasure": 0.02, "shop": 0.03}
@@ -87,8 +100,22 @@ _ROOM_OF_KIND = {
     mapgen.MONSTER: "monster", mapgen.ELITE: "elite", mapgen.BOSS: "boss", mapgen.REST: "rest",
     mapgen.SHOP: "shop", mapgen.TREASURE: "treasure", mapgen.UNKNOWN: "unknown", mapgen.ANCIENT: "ancient",
 }
-_REST_HEAL = ("HEAL", "Rest", "Heal for 30% of your Max HP ({heal}).")
-_REST_SMITH = ("SMITH", "Smith", "Upgrade a card in your Deck.")
+# Rest site options (rest_site_ui OPTION_*): id, name, description.
+_REST_TEXT = {
+    "HEAL": ("Rest", "Heal for 30% of your Max HP ({heal})."),
+    "SMITH": ("Smith", "Upgrade a card in your Deck."),
+    "LIFT": ("Train", "Start battles with +1 Strength. ({left} Left)"),
+    "DIG": ("Dig", "Dig for a Relic."),
+}
+# Enchantments relics hand out on pickup: (enchant, amount, count, may pick fewer, card types).
+_PICKUP_ENCHANTS = {
+    "gnarled_hammer": ("sharp", 3, 3, True, ("attack",)),
+    "kifuda": ("adroit", 3, 3, True, ("attack", "skill", "power")),
+    "punch_dagger": ("momentum", 5, 1, False, ("attack",)),
+    "royal_stamp": ("royally_approved", 0, 1, False, ("attack", "skill")),
+}
+_ENCHANT_NAMES = {"sharp": "Sharp", "adroit": "Adroit", "momentum": "Momentum",
+                  "royally_approved": "Royally Approved", "swift": "Swift"}
 
 
 @dataclass
@@ -137,7 +164,10 @@ class RunLoop:
         self._monsters: dict[str, MonsterSchema] | None = None
         self._powers: dict[str, PowerSchema] | None = None
         self._encounters: dict[str, EncounterSchema] | None = None
+        self._potions: dict[str, PotionSchema] = {}
+        self._relics: dict[str, RelicSchema] = {}
         self._reward_pool: list[str] = []
+        self._colorless_pool: list[str] = []
 
     # ------------------------------------------------------------------
     # Public surface
@@ -196,6 +226,14 @@ class RunLoop:
         assert self._encounters is not None
         return self._encounters
 
+    @property
+    def potion_defs(self) -> dict[str, PotionSchema]:
+        return self._potions
+
+    @property
+    def relics(self) -> dict[str, RelicSchema]:
+        return self._relics
+
     def reset(self) -> dict[str, Any]:
         self._rng = Rng(self._master_seed)
         self._effects = EffectQueue()
@@ -203,12 +241,15 @@ class RunLoop:
         if self._cards is None:
             self._powers, self._cards, self._monsters = load_all()
             self._encounters = load_encounters(monster_ids=set(self._monsters))
+            self._potions = load_potions()
+            self._relics = load_relics()
             self._reward_pool = rewards.reward_pool(self._cards)
+            self._colorless_pool = rewards.reward_pool(self._cards, "colorless")
         asc = self._ascension
         hp = _IRONCLAD_MAX_HP if asc < ASC_WEARY_TRAVELER else int(_IRONCLAD_MAX_HP * 0.8)
-        deck = list(IRONCLAD_STARTING_DECK)
+        deck = [CardRef(c) for c in IRONCLAD_STARTING_DECK]
         if asc >= ASC_ASCENDERS_BANE:
-            deck.append("ascenders_bane")
+            deck.append(CardRef("ascenders_bane"))
         self._state = RunState(
             character=self._character,
             ascension=asc,
@@ -237,8 +278,10 @@ class RunLoop:
             hooks=self._hooks,
             effects=self._effects,
             encounters=self._encounters,
+            potions=self._potions,
         )
         if not self.single_combat:
+            self._fill_relic_bags()
             self._generate_acts()
             self._enter_act_map(0)
         self._state.screen = Screen.NEOW
@@ -266,7 +309,7 @@ class RunLoop:
         elif screen == Screen.MAP:
             self._choose_map_node(int(args[0]))
         elif screen == Screen.COMBAT:
-            self._handle_combat_action(action_id)
+            self._handle_combat_action(name, args)
             self._maybe_finalize_combat()
         elif screen == Screen.REWARDS:
             self._step_rewards(name, args)
@@ -301,6 +344,19 @@ class RunLoop:
     def _require_started(self) -> None:
         if self._state is None:
             raise RunLoopError("RunLoop not started; call reset() first")
+
+    def _fill_relic_bags(self) -> None:
+        """RunManager.InitializeNewRun: the shared bag, then the player's (shared + Ironclad)."""
+
+        state = self.state
+        stream = self.rng.stream("up_front")
+        shared = [r for r in self._relics.values() if r.pool == "shared" and r.rarity in _RELIC_RARITIES]
+        ironclad = [r for r in self._relics.values() if r.pool == "ironclad" and r.rarity in _RELIC_RARITIES]
+        for bag, pool in ((state.shared_relic_bag, shared), (state.relic_bag, shared + ironclad)):
+            for rarity in _RELIC_RARITIES:
+                ids = sorted(r.relic_id for r in pool if r.rarity == rarity)
+                stream.shuffle(ids)
+                bag[rarity] = ids
 
     def _generate_acts(self) -> None:
         """RunManager.GenerateRooms: every act's encounter sequence up front."""
@@ -372,6 +428,149 @@ class RunLoop:
         state.unknown_odds = dict(_UNKNOWN_BASE)
 
     # ------------------------------------------------------------------
+    # Relics, gold, deck
+
+    def _relic_allowed(self, relic_id: str) -> bool:
+        r = self._relics[relic_id]
+        return relic_id not in self.state.player.relics and not (
+            r.stops_after_act3_chest and self.state.floor >= LATE_RELIC_FLOOR)
+
+    def _pull_relic(self, bag: dict[str, list[str]], rarity: str, *, front: bool = True,
+                    shop: bool = False) -> str | None:
+        """RelicGrabBag.Pull: the rarity's deque, falling back Shop -> Common -> Uncommon -> Rare."""
+
+        chain = {"shop": "common", "common": "uncommon", "uncommon": "rare", "rare": None}
+        r: str | None = rarity
+        while r is not None:
+            deque = bag.get(r, [])
+            deque[:] = [x for x in deque if self._relic_allowed(x)]
+            order = deque if front else list(reversed(deque))
+            pick = next((x for x in order if not shop or self._relics[x].in_shops), None)
+            if pick is not None:
+                deque.remove(pick)
+                return pick
+            r = chain[r]
+        return None
+
+    def _roll_relic_rarity(self, stream) -> str:
+        roll = stream.random()
+        return "common" if roll < 0.5 else "uncommon" if roll < 0.83 else "rare"
+
+    def _next_relic(self, stream) -> str:
+        """RunRewardGenerator.NextRelic: a rolled rarity from the front of the player's bag."""
+
+        relic = self._pull_relic(self.state.relic_bag, self._roll_relic_rarity(stream))
+        if relic is None:
+            return "circlet"
+        self._drop_from_bags(relic)
+        return relic
+
+    def _drop_from_bags(self, relic: str) -> None:
+        for bag in (self.state.relic_bag, self.state.shared_relic_bag):
+            for deque in bag.values():
+                if relic in deque:
+                    deque.remove(relic)
+
+    def _gain_gold(self, amount: int) -> None:
+        p = self.state.player
+        p.gold += gold_gained(p, amount)
+
+    def _heal(self, amount: int) -> None:
+        p = self.state.player
+        p.hp = min(p.max_hp, p.hp + max(0, amount))
+
+    def _gain_max_hp(self, amount: int) -> None:
+        p = self.state.player
+        p.max_hp += amount
+        p.hp += amount
+
+    def _add_card_to_deck(self, card: str) -> None:
+        """AddCardToDeck: egg upgrades, Lucky Fysh, Book of Five Rings."""
+
+        p = self.state.player
+        ref = card if isinstance(card, CardRef) else CardRef(card)
+        cdef = self.cards[ref]
+        egg = {"power": "frozen_egg", "attack": "molten_egg", "skill": "toxic_egg"}.get(cdef.card_type)
+        if egg in p.relics and cdef.upgrade_of is not None:
+            ref = CardRef(cdef.upgrade_of, like=ref)
+        p.deck.append(ref)
+        if "lucky_fysh" in p.relics:
+            self._gain_gold(15)
+        if "book_of_five_rings" in p.relics:
+            n = p.relic_state.get("book_of_five_rings", 0) + 1
+            p.relic_state["book_of_five_rings"] = n % 5
+            if n % 5 == 0:
+                self._heal(20)
+
+    def _upgrade_random(self, card_type: str, count: int) -> None:
+        p = self.state.player
+        cands = [i for i, c in enumerate(p.deck) if self.cards[c].card_type == card_type
+                 and self.cards[c].upgrade_of is not None]
+        stream = self.rng.stream("relic_pickup")
+        stream.shuffle(cands)
+        for i in cands[:count]:
+            p.deck[i] = CardRef(self.cards[p.deck[i]].upgrade_of, like=p.deck[i])
+
+    def _obtain_relic(self, relic_id: str, *, return_to: str) -> None:
+        """ApplyRelicPickup. May open a deck selection or extra rewards."""
+
+        state = self.state
+        p = state.player
+        if relic_id != "circlet" and relic_id in p.relics:
+            return
+        p.relics.append(relic_id)
+        self._drop_from_bags(relic_id)
+        if relic_id == "potion_belt":
+            p.potions.extend([None, None])
+        elif relic_id == "war_paint":
+            self._upgrade_random("skill", 2)
+        elif relic_id == "whetstone":
+            self._upgrade_random("attack", 2)
+        elif relic_id == "strawberry":
+            self._gain_max_hp(7)
+        elif relic_id == "pear":
+            self._gain_max_hp(10)
+        elif relic_id == "mango":
+            self._gain_max_hp(14)
+        elif relic_id == "lees_waffle":
+            self._gain_max_hp(7)
+            p.hp = p.max_hp
+        elif relic_id == "old_coin":
+            self._gain_gold(300)
+        elif relic_id == "orrery":
+            for _ in range(5):
+                self._push_reward(self._card_reward_item("monster"), return_to)
+        elif relic_id == "cauldron":
+            stream = self.rng.stream("rewards")
+            for _ in range(5):
+                self._push_reward(RewardItem(kind="potion", potion=random_potion(self._potions, stream)), return_to)
+        elif relic_id == "dollys_mirror":
+            self._open_deck_select("duplicate", list(range(len(p.deck))), 1, return_to)
+        elif relic_id in _PICKUP_ENCHANTS:
+            enchant, amount, count, fewer, types = _PICKUP_ENCHANTS[relic_id]
+            cands = [i for i, c in enumerate(p.deck) if self.cards[c].card_type in types
+                     and getattr(c, "enchant", None) is None and not self.cards[c].unplayable]
+            if cands:
+                self._open_deck_select("enchant", cands, count, return_to, min_count=0 if fewer else None,
+                                       enchant=enchant, enchant_amount=amount)
+
+    def _push_reward(self, item: RewardItem, return_to: str) -> None:
+        state = self.state
+        state.rewards.append(item)
+        if state.screen != Screen.REWARDS and state.deck_select is None:
+            state.rewards_return = return_to
+            state.screen = Screen.REWARDS
+
+    def _open_deck_select(self, purpose: str, cands: list[int], count: int, return_to: str, *,
+                          min_count: int | None = None, enchant: str | None = None, enchant_amount: int = 0,
+                          price: int = 0, cancelable: bool = False) -> None:
+        state = self.state
+        state.deck_select = DeckSelection(purpose=purpose, candidates=cands, count=min(count, len(cands)),
+                                          source=return_to, min_count=min_count, enchant=enchant,
+                                          enchant_amount=enchant_amount, price=price, cancelable=cancelable)
+        state.screen = Screen.CARD_SELECT
+
+    # ------------------------------------------------------------------
     # Neow / Ancient / map
 
     def _leave_neow(self) -> None:
@@ -398,23 +597,27 @@ class RunLoop:
 
     def _choose_map_node(self, index: int) -> None:
         state = self.state
+        p = state.player
         node = self._map_options()[index]
         state.map_coord = node.coord
         state.floor += 1
         room = _ROOM_OF_KIND[node.kind]
         if room == "unknown":
             room = self._roll_unknown()
+            if "planisphere" in p.relics:
+                self._heal(5)
         state.room = room
         if room == "ancient":
             self._ancient_heal()
             state.screen = Screen.ANCIENT
             return
         if room in ("monster", "elite", "boss"):
+            if room == "boss" and "pantograph" in p.relics:
+                self._heal(25)
             enc_id = self._next_encounter(room, node)
             self._start_encounter(enc_id, room)
         elif room == "rest":
-            state.rest_used = False
-            state.screen = Screen.REST
+            self._enter_rest()
         elif room == "shop":
             self._enter_shop()
         elif room == "treasure":
@@ -445,6 +648,8 @@ class RunLoop:
         options = self._map_options()
         if state.last_room == "shop" or (options and all(n.kind == mapgen.SHOP for n in options)):
             allowed.discard("shop")
+        if "juzu_bracelet" in state.player.relics:
+            allowed.discard("monster")
         roll = self.rng.stream("unknown_map_point").random()
         rolled = "event"
         acc = 0.0
@@ -498,13 +703,14 @@ class RunLoop:
         state.room = room
         p = state.player
         assert p is not None
-        self.combat_ctx.start_combat(monster_ids, list(p.deck), monster_flags=flags)
+        ctx = self.combat_ctx
+        ctx.relics = RelicEngine(ctx)
+        ctx.start_combat(monster_ids, list(p.deck), monster_flags=flags, room=room)
         self._maybe_finalize_combat()
 
-    def _handle_combat_action(self, action_id: str) -> None:
+    def _handle_combat_action(self, name: str, args: tuple[str, ...]) -> None:
         ctx = self.combat_ctx
         try:
-            name, args = actions.parse_action(action_id)
             sel = ctx.combat.pending_selection
             if name == actions.END_TURN and not args:
                 ctx.end_turn()
@@ -512,14 +718,19 @@ class RunLoop:
                 ctx.play_card(args[0])
             elif name == actions.PLAY_CARD and len(args) == 2:
                 ctx.play_card(args[0], target_slot=self._alive_monsters()[int(args[1])].slot)
+            elif name == actions.USE_POTION:
+                target = self._alive_monsters()[int(args[1])].slot if len(args) == 2 else None
+                ctx.use_potion(int(args[0]), target_slot=target)
             elif name in (actions.COMBAT_SELECT_CARD, actions.SELECT_CARD) and sel is not None:
                 ctx.toggle_selection(sel.candidates[int(args[0])])
             elif name in (actions.COMBAT_CONFIRM_SELECTION, actions.CONFIRM_SELECTION):
                 ctx.confirm_selection()
+            elif name == actions.CANCEL_SELECTION:
+                ctx.confirm_selection(skip=True)
             else:
-                raise RunLoopError(f"unknown combat action {action_id!r}")
+                raise RunLoopError(f"unknown combat action {name!r}")
         except CombatError as exc:
-            raise RunLoopError(f"combat engine rejected {action_id!r}: {exc}") from exc
+            raise RunLoopError(f"combat engine rejected {name}:{':'.join(args)}: {exc}") from exc
 
     def _maybe_finalize_combat(self) -> None:
         state = self.state
@@ -543,8 +754,13 @@ class RunLoop:
         if self.single_combat:
             self._game_over(Outcome.VICTORY)
             return
+        # GenerateCombatRewards: the healing relics act first.
         if "burning_blood" in p.relics:
-            p.hp = min(p.max_hp, p.hp + 6)
+            self._heal(6)
+        if "black_blood" in p.relics:
+            self._heal(12)
+        if "meat_on_the_bone" in p.relics and p.hp <= p.max_hp // 2:
+            self._heal(12)
         room = state.room
         if room == "boss" and state.act_index >= len(state.acts) - 1:
             if not self._boss_remaining():
@@ -553,7 +769,7 @@ class RunLoop:
             # A10's first boss of the last act: straight on to the second.
             self._enter_map_screen()
             return
-        self._open_combat_rewards(room or "monster")
+        self._open_combat_rewards(room or "monster", took_damage=combat.took_unblocked)
 
     def _boss_remaining(self) -> bool:
         state = self.state
@@ -567,50 +783,71 @@ class RunLoop:
     # ------------------------------------------------------------------
     # Rewards
 
-    def _open_combat_rewards(self, room: str) -> None:
+    def _card_reward_item(self, room: str, *, took_damage: bool = True, rare: bool = False) -> RewardItem:
         state = self.state
+        p = state.player
+        pool = self._reward_pool + (self._colorless_pool if "dingy_rug" in p.relics else [])
         stream = self.rng.stream("rewards")
-        items: list[RewardItem] = [RewardItem(kind="gold", gold=rewards.combat_gold(room, state.ascension, stream))]
-        dropped, state.potion_odds = rewards.roll_potion_drop(state.potion_odds, room, stream)
-        if dropped:
-            potion = self._roll_potion(stream)
-            if potion is not None:
-                items.append(RewardItem(kind="potion", potion=potion))
-        if room == "elite":
-            relic = self._roll_relic(stream)
-            if relic is not None:
-                items.append(RewardItem(kind="relic", relic=relic))
         cards, state.card_rarity_offset = rewards.card_reward(
-            self.cards, self._reward_pool, room, ascension=state.ascension, act_index=state.act_index,
+            self.cards, pool, "boss" if rare else room, ascension=state.ascension, act_index=state.act_index,
             offset=state.card_rarity_offset, rng=stream)
-        items.append(RewardItem(kind="card", cards=cards))
+        refs = [CardRef(c) for c in cards]
+        if "lava_lamp" in p.relics and not took_damage:
+            refs = [CardRef(self.cards[c].upgrade_of, like=c) if self.cards[c].upgrade_of else c for c in refs]
+        if "lasting_candy" in p.relics and p.relic_state.get("lasting_candy", 0) % 2 == 0 \
+                and p.relic_state.get("lasting_candy", 0) > 0:
+            powers = [c for c in pool if self.cards[c].card_type == "power" and c not in cards]
+            if powers:
+                refs.append(CardRef(stream.choice(powers)))
+        if "wing_charm" in p.relics:
+            target = stream.choice(refs)
+            target.enchant, target.enchant_amount = "swift", 1
+        return RewardItem(kind="card", cards=refs)
+
+    def _open_combat_rewards(self, room: str, *, took_damage: bool) -> None:
+        state = self.state
+        p = state.player
+        stream = self.rng.stream("rewards")
+        if "lasting_candy" in p.relics:
+            p.relic_state["lasting_candy"] = p.relic_state.get("lasting_candy", 0) + 1
+        gold = rewards.combat_gold(room, state.ascension, stream)
+        if "amethyst_aubergine" in p.relics:
+            gold += 15
+        items: list[RewardItem] = [RewardItem(kind="gold", gold=gold)]
+        dropped, state.potion_odds = rewards.roll_potion_drop(state.potion_odds, room, stream)
+        if dropped or "white_beast_statue" in p.relics:
+            items.append(RewardItem(kind="potion", potion=random_potion(self._potions, stream)))
+        if room == "elite":
+            items.append(RewardItem(kind="relic", relic=self._next_relic(stream)))
+        items.append(self._card_reward_item(room, took_damage=took_damage))
+        if room == "monster" and "prayer_wheel" in p.relics:
+            items.append(self._card_reward_item(room, took_damage=took_damage))
+        if room == "elite" and "white_star" in p.relics:
+            items.append(self._card_reward_item(room, took_damage=took_damage, rare=True))
         state.rewards = items
+        state.rewards_return = None
         state.screen = Screen.REWARDS
-
-    def _roll_potion(self, stream) -> str | None:
-        del stream
-        return None  # potions arrive with potions.py
-
-    def _roll_relic(self, stream) -> str | None:
-        del stream
-        return None  # relic rewards arrive with relics.py
 
     def _step_rewards(self, name: str, args: tuple[str, ...]) -> None:
         state = self.state
+        p = state.player
+        assert p is not None
         if name == actions.PROCEED:
             self._leave_rewards()
             return
+        if name == actions.DISCARD_POTION:
+            p.potions[int(args[0])] = None
+            return
         index = int(args[0])
         item = state.rewards[index]
-        p = state.player
-        assert p is not None
         if item.kind == "gold":
-            p.gold += item.gold
+            self._gain_gold(item.gold)
         elif item.kind == "potion":
-            slot = p.potions.index(None)
-            p.potions[slot] = item.potion
+            p.potions[p.potions.index(None)] = item.potion
         elif item.kind == "relic":
-            p.relics.append(item.relic)
+            state.rewards.pop(index)
+            self._obtain_relic(item.relic, return_to=Screen.REWARDS)
+            return
         elif item.kind == "card":
             state.card_reward = list(item.cards)
             state.card_reward_item = index
@@ -622,7 +859,7 @@ class RunLoop:
         state = self.state
         assert state.card_reward is not None and state.card_reward_item is not None
         if name == actions.SELECT_CARD_REWARD:
-            state.player.deck.append(state.card_reward[int(args[0])])
+            self._add_card_to_deck(state.card_reward[int(args[0])])
         state.rewards.pop(state.card_reward_item)
         state.card_reward = None
         state.card_reward_item = None
@@ -631,6 +868,11 @@ class RunLoop:
     def _leave_rewards(self) -> None:
         state = self.state
         state.rewards = []
+        back = state.rewards_return
+        state.rewards_return = None
+        if back is not None:
+            state.screen = back
+            return
         if state.room == "boss":
             self._enter_act_map(state.act_index + 1)
         self._enter_map_screen()
@@ -638,40 +880,74 @@ class RunLoop:
     # ------------------------------------------------------------------
     # Rest site
 
+    def _enter_rest(self) -> None:
+        state = self.state
+        p = state.player
+        p.relic_state.pop("rest_taken", None)
+        if "venerable_tea_set" in p.relics:
+            p.relic_state["venerable_tea_set"] = 1
+        if "eternal_feather" in p.relics:
+            self._heal(len(p.deck) // 5 * 3)
+        state.rest_used = False
+        state.screen = Screen.REST
+
     def _rest_heal(self) -> int:
-        return max(1, int(self.state.player.max_hp * 0.3))
+        p = self.state.player
+        return max(1, int(p.max_hp * 0.3)) + (15 if "regal_pillow" in p.relics else 0)
 
     def _upgradable_deck(self) -> list[int]:
         cards = self.cards
         return [i for i, c in enumerate(self.state.player.deck)
                 if cards[c].upgrade_of is not None and cards[c].card_type not in ("status", "curse")]
 
-    def _rest_options(self) -> list[tuple[str, str, str, bool]]:
-        heal = self._rest_heal()
-        return [
-            (_REST_HEAL[0], _REST_HEAL[1], _REST_HEAL[2].format(heal=heal), True),
-            (_REST_SMITH[0], _REST_SMITH[1], _REST_SMITH[2], bool(self._upgradable_deck())),
-        ]
+    def _rest_options(self) -> list[tuple[str, str, str]]:
+        p = self.state.player
+        taken = p.relic_state.get("rest_taken", ())
+        out = []
+        if "HEAL" not in taken:
+            out.append(("HEAL", _REST_TEXT["HEAL"][0], _REST_TEXT["HEAL"][1].format(heal=self._rest_heal())))
+        if "SMITH" not in taken and self._upgradable_deck():
+            out.append(("SMITH",) + _REST_TEXT["SMITH"])
+        lifts = p.relic_state.get("girya", 0)
+        if "girya" in p.relics and lifts < GIRYA_LIFTS and "LIFT" not in taken:
+            out.append(("LIFT", _REST_TEXT["LIFT"][0], _REST_TEXT["LIFT"][1].format(left=GIRYA_LIFTS - lifts)))
+        if "shovel" in p.relics and "DIG" not in taken:
+            out.append(("DIG",) + _REST_TEXT["DIG"])
+        return out
+
+    def _finish_rest_option(self, option: str) -> None:
+        p = self.state.player
+        p.relic_state["rest_taken"] = tuple(p.relic_state.get("rest_taken", ())) + (option,)
+        if "miniature_tent" not in p.relics or not self._rest_options():
+            self.state.rest_used = True
 
     def _step_rest(self, name: str, args: tuple[str, ...]) -> None:
         state = self.state
         if name == actions.PROCEED:
             self._enter_map_screen()
             return
-        enabled = [o for o in self._rest_options() if o[3]]
-        option = enabled[int(args[0])][0]
+        option = self._rest_options()[int(args[0])][0]
         p = state.player
         assert p is not None
         if option == "HEAL":
-            p.hp = min(p.max_hp, p.hp + self._rest_heal())
-            state.rest_used = True
+            self._heal(self._rest_heal())
+            if "tiny_mailbox" in p.relics:
+                stream = self.rng.stream("rewards")
+                for _ in range(2):
+                    if None in p.potions:
+                        p.potions[p.potions.index(None)] = random_potion(self._potions, stream)
+            self._finish_rest_option(option)
         elif option == "SMITH":
-            state.deck_select = DeckSelection(purpose="upgrade", candidates=self._upgradable_deck(), count=1,
-                                              source=Screen.REST)
-            state.screen = Screen.CARD_SELECT
+            self._open_deck_select("upgrade", self._upgradable_deck(), 1, Screen.REST, cancelable=True)
+        elif option == "LIFT":
+            p.relic_state["girya"] = p.relic_state.get("girya", 0) + 1
+            self._finish_rest_option(option)
+        elif option == "DIG":
+            self._finish_rest_option(option)
+            self._obtain_relic(self._next_relic(self.rng.stream("rewards")), return_to=Screen.REST)
 
     # ------------------------------------------------------------------
-    # Deck card selection (Smith, card removal)
+    # Deck card selection (Smith, card removal, relic pickups)
 
     def _step_deck_select(self, name: str, args: tuple[str, ...]) -> None:
         state = self.state
@@ -691,8 +967,8 @@ class RunLoop:
         deck = state.player.deck
         if sel.purpose == "upgrade":
             for idx in sel.selected:
-                deck[idx] = self.cards[deck[idx]].upgrade_of or deck[idx]
-            state.rest_used = True
+                deck[idx] = CardRef(self.cards[deck[idx]].upgrade_of or deck[idx], like=deck[idx])
+            self._finish_rest_option("SMITH")
         elif sel.purpose == "remove":
             for idx in sorted(sel.selected, reverse=True):
                 deck.pop(idx)
@@ -701,31 +977,84 @@ class RunLoop:
             for item in state.shop:
                 if item.category == "card_removal":
                     item.stocked = False
+        elif sel.purpose == "duplicate":
+            for idx in sel.selected:
+                self._add_card_to_deck(CardRef(str(deck[idx]), like=deck[idx]))
+        elif sel.purpose == "enchant":
+            for idx in sel.selected:
+                ref = deck[idx] if isinstance(deck[idx], CardRef) else CardRef(deck[idx])
+                ref.enchant, ref.enchant_amount = sel.enchant, sel.enchant_amount
+                deck[idx] = ref
+        if state.rewards and state.screen != Screen.REWARDS and state.rewards_return is None:
+            state.rewards_return = state.screen
+            state.screen = Screen.REWARDS
 
     # ------------------------------------------------------------------
     # Shop
 
+    def _price(self, base: int) -> int:
+        p = self.state.player
+        if "the_courier" in p.relics:
+            base = int(base * 0.8)
+        if "membership_card" in p.relics:
+            base //= 2
+        return base
+
+    def _shop_card(self, ctype: str | None, picked: list[str], stream, *, colorless_rarity: str | None = None
+                   ) -> ShopItem:
+        state = self.state
+        cards = self.cards
+        if colorless_rarity is not None:
+            cid = rewards.choose_card(self._colorless_pool, cards, colorless_rarity, picked, stream)
+            price = rewards.shop_card_price(cards[cid].rarity, colorless=True, rng=stream)
+        else:
+            typed = [c for c in self._reward_pool if cards[c].card_type == ctype]
+            rarity, _ = rewards.roll_rarity(state.card_rarity_offset, rewards.card_odds("shop", state.ascension),
+                                            stream, ascension=state.ascension, mutate=False)
+            cid = rewards.choose_card(typed, cards, rarity, picked, stream)
+            price = rewards.shop_card_price(cards[cid].rarity, colorless=False, rng=stream)
+        picked.append(cid)
+        return ShopItem(category="card", item=cid, price=price)
+
+    def _shop_relic(self, rarity: str, stream) -> ShopItem:
+        relic = self._pull_relic(self.state.relic_bag, rarity, front=False, shop=True) or "circlet"
+        self._drop_from_bags(relic)
+        base = {"common": 175, "uncommon": 225, "rare": 275, "shop": 200}.get(self._relics[relic].rarity, 1)
+        return ShopItem(category="relic", item=relic, price=round(base * stream.uniform(0.85, 1.15)))
+
+    def _shop_potion(self, picked: list[str], stream) -> ShopItem:
+        pid = random_potion(self._potions, stream, blacklist=picked)
+        picked.append(pid)
+        base = {"rare": 100, "uncommon": 75}.get(self._potions[pid].rarity, 50)
+        return ShopItem(category="potion", item=pid, price=int(base * stream.uniform(0.95, 1.05) + 0.5))
+
     def _enter_shop(self) -> None:
         state = self.state
+        p = state.player
+        if "meal_ticket" in p.relics:
+            self._heal(15)
         stream = self.rng.stream("shop")
-        cards = self.cards
-        pool = self._reward_pool
         sale = stream.randrange(5)
         items: list[ShopItem] = []
         picked: list[str] = []
         for i, ctype in enumerate(("attack", "attack", "skill", "skill", "power")):
-            typed = [c for c in pool if cards[c].card_type == ctype]
-            rarity, _ = rewards.roll_rarity(state.card_rarity_offset, rewards.card_odds("shop", state.ascension),
-                                            stream, ascension=state.ascension, mutate=False)
-            cid = rewards.choose_card(typed, cards, rarity, picked, stream)
-            picked.append(cid)
-            price = rewards.shop_card_price(cards[cid].rarity, colorless=False, rng=stream)
+            item = self._shop_card(ctype, picked, stream)
             if i == sale:
-                price //= 2
-            items.append(ShopItem(category="card", item=cid, price=price, on_sale=i == sale))
+                item.price //= 2
+                item.on_sale = True
+            items.append(item)
+        for rarity in ("uncommon", "rare"):
+            items.append(self._shop_card(None, picked, stream, colorless_rarity=rarity))
+        for rarity in (self._roll_relic_rarity(stream), self._roll_relic_rarity(stream), "shop"):
+            items.append(self._shop_relic(rarity, stream))
+        potions: list[str] = []
+        for _ in range(3):
+            items.append(self._shop_potion(potions, stream))
         inflation = state.ascension >= ASC_INFLATION
         removal = (100 if inflation else 75) + (50 if inflation else 25) * state.removals_used
         items.append(ShopItem(category="card_removal", item=None, price=removal))
+        for item in items:
+            item.price = self._price(item.price)
         state.shop = items
         state.screen = Screen.SHOP
 
@@ -739,40 +1068,68 @@ class RunLoop:
         p = state.player
         assert p is not None
         if item.category == "card_removal":
-            state.deck_select = DeckSelection(
-                purpose="remove", candidates=[i for i, c in enumerate(p.deck) if self._removable(c)],
-                count=1, source=Screen.SHOP, price=item.price)
-            state.screen = Screen.CARD_SELECT
+            self._open_deck_select("remove", [i for i, c in enumerate(p.deck) if c not in _UNREMOVABLE], 1,
+                                   Screen.SHOP, price=item.price, cancelable=True)
             return
         p.gold -= item.price
         item.stocked = False
+        if "the_courier" in p.relics:
+            self._restock(item)
         if item.category == "card":
-            p.deck.append(item.item)
+            self._add_card_to_deck(item.item)
+        elif item.category == "potion":
+            p.potions[p.potions.index(None)] = item.item
+        elif item.category == "relic":
+            self._obtain_relic(item.item, return_to=Screen.SHOP)
 
-    def _removable(self, card_id: str) -> bool:
-        return card_id not in ("ascenders_bane", "curse_of_the_bell", "necronomicurse")
+    def _restock(self, sold: ShopItem) -> None:
+        """The Courier: the merchant never runs out."""
+
+        stream = self.rng.stream("shop")
+        if sold.category == "card":
+            cdef = self.cards[sold.item]
+            new = self._shop_card(None if cdef.color == "colorless" else cdef.card_type, [sold.item], stream,
+                                  colorless_rarity=cdef.rarity if cdef.color == "colorless" else None)
+        elif sold.category == "relic":
+            new = self._shop_relic(self._roll_relic_rarity(stream), stream)
+        else:
+            new = self._shop_potion([sold.item], stream)
+        new.price = self._price(new.price)
+        self.state.shop[self.state.shop.index(sold)] = new
 
     def _shop_items(self) -> list[ShopItem]:
         p = self.state.player
         assert p is not None
-        return [i for i in self.state.shop if i.stocked and i.price <= p.gold
-                and (i.category != "card_removal" or any(self._removable(c) for c in p.deck))]
+        out = []
+        for i in self.state.shop:
+            if not i.stocked or i.price > p.gold:
+                continue
+            if i.category == "card_removal" and not any(c not in _UNREMOVABLE for c in p.deck):
+                continue
+            if i.category == "potion" and None not in p.potions:
+                continue
+            out.append(i)
+        return out
 
     # ------------------------------------------------------------------
     # Treasure
 
     def _enter_treasure(self) -> None:
+        """EnterTreasureRoom: the chest's gold, paid as it opens, and a relic from the shared bag."""
+
         state = self.state
         stream = self.rng.stream("treasure")
-        state.player.gold += rewards.poverty_gold(state.ascension, stream.randint(42, 52))
-        state.treasure_relics = []
+        self._gain_gold(rewards.poverty_gold(state.ascension, stream.randint(42, 52)))
+        relic = self._pull_relic(state.shared_relic_bag, self._roll_relic_rarity(stream))
+        state.treasure_relics = [relic or "circlet"]
         state.screen = Screen.TREASURE
 
     def _step_treasure(self, name: str, args: tuple[str, ...]) -> None:
         state = self.state
         if name == actions.CLAIM_TREASURE_RELIC:
-            state.player.relics.append(state.treasure_relics.pop(int(args[0])))
+            relic = state.treasure_relics.pop(int(args[0]))
             state.treasure_relics = []
+            self._obtain_relic(relic, return_to=Screen.TREASURE)
             return
         self._enter_map_screen()
 
@@ -800,22 +1157,36 @@ class RunLoop:
         if screen == Screen.CARD_SELECT:
             return self._deck_select_decisions()
         if screen == Screen.REST:
-            if state.rest_used:
-                return [Decision(id=actions.PROCEED, text="leave rest site")]
-            return [Decision(id=actions.format_action(actions.CHOOSE_REST_OPTION, i), text=f"{name}: {desc}")
-                    for i, (_, name, desc, on) in enumerate(o for o in self._rest_options() if o[3])]
+            out = [] if state.rest_used else [
+                Decision(id=actions.format_action(actions.CHOOSE_REST_OPTION, i), text=f"{name}: {desc}")
+                for i, (_, name, desc) in enumerate(self._rest_options())]
+            if state.rest_used or state.player.relic_state.get("rest_taken"):
+                out.append(Decision(id=actions.PROCEED, text="leave rest site"))
+            return out
         if screen == Screen.SHOP:
             out = [Decision(id=actions.format_action(actions.SHOP_PURCHASE, i), text=self._shop_item_text(item))
                    for i, item in enumerate(self._shop_items())]
             out.append(Decision(id=actions.PROCEED, text="leave"))
             return out
         if screen == Screen.TREASURE:
-            return [Decision(id=actions.PROCEED, text="leave treasure room")]
+            out = [Decision(id=actions.format_action(actions.CLAIM_TREASURE_RELIC, i),
+                            text=f"take relic {self._relic_text(r)}") for i, r in enumerate(state.treasure_relics)]
+            out.append(Decision(id=actions.PROCEED, text="leave treasure room"))
+            return out
         if screen == Screen.EVENT:
-            return [Decision(id=actions.format_action(actions.CHOOSE_EVENT_OPTION, 0), text="proceed (events are not simulated yet)")]
+            return [Decision(id=actions.format_action(actions.CHOOSE_EVENT_OPTION, 0),
+                             text="proceed (events are not simulated yet)")]
         if screen == Screen.GAME_OVER:
             return [Decision(id=actions.GAME_OVER_MAIN_MENU, text="<game_over>")]
         raise RunLoopError(f"no decision table for screen {screen!r}")
+
+    def _relic_text(self, relic_id: str) -> str:
+        r = self._relics[relic_id]
+        return f"{r.name}: {r.description}"
+
+    def _potion_text(self, potion_id: str) -> str:
+        p = self._potions[potion_id]
+        return f"{p.name}: {p.description}"
 
     def _map_decisions(self) -> list[Decision]:
         out = []
@@ -830,11 +1201,18 @@ class RunLoop:
         p = self.state.player
         assert p is not None
         out = []
+        potion_waiting = False
         for i, item in enumerate(self.state.rewards):
             if item.kind == "potion" and None not in p.potions:
+                potion_waiting = True
                 continue
             out.append(Decision(id=actions.format_action(actions.CLAIM_REWARD, i),
                                 text=f"claim {item.kind}: {self._reward_description(item)}"))
+        if potion_waiting:
+            for slot, pid in enumerate(p.potions):
+                if pid is not None:
+                    out.append(Decision(id=actions.format_action(actions.DISCARD_POTION, slot),
+                                        text=f"discard potion {self._potions[pid].name}"))
         out.append(Decision(id=actions.PROCEED, text="proceed"))
         return out
 
@@ -843,7 +1221,11 @@ class RunLoop:
             return f"{item.gold} Gold"
         if item.kind == "card":
             return "Add a card to your deck."
-        return item.potion or item.relic or ""
+        if item.kind == "potion" and item.potion is not None:
+            return self._potion_text(item.potion)
+        if item.kind == "relic" and item.relic is not None:
+            return self._relic_text(item.relic)
+        return ""
 
     def _deck_select_decisions(self) -> list[Decision]:
         sel = self.state.deck_select
@@ -855,7 +1237,8 @@ class RunLoop:
                 if idx not in sel.selected:
                     out.append(Decision(id=actions.format_action(actions.SELECT_CARD, pos),
                                         text=f"select {self.deck_card_label(deck[idx])}"))
-        if len(sel.selected) == sel.count:
+        low = sel.count if sel.min_count is None else sel.min_count
+        if low <= len(sel.selected) <= sel.count:
             out.append(Decision(id=actions.CONFIRM_SELECTION, text="confirm selection"))
         if sel.cancelable:
             out.append(Decision(id=actions.CANCEL_SELECTION, text="cancel / skip"))
@@ -865,6 +1248,10 @@ class RunLoop:
         if item.category == "card":
             card = self.cards[item.item]
             what = f"card {card.name}: {card.description}"
+        elif item.category == "relic":
+            what = f"relic {self._relic_text(item.item)}"
+        elif item.category == "potion":
+            what = f"potion {self._potion_text(item.item)}"
         else:
             what = item.category
         return f"buy {what} for {item.price} gold"
@@ -874,7 +1261,12 @@ class RunLoop:
         up = "+" if card.upgraded else ""
         cost = "X" if card.x_cost else card.cost
         name = card.name[:-1] if card.upgraded and card.name.endswith("+") else card.name
-        return f"{name}{up} ({card.card_type}, cost {cost}): {card.description}"
+        enchant = getattr(card_id, "enchant", None)
+        extra = ""
+        if enchant is not None:
+            amount = getattr(card_id, "enchant_amount", 0)
+            extra = f" [{_ENCHANT_NAMES.get(enchant, enchant)}{(' ' + str(amount)) if amount else ''}]"
+        return f"{name}{up}{extra} ({card.card_type}, cost {cost}): {card.description}"
 
     def card_label(self, card_id: str) -> str:
         card = self.cards[card_id]
@@ -888,7 +1280,7 @@ class RunLoop:
             combat = self.state.combat
             if combat is not None and combat.curse_choice is not None:
                 desc = f"At the end of your turn, take {combat.curse_choice[1]} damage."
-        return f"{card.name}: {desc}"
+        return f"{card.name} ({card.card_type}): {desc}"
 
     def _combat_decisions(self) -> list[Decision]:
         state = self.state
@@ -903,33 +1295,8 @@ class RunLoop:
             )
 
         sel = combat.pending_selection
-        if sel is not None and sel.source == "generated":
-            out = []
-            if len(sel.selected) < sel.max_count:
-                for pos, idx in enumerate(sel.candidates):
-                    if idx not in sel.selected:
-                        out.append(Decision(id=actions.format_action(actions.SELECT_CARD, pos),
-                                            text=f"choose {self._generated_label(sel, idx)}"))
-            if ctx.can_confirm_selection():
-                out.append(Decision(id=actions.CONFIRM_SELECTION, text="confirm selection"))
-            return out
         if sel is not None:
-            in_hand = sel.source == "hand"
-            pile = player.hand if in_hand else player.discard_pile
-            pick, confirm = (
-                (actions.COMBAT_SELECT_CARD, actions.COMBAT_CONFIRM_SELECTION) if in_hand
-                else (actions.SELECT_CARD, actions.CONFIRM_SELECTION)
-            )
-            out = []
-            if len(sel.selected) < sel.max_count:
-                for pos, idx in enumerate(sel.candidates):
-                    if idx in sel.selected:
-                        continue
-                    out.append(Decision(id=actions.format_action(pick, pos),
-                                        text=f"select {self.card_label(pile[idx])}"))
-            if ctx.can_confirm_selection():
-                out.append(Decision(id=confirm, text="confirm selection"))
-            return out
+            return self._selection_decisions(sel)
 
         decisions: list[Decision] = []
         seen: set[str] = set()
@@ -951,8 +1318,45 @@ class RunLoop:
                     ))
             else:
                 decisions.append(Decision(id=actions.format_action(actions.PLAY_CARD, card_id), text=label))
+        for slot, pid in enumerate(player.potions):
+            if pid is None or not ctx.can_use_potion(slot):
+                continue
+            potion = self._potions[pid]
+            label = f"use potion {potion.name}: {potion.description}"
+            if potion.target == "single_enemy":
+                for pos, monster in enumerate(alive):
+                    decisions.append(Decision(
+                        id=actions.format_action(actions.USE_POTION, slot, pos),
+                        text=f"{label} -> {monster.name}#{pos}[{monster.hp}/{monster.max_hp}]",
+                    ))
+            else:
+                decisions.append(Decision(id=actions.format_action(actions.USE_POTION, slot), text=label))
         decisions.append(Decision(id=actions.END_TURN, text="end turn"))
         return decisions
+
+    def _selection_decisions(self, sel) -> list[Decision]:
+        ctx = self.combat_ctx
+        player = self.state.player
+        in_hand = sel.source == "hand"
+        pick, confirm = ((actions.COMBAT_SELECT_CARD, actions.COMBAT_CONFIRM_SELECTION) if in_hand
+                         else (actions.SELECT_CARD, actions.CONFIRM_SELECTION))
+        out = []
+        if len(sel.selected) < sel.max_count:
+            for pos, idx in enumerate(sel.candidates):
+                if idx in sel.selected:
+                    continue
+                if sel.source == "generated":
+                    text = f"choose {self._generated_label(sel, idx)}"
+                else:
+                    pile = {"hand": player.hand, "discard": player.discard_pile,
+                            "draw": player.draw_pile}[sel.source]
+                    text = f"select {self.card_label(pile[idx])}"
+                out.append(Decision(id=actions.format_action(pick, pos), text=text))
+        if ctx.can_confirm_selection() and (sel.selected or sel.min_count > 0 or in_hand):
+            out.append(Decision(id=confirm, text="confirm selection"))
+        if sel.min_count == 0 and not in_hand:
+            out.append(Decision(id=actions.CANCEL_SELECTION, text="skip"))
+        return out
 
     def _alive_monsters(self) -> list:
         state = self.state

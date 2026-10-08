@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Callable, Iterator
 
-from .combat import CombatContext, Play, SelectionRequest
+from .combat import REND_DEBUFFS, CombatContext, Play, SelectionRequest
 from .state import CardRef, index_ref, remove_ref
 
 
@@ -634,6 +634,366 @@ def crimson_mantle(c, p):
     # Each copy played adds 1 to the HP lost at the start of the turn.
     c.player.powers["crimson_mantle_hp"] = c.player.powers.get("crimson_mantle_hp", 0) + 1
 
+
+
+# ---------------------------------------------------------------------------
+# Colorless (r33hab CardEffects `case CL.*`)
+
+@card("ALCHEMIZE")
+def alchemize(c, p):
+    from .potion_effects import random_potion
+
+    c.procure_potion(random_potion(c.potion_defs, c.rng.stream("potion_generation")))
+
+
+@card("ANOINTED")
+def anointed(c, p):
+    pl = c.player
+    rares = [ref for ref in pl.draw_pile if c.cards[ref].rarity == "rare"]
+    c.rng.stream("card_select").shuffle(rares)
+    room = 10 - len(pl.hand)
+    for ref in rares[:max(0, room)]:
+        remove_ref(pl.draw_pile, ref)
+        if not isinstance(ref, CardRef):
+            ref = CardRef(ref)
+        # Anointed+ only gains Retain itself (its upgrade); the drawn Rares do not.
+        pl.hand.append(ref)
+
+
+@card("BEAT_DOWN")
+def beat_down(c, p):
+    pl = c.player
+    attacks = sorted((ref for ref in pl.discard_pile
+                      if c.cards[ref].card_type == "attack" and not c.cards[ref].unplayable), key=str)
+    c.rng.stream("combat_shuffle").shuffle(attacks)
+    taken = attacks[:_v(p, "cards")]
+    for ref in taken:
+        remove_ref(pl.discard_pile, ref)
+    for ref in taken:
+        if c.combat.outcome is not None:
+            pl.discard_pile.append(ref)
+            continue
+        c.autoplay(ref)
+
+
+@card("BOLAS")
+def bolas(c, p):
+    _hit(c, p, _v(p, "damage"))
+
+
+@card("CATASTROPHE")
+def catastrophe(c, p):
+    pl = c.player
+    stream = c.rng.stream("combat_shuffle")
+    for _ in range(_v(p, "cards")):
+        if not pl.draw_pile or c.combat.outcome is not None:
+            break
+        playable = [ref for ref in pl.draw_pile if not c.cards[ref].unplayable] or list(pl.draw_pile)
+        playable.sort(key=str)
+        stream.shuffle(playable)
+        ref = playable[0]
+        remove_ref(pl.draw_pile, ref)
+        c.autoplay(ref)
+
+
+@card("DARK_SHACKLES")
+def dark_shackles(c, p):
+    t = p.target
+    if t is not None and t.alive:
+        loss = _v(p, "strength_loss")
+        if c.apply_power(t, "strength", -loss, source=c.player):
+            t.flags["temporary_strength_loss"] = t.flags.get("temporary_strength_loss", 0) + loss
+
+
+@card("DISCOVERY")
+def discovery(c, p) -> Iterator[SelectionRequest]:
+    options = c.distinct_cards(c.generation_pool(color="colorless"), 3)
+    if not options:
+        return
+    chosen = yield SelectionRequest(source="generated", candidates=list(range(len(options))), count=1,
+                                    purpose="to_hand", options=options)
+    for cid in chosen:
+        c.add_to_hand(cid).free_turn = True
+
+
+@card("DRAMATIC_ENTRANCE")
+def dramatic_entrance(c, p):
+    c.attack_all(_v(p, "damage"))
+
+
+@card("EQUILIBRIUM")
+def equilibrium(c, p):
+    c.gain_block(_v(p, "block"))
+    c.apply_power(c.player, "retain_hand", 1)
+
+
+@card("FINESSE")
+def finesse(c, p):
+    c.gain_block(_v(p, "block"))
+    c.draw(_v(p, "cards"))
+
+
+@card("FISTICUFFS")
+def fisticuffs(c, p):
+    dealt = _hit(c, p, _v(p, "damage"))
+    if dealt > 0:
+        c.gain_block(dealt)
+
+
+@card("FLASH_OF_STEEL")
+def flash_of_steel(c, p):
+    _hit(c, p, _v(p, "damage"))
+    c.draw(_v(p, "cards"))
+
+
+@card("GOLD_AXE")
+def gold_axe(c, p):
+    _hit(c, p, c.combat.cards_played_this_combat)
+
+
+@card("HAND_OF_GREED")
+def hand_of_greed(c, p):
+    t = p.target
+    if t is None:
+        return
+    fatal_ok = t.powers.get("minion", 0) <= 0 and t.powers.get("reattach", 0) <= 0
+    _hit(c, p, _v(p, "damage"))
+    if fatal_ok and t.hp <= 0:
+        c.gain_gold(_v(p, "gold"))
+
+
+@card("HIDDEN_GEM")
+def hidden_gem(c, p):
+    pile = c.player.draw_pile
+    ok = [i for i, ref in enumerate(pile) if not c.cards[ref].unplayable
+          and c.cards[ref].card_type not in ("status", "curse") and getattr(ref, "replay", 0) < 1]
+    preferred = [i for i in ok if c.cards[pile[i]].card_type in ("attack", "skill", "power")] or ok
+    if preferred:
+        i = c.rng.stream("card_select").choice(preferred)
+        if not isinstance(pile[i], CardRef):
+            pile[i] = CardRef(pile[i])
+        pile[i].replay += _v(p, "replay")
+
+
+@card("IMPATIENCE")
+def impatience(c, p):
+    if not any(c.cards[ref].card_type == "attack" for ref in c.player.hand):
+        c.draw(_v(p, "cards"))
+
+
+@card("JACK_OF_ALL_TRADES")
+def jack_of_all_trades(c, p):
+    pool = c.generation_pool(color="colorless")
+    stream = c.rng.stream("card_generation")
+    for _ in range(_v(p, "cards")):
+        if len(c.player.hand) >= 10:
+            break
+        c.add_to_hand(stream.choice(pool))
+
+
+@card("JACKPOT")
+def jackpot(c, p):
+    _hit(c, p, _v(p, "damage"))
+    pool = [cid for cid in c.generation_pool() if c.cards[cid].cost == 0 and not c.cards[cid].x_cost]
+    stream = c.rng.stream("card_generation")
+    for _ in range(_v(p, "cards")):
+        if not pool or len(c.player.hand) >= 10:
+            break
+        cid = stream.choice(pool)
+        if p.card.upgraded:
+            cid = c.cards[cid].upgrade_of or cid
+        c.add_to_hand(cid)
+
+
+@card("MASTER_OF_STRATEGY")
+def master_of_strategy(c, p):
+    c.draw(_v(p, "cards"))
+
+
+@card("MIND_BLAST")
+def mind_blast(c, p):
+    _hit(c, p, len(c.player.draw_pile))
+
+
+@card("OMNISLICE")
+def omnislice(c, p):
+    t = p.target
+    if t is None:
+        return
+    dealt = _hit(c, p, _v(p, "damage"))
+    if dealt <= 0:
+        return
+    for m in c.alive_monsters():
+        if m is not t:
+            c.damage_monster_unpowered(m, dealt, thorns=True)
+
+
+@card("PANIC_BUTTON")
+def panic_button(c, p):
+    c.gain_block(_v(p, "block"))
+    c.apply_power(c.player, "no_block", _v(p, "turns"))
+
+
+@card("PRODUCTION")
+def production(c, p):
+    c.gain_energy(_v(p, "energy"))
+
+
+@card("PROLONG")
+def prolong(c, p):
+    if c.player.block > 0:
+        c.apply_power(c.player, "block_next_turn", c.player.block)
+
+
+@card("PROWESS")
+def prowess(c, p):
+    c.gain_strength(_v(p, "strength"))
+    c.apply_power(c.player, "dexterity", _v(p, "dexterity"))
+
+
+@card("PURITY")
+def purity(c, p) -> Iterator[SelectionRequest]:
+    hand = c.player.hand
+    if not hand:
+        return
+    chosen = yield SelectionRequest(source="hand", candidates=list(range(len(hand))), count=_v(p, "cards"),
+                                    purpose="exhaust", min_count=0)
+    for ref in chosen:
+        c.exhaust_from_hand(ref)
+
+
+@card("REND")
+def rend(c, p):
+    t = p.target
+    debuffs = sum(1 for d in REND_DEBUFFS if t is not None and t.powers.get(d, 0) > 0)
+    _hit(c, p, _v(p, "calculation_base") + _v(p, "extra_damage") * debuffs)
+
+
+@card("RESTLESSNESS")
+def restlessness(c, p):
+    if not c.player.hand:
+        c.draw(_v(p, "cards"))
+        c.gain_energy(_v(p, "energy"))
+
+
+@card("SALVO")
+def salvo(c, p):
+    _hit(c, p, _v(p, "damage"))
+    c.apply_power(c.player, "retain_hand", 1)
+
+
+@card("SCRAWL")
+def scrawl(c, p):
+    c.draw(10 - len(c.player.hand))
+
+
+def _from_draw_pile(c, card_type: str | None):
+    pile = c.player.draw_pile
+    cands = [i for i, ref in enumerate(pile) if card_type is None or c.cards[ref].card_type == card_type]
+    if not cands:
+        return
+    chosen = yield SelectionRequest(source="draw", candidates=cands, count=1, purpose="to_hand")
+    for ref in chosen:
+        remove_ref(pile, ref)
+        c.add_to_hand(ref)
+
+
+@card("SECRET_TECHNIQUE")
+def secret_technique(c, p) -> Iterator[SelectionRequest]:
+    yield from _from_draw_pile(c, "skill")
+
+
+@card("SECRET_WEAPON")
+def secret_weapon(c, p) -> Iterator[SelectionRequest]:
+    yield from _from_draw_pile(c, "attack")
+
+
+@card("SEEKER_STRIKE")
+def seeker_strike(c, p) -> Iterator[SelectionRequest]:
+    _hit(c, p, _v(p, "damage"))
+    pile = c.player.draw_pile
+    if not pile or c.combat.outcome is not None:
+        return
+    order = sorted(range(len(pile)), key=lambda i: str(pile[i]))
+    c.rng.stream("card_select").shuffle(order)
+    cands = sorted(order[:_v(p, "cards")])
+    chosen = yield SelectionRequest(source="draw", candidates=cands, count=1, purpose="to_hand")
+    for ref in chosen:
+        remove_ref(pile, ref)
+        c.add_to_hand(ref)
+
+
+@card("SHOCKWAVE")
+def shockwave(c, p):
+    for m in c.alive_monsters():
+        c.apply_power(m, "weak", _v(p, "power"), source=c.player)
+        c.apply_power(m, "vulnerable", _v(p, "power"), source=c.player)
+
+
+@card("SPLASH")
+def splash(c, p):
+    # Offers Attacks from the other characters' pools, which the sim does not model;
+    # Splash is kept out of every reward / shop / generation pool (rewards.UNSUPPORTED_CARDS).
+    del c, p
+
+
+@card("THE_BOMB")
+def the_bomb(c, p):
+    c.apply_power(c.player, "the_bomb", _v(p, "turns"))
+    c._s.extra["the_bomb_damage"] = _v(p, "bomb_damage")
+
+
+@card("THE_GAMBIT")
+def the_gambit(c, p):
+    c.gain_block(_v(p, "block"))
+    c.apply_power(c.player, "the_gambit", 1)
+
+
+@card("THINKING_AHEAD")
+def thinking_ahead(c, p) -> Iterator[SelectionRequest]:
+    c.draw(_v(p, "cards"))
+    hand = c.player.hand
+    if not hand:
+        return
+    chosen = yield SelectionRequest(source="hand", candidates=list(range(len(hand))), count=1, purpose="to_draw_top")
+    for ref in chosen:
+        remove_ref(hand, ref)
+        c.player.draw_pile.append(ref)
+
+
+@card("THRUMMING_HATCHET")
+def thrumming_hatchet(c, p):
+    _hit(c, p, _v(p, "damage"))
+
+
+@card("ULTIMATE_DEFEND")
+def ultimate_defend(c, p):
+    c.gain_block(_v(p, "block"))
+
+
+@card("ULTIMATE_STRIKE")
+def ultimate_strike(c, p):
+    _hit(c, p, _v(p, "damage"))
+
+
+@card("VOLLEY")
+def volley(c, p):
+    c.attack_random(_v(p, "damage"), hits=p.x)
+
+
+CARD_EFFECTS.update({
+    "AUTOMATION": _power("automation", "energy"),
+    "CALAMITY": _power("calamity"),
+    "ENTROPY": _power("entropy", "cards"),
+    "ETERNAL_ARMOR": _power("plating", "plating"),
+    "FASTEN": _power("fasten", "extra_block"),
+    "MAYHEM": _power("mayhem"),
+    "NOSTALGIA": _power("nostalgia"),
+    "PANACHE": _power("panache", "panache_damage"),
+    "PREP_TIME": _power("prep_time", "prep_time"),
+    "ROLLING_BOULDER": _power("rolling_boulder", "rolling_boulder"),
+    "STRATAGEM": _power("stratagem"),
+})
 
 
 __all__ = ["CARD_EFFECTS"]

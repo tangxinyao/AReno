@@ -262,7 +262,7 @@ class ActionIdTest(unittest.TestCase):
         sim = _import_sim()
         loop = sim.RunLoop(seed=0)
         packet = loop.reset()
-        for _ in range(200):
+        for _ in range(20000):
             for cand in packet["candidates"]:
                 self.actions.parse_action(cand["id"])
             if packet["done"]:

@@ -31,16 +31,21 @@ from .schemas import (
     MONSTER_VERBS,
     MonsterSchema,
     MoveSchema,
+    POTION_RARITIES,
+    POTION_TARGETS,
     POWER_KINDS,
     POWER_STACKS,
     POWER_TARGETS,
+    PotionSchema,
     PowerSchema,
+    RELIC_RARITIES,
     REPEAT_RULES,
+    RelicSchema,
 )
 
 
 DATA_ROOT = Path(__file__).resolve().parent / "data"
-CARD_FILES = ("ironclad", "status", "curse", "token")
+CARD_FILES = ("ironclad", "colorless", "status", "curse", "token")
 MONSTER_FILES = ("overgrowth", "underdocks", "hive", "glory")
 ENCOUNTER_POOLS = frozenset({"weak", "normal", "elite", "boss"})
 ACTS = frozenset({"overgrowth", "underdocks", "hive", "glory"})
@@ -154,6 +159,49 @@ def load_encounters(
         )
         _require_unique(out, eid, where="encounters")
         out[eid] = enc
+    return out
+
+
+def load_potions(path: Path | None = None) -> dict[str, PotionSchema]:
+    raw = _read_json(path or DATA_ROOT / "potions.json")
+    _require_list(raw, "potions")
+    out: dict[str, PotionSchema] = {}
+    for i, e in enumerate(raw):
+        where = f"potions[{i}]"
+        _require_type(e, dict, where)
+        p = PotionSchema(
+            potion_id=_get_str(e, "potion_id", where),
+            game_id=_get_str(e, "game_id", where),
+            name=_get_str(e, "name", where),
+            rarity=_get_in(e, "rarity", POTION_RARITIES, where),
+            pool=_get_in(e, "pool", frozenset({"ironclad", "shared", "token"}), where),
+            target=_get_in(e, "target", POTION_TARGETS, where),
+            description=_get_str(e, "description", where),
+        )
+        _require_unique(out, p.potion_id, where="potions")
+        out[p.potion_id] = p
+    return out
+
+
+def load_relics(path: Path | None = None) -> dict[str, RelicSchema]:
+    raw = _read_json(path or DATA_ROOT / "relics.json")
+    _require_list(raw, "relics")
+    out: dict[str, RelicSchema] = {}
+    for i, e in enumerate(raw):
+        where = f"relics[{i}]"
+        _require_type(e, dict, where)
+        r = RelicSchema(
+            relic_id=_get_str(e, "relic_id", where),
+            game_id=_get_str(e, "game_id", where),
+            name=_get_str(e, "name", where),
+            rarity=_get_in(e, "rarity", RELIC_RARITIES, where),
+            pool=_get_in(e, "pool", frozenset({"ironclad", "shared"}), where),
+            description=_get_str(e, "description", where),
+            in_shops=bool(e.get("in_shops", True)),
+            stops_after_act3_chest=bool(e.get("stops_after_act3_chest", False)),
+        )
+        _require_unique(out, r.relic_id, where="relics")
+        out[r.relic_id] = r
     return out
 
 
@@ -431,5 +479,7 @@ __all__ = [
     "load_cards",
     "load_encounters",
     "load_monsters",
+    "load_potions",
     "load_powers",
+    "load_relics",
 ]

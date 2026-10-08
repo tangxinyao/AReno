@@ -284,6 +284,11 @@ def run_enemy_turn(c: "CombatContext") -> None:
         if not c.player.alive:
             c._end_combat("defeat")
             return
+        demise = m.powers.get("demise", 0)
+        if demise > 0 and m.alive:
+            c.lose_hp_monster(m, demise)
+            if c._check_end():
+                return
     for m in combat.monsters:
         if not m.alive:
             continue

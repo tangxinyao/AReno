@@ -19,21 +19,28 @@ from .enums import CombatPhase, Outcome, Screen
 
 
 class CardRef(str):
-    """One copy of a card in a combat pile; compares and hashes as its card id."""
+    """One copy of a card; compares and hashes as its card id.
+
+    Deck copies carry what persists across fights (enchantments); combat copies
+    are rebuilt from them each fight and add per-fight state."""
 
     def __new__(cls, card_id: str, *, like: "CardRef | str | None" = None) -> "CardRef":
         obj = super().__new__(cls, card_id)
         obj.bonus = 0             # Rampage / Thrash growth
         obj.cost_bump = 0         # Frantic Escape: +1 cost per play, this combat
-        obj.cost_override = None  # a set cost for the rest of combat (None: printed)
+        obj.cost_override = None  # a set cost for the rest of combat (Snecko Oil ...)
         obj.free_turn = False     # costs 0 until the end of this turn
         obj.bound = False         # Chains of Binding
         obj.dampened_from = None  # the upgraded id Dampen took this copy down from
+        obj.replay = 0            # extra plays (Hidden Gem, Soldier's Stew)
+        obj.retain = False        # Retain for this combat (Anointed+)
+        obj.ethereal = False      # Ethereal for this combat (Ghost Seed)
+        obj.enchant = None        # Sharp / Adroit / Momentum / Royally Approved / Swift
+        obj.enchant_amount = 0
+        obj.enchant_spent = False  # Swift: first play only
         if isinstance(like, CardRef):
-            obj.bonus = like.bonus
-            obj.cost_bump = like.cost_bump
-            obj.cost_override = like.cost_override
-            obj.free_turn = like.free_turn
+            for k, v in like.__dict__.items():
+                setattr(obj, k, v)
         return obj
 
     def __reduce__(self):
@@ -133,7 +140,7 @@ class MonsterState:
 class PendingSelection:
     """A card choice the player must make mid-card (Brand, Headbutt ...)."""
 
-    source: str  # "hand" | "discard" | "generated" (choose one of `options`)
+    source: str  # "hand" | "discard" | "draw" | "generated" (choose from `options`)
     candidates: list[int]  # indices into the source pile
     min_count: int
     max_count: int
@@ -159,6 +166,8 @@ class CombatState:
     block_gains_this_turn: int = 0
     # Per-combat counters.
     hp_loss_events_this_combat: int = 0
+    hp_lost_this_combat: int = 0
+    took_unblocked: bool = False  # unblocked attack damage this combat (Lava Lamp)
     # Player debuffs that existed when the last round ended; a debuff not
     # in here was applied this round and skips its first decrement.
     player_debuffs_at_round_start: set[str] = field(default_factory=set)
@@ -201,13 +210,16 @@ class RewardItem:
 class DeckSelection:
     """A choice of cards from the master deck (Smith, card removal ...)."""
 
-    purpose: str  # "upgrade" | "remove"
+    purpose: str  # "upgrade" | "remove" | "duplicate" | "enchant"
     candidates: list[int]  # deck indices
     count: int
     source: str  # screen to return to
     selected: list[int] = field(default_factory=list)
     cancelable: bool = True
     price: int = 0
+    min_count: int | None = None  # None: exactly `count`
+    enchant: str | None = None
+    enchant_amount: int = 0
 
 
 @dataclass
@@ -252,6 +264,11 @@ class RunState:
     shop: list[ShopItem] = field(default_factory=list)
     removals_used: int = 0
     treasure_relics: list[str] = field(default_factory=list)
+    # Relic grab bags (RelicGrabBag): rarity -> relic ids, front first.
+    relic_bag: dict[str, list[str]] = field(default_factory=dict)
+    shared_relic_bag: dict[str, list[str]] = field(default_factory=dict)
+    # Where leaving the rewards screen goes (a relic's bonus rewards from a shop ...).
+    rewards_return: str | None = None
 
     def is_terminal(self) -> bool:
         return self.outcome != Outcome.UNDECIDED or self.screen == Screen.GAME_OVER

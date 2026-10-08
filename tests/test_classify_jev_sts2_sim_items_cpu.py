@@ -1,0 +1,577 @@
+"""sts2_sim potions, Colorless cards and relics (STS2 v0.107.1), CPU only.
+
+Builds combats with a RelicEngine for the given relics and checks each item's
+effect against its game text / r33hab `PotionEffects` / `RelicEffects`.
+"""
+
+from __future__ import annotations
+
+import unittest
+
+from tests.test_classify_jev_sts2_sim_combat_cpu import DATA, SIM, m0
+
+POTIONS = SIM.load_potions()
+RELICS = SIM.load_relics()
+
+
+def make(monsters=("nibbit",), *, hand=None, deck=None, relics=(), potions=(), energy=3, hp=100, monster_hp=200,
+         seed=7, room="monster", ascension=0):
+    RelicEngine = SIM.relics.RelicEngine
+
+    powers, cards, mdefs = DATA
+    player = SIM.PlayerState(hp=hp, max_hp=hp, gold=99, max_energy=3, relics=list(relics),
+                             potions=list(potions) + [None] * max(0, 3 - len(potions)))
+    run = SIM.RunState(character="ironclad", ascension=ascension, seed=seed, player=player)
+    ctx = SIM.CombatContext(run=run, cards=cards, monsters=mdefs, powers=powers, rng=SIM.Rng(seed),
+                            hooks=SIM.HookBus(), effects=SIM.EffectQueue(), potions=POTIONS)
+    ctx.relics = RelicEngine(ctx)
+    ctx.start_combat(list(monsters), list(deck or ["strike_ironclad"] * 10), room=room)
+    player.hp = hp
+    if monster_hp is not None:
+        for m in ctx.combat.monsters:
+            m.hp = m.max_hp = monster_hp
+    if hand is not None:
+        player.draw_pile.extend(player.hand)
+        player.hand = [SIM.CardRef(c) for c in hand]
+    player.energy = energy
+    return ctx
+
+
+class PotionTest(unittest.TestCase):
+    def test_catalog(self) -> None:
+        self.assertEqual(len([p for p in POTIONS.values() if p.pool != "token"]), 48)
+        POTION_EFFECTS = SIM.potion_effects.POTION_EFFECTS
+        for p in POTIONS.values():
+            self.assertIn(p.game_id, POTION_EFFECTS, p.potion_id)
+
+    def test_fire_and_explosive(self) -> None:
+        ctx = make(["nibbit", "nibbit"], potions=["fire_potion", "explosive_ampoule"])
+        ctx.use_potion(0, target_slot=1)
+        self.assertEqual(ctx.combat.monsters[1].hp, 180)
+        ctx.use_potion(1)
+        self.assertEqual([m.hp for m in ctx.combat.monsters], [190, 170])
+        self.assertEqual(ctx.player.potions, [None, None, None])
+
+    def test_block_potion_is_unpowered(self) -> None:
+        ctx = make(potions=["block_potion"])
+        ctx.player.powers["dexterity"] = 5
+        ctx.player.powers["frail"] = 1
+        ctx.use_potion(0)
+        self.assertEqual(ctx.player.block, 12)
+
+    def test_flex_and_speed_are_temporary(self) -> None:
+        ctx = make(potions=["flex_potion", "speed_potion"], hand=[])
+        ctx.use_potion(0)
+        ctx.use_potion(1)
+        self.assertEqual(ctx.player.powers["strength"], 5)
+        self.assertEqual(ctx.player.powers["dexterity"], 5)
+        ctx.end_turn()
+        self.assertNotIn("strength", ctx.player.powers)
+        self.assertNotIn("dexterity", ctx.player.powers)
+
+    def test_duplicator_replays_next_card(self) -> None:
+        ctx = make(potions=["duplicator"], hand=["defend_ironclad"])
+        ctx.use_potion(0)
+        ctx.play_card("defend_ironclad")
+        self.assertEqual(ctx.player.block, 10)
+
+    def test_gigantification_triples_next_attack(self) -> None:
+        ctx = make(potions=["gigantification_potion"], hand=["strike_ironclad", "strike_ironclad"])
+        ctx.use_potion(0)
+        ctx.play_card("strike_ironclad", target_slot=0)
+        ctx.play_card("strike_ironclad", target_slot=0)
+        self.assertEqual(m0(ctx).hp, 200 - 18 - 6)
+
+    def test_attack_potion_choice_is_free_and_skippable(self) -> None:
+        ctx = make(potions=["attack_potion", "attack_potion"], hand=[], energy=0)
+        ctx.use_potion(0)
+        sel = ctx.combat.pending_selection
+        self.assertEqual(sel.source, "generated")
+        self.assertEqual(len(sel.options), 3)
+        self.assertTrue(all(ctx.cards[c].card_type == "attack" for c in sel.options))
+        ctx.toggle_selection(0)
+        ctx.confirm_selection()
+        self.assertEqual(ctx.player.hand, [sel.options[0]])
+        self.assertEqual(ctx.effective_cost(ctx.player.hand[0]), 0)
+        ctx.use_potion(1)
+        ctx.confirm_selection(skip=True)
+        self.assertEqual(len(ctx.player.hand), 1)
+
+    def test_fairy_in_a_bottle_saves_from_death(self) -> None:
+        ctx = make(potions=["fairy_in_a_bottle"], hp=5, hand=[])
+        self.assertFalse(ctx.can_use_potion(0))
+        ctx.end_turn()  # Nibbit Butt 12
+        self.assertIsNone(ctx.combat.outcome)
+        self.assertEqual(ctx.player.hp, 1)  # max(30% of 5, 1)
+        self.assertEqual(ctx.player.potions[0], None)
+
+    def test_entropic_brew_fills_slots(self) -> None:
+        ctx = make(potions=["entropic_brew"])
+        ctx.use_potion(0)
+        self.assertTrue(all(ctx.player.potions))
+
+    def test_regen_buffer_and_ship(self) -> None:
+        ctx = make(potions=["regen_potion", "lucky_tonic", "ship_in_a_bottle"], hand=[], hp=100)
+        ctx.player.hp = 50
+        for slot in range(3):
+            ctx.use_potion(slot)
+        self.assertEqual(ctx.player.block, 10)
+        ctx.end_turn()  # Regen 5 heals at turn end; the Nibbit hit gets past 10 Block, Buffer eats it
+        self.assertEqual(ctx.player.powers["regen"], 4)
+        self.assertNotIn("buffer", ctx.player.powers)
+        self.assertEqual(ctx.player.block, 10)  # Ship in a Bottle: block next turn
+        self.assertEqual(ctx.player.hp, 55)
+
+    def test_powdered_demise(self) -> None:
+        ctx = make(potions=["powdered_demise"], hand=[])
+        ctx.use_potion(0, target_slot=0)
+        ctx.end_turn()
+        self.assertEqual(m0(ctx).hp, 191)
+
+    def test_snecko_oil_and_touch_of_insanity(self) -> None:
+        ctx = make(potions=["snecko_oil", "touch_of_insanity"], hand=["bludgeon"])
+        ctx.use_potion(0)
+        self.assertTrue(all(0 <= ctx.effective_cost(c) <= 3 for c in ctx.player.hand))
+        ctx.player.hand = [SIM.CardRef("bludgeon")]
+        ctx.use_potion(1)
+        ctx.toggle_selection(0)
+        ctx.confirm_selection()
+        self.assertEqual(ctx.effective_cost(ctx.player.hand[0]), 0)
+
+    def test_soldiers_stew_replays_strikes(self) -> None:
+        ctx = make(potions=["soldiers_stew"], hand=["strike_ironclad"])
+        ctx.use_potion(0)
+        ctx.play_card("strike_ironclad", target_slot=0)
+        self.assertEqual(m0(ctx).hp, 188)
+
+    def test_shackling_and_beetle_juice(self) -> None:
+        ctx = make(["nibbit", "nibbit"], potions=["shackling_potion", "beetle_juice"], hand=[])
+        ctx.use_potion(0)
+        self.assertEqual(m0(ctx).powers["strength"], -7)
+        ctx.use_potion(1, target_slot=1)
+        self.assertEqual(ctx.combat.monsters[1].powers["shrink"], 4)
+        ctx.end_turn()
+        self.assertNotIn("strength", m0(ctx).powers)
+
+    def test_liquid_memories_and_droplet(self) -> None:
+        ctx = make(potions=["liquid_memories", "droplet_of_precognition"], hand=[])
+        ctx.player.discard_pile = [SIM.CardRef("bludgeon")]
+        ctx.use_potion(0)
+        ctx.toggle_selection(0)
+        ctx.confirm_selection()
+        self.assertEqual(ctx.player.hand, ["bludgeon"])
+        self.assertEqual(ctx.effective_cost("bludgeon"), 0)
+        ctx.use_potion(1)
+        self.assertEqual(ctx.combat.pending_selection.source, "draw")
+
+
+class ColorlessCardTest(unittest.TestCase):
+    def test_catalog(self) -> None:
+        cards = DATA[1]
+        colorless = [c for c in cards.values() if c.color == "colorless" and not c.upgraded]
+        self.assertEqual(len(colorless), 64)
+        from importlib import import_module
+        CARD_EFFECTS = import_module(SIM.__name__ + ".card_effects").CARD_EFFECTS
+        for c in colorless:
+            if not c.multiplayer_only:
+                self.assertIn(c.game_id, CARD_EFFECTS, c.card_id)
+
+    def test_rend_counts_unique_debuffs(self) -> None:
+        ctx = make(hand=["rend", "rend+1"], energy=4)
+        m0(ctx).powers.update(weak=1, vulnerable=1)
+        ctx.play_card("rend", target_slot=0)
+        self.assertEqual(m0(ctx).hp, 200 - int((15 + 10) * 1.5))
+        ctx.play_card("rend+1", target_slot=0)
+        self.assertEqual(m0(ctx).hp, 200 - 37 - int((18 + 16) * 1.5))
+
+    def test_omnislice_and_fisticuffs(self) -> None:
+        ctx = make(["nibbit", "nibbit"], hand=["omnislice", "fisticuffs"])
+        ctx.play_card("omnislice", target_slot=0)
+        self.assertEqual([m.hp for m in ctx.combat.monsters], [192, 192])
+        ctx.play_card("fisticuffs", target_slot=1)
+        self.assertEqual(ctx.player.block, 7)
+
+    def test_volley_x(self) -> None:
+        ctx = make(hand=["volley"], energy=3)
+        ctx.play_card("volley")
+        self.assertEqual(m0(ctx).hp, 170)
+
+    def test_panic_button_blocks_card_block(self) -> None:
+        ctx = make(hand=["panic_button", "defend_ironclad"])
+        ctx.play_card("panic_button")
+        ctx.play_card("defend_ironclad")
+        self.assertEqual(ctx.player.block, 30)
+
+    def test_prolong_and_equilibrium(self) -> None:
+        ctx = make(hand=["equilibrium", "prolong", "strike_ironclad"], energy=3)
+        ctx.play_card("equilibrium")
+        ctx.play_card("prolong")
+        ctx.end_turn()
+        self.assertIn("strike_ironclad", ctx.player.hand)  # retained
+        self.assertEqual(ctx.player.block, 13)  # 13 - 12 Butt... then Prolong's 13 next turn
+        self.assertNotIn("block_next_turn", ctx.player.powers)
+
+    def test_the_bomb(self) -> None:
+        ctx = make(hand=["the_bomb"])
+        ctx.play_card("the_bomb")
+        for _ in range(3):
+            ctx.player.hand = []
+            ctx.end_turn()
+        self.assertEqual(m0(ctx).hp, 165)  # the Nibbit still holds 5 Block from its last turn
+
+    def test_hand_of_greed_gold(self) -> None:
+        ctx = make(hand=["hand_of_greed"], monster_hp=10)
+        ctx.play_card("hand_of_greed", target_slot=0)
+        self.assertEqual(ctx.player.gold, 119)
+
+    def test_gold_axe_and_mind_blast(self) -> None:
+        ctx = make(hand=["defend_ironclad", "gold_axe", "mind_blast"], energy=3)
+        ctx.play_card("defend_ironclad")
+        ctx.play_card("gold_axe", target_slot=0)
+        self.assertEqual(m0(ctx).hp, 198)
+        draw = len(ctx.player.draw_pile)
+        ctx.play_card("mind_blast", target_slot=0)
+        self.assertEqual(m0(ctx).hp, 198 - draw)
+
+    def test_mayhem_rolling_boulder_prep_time(self) -> None:
+        ctx = make(hand=["rolling_boulder", "prep_time"], energy=4)
+        ctx.play_card("rolling_boulder")
+        ctx.play_card("prep_time")
+        ctx.end_turn()
+        self.assertEqual(m0(ctx).hp, 195)
+        self.assertEqual(ctx.player.powers["rolling_boulder"], 10)
+        self.assertEqual(ctx.player.powers["vigor"], 4)
+
+    def test_nostalgia_puts_first_attack_on_top(self) -> None:
+        ctx = make(hand=["nostalgia", "strike_ironclad"])
+        ctx.play_card("nostalgia")
+        ctx.play_card("strike_ironclad", target_slot=0)
+        self.assertEqual(ctx.player.draw_pile[-1], "strike_ironclad")
+
+    def test_panache_every_five_cards(self) -> None:
+        ctx = make(hand=["panache"] + ["defend_ironclad"] * 5, energy=6)
+        ctx.play_card("panache")
+        for _ in range(5):
+            ctx.play_card("defend_ironclad")
+        self.assertEqual(m0(ctx).hp, 190)
+
+    def test_stratagem_choice_on_shuffle(self) -> None:
+        ctx = make(hand=["stratagem"], deck=["strike_ironclad"] * 5)
+        ctx.play_card("stratagem")
+        ctx.player.draw_pile = []
+        ctx.player.discard_pile = [SIM.CardRef("bludgeon"), SIM.CardRef("defend_ironclad")]
+        ctx.draw(1)
+        sel = ctx.combat.pending_selection
+        self.assertIsNone(sel)  # follow-ups run once the current action resolves
+        ctx._settle()
+        self.assertEqual(ctx.combat.pending_selection.source, "draw")
+
+    def test_purity_up_to_three(self) -> None:
+        ctx = make(hand=["purity", "wound", "wound", "strike_ironclad"])
+        ctx.play_card("purity")
+        ctx.toggle_selection(0)
+        ctx.toggle_selection(1)
+        ctx.confirm_selection()
+        self.assertEqual(ctx.player.hand, ["strike_ironclad"])
+
+    def test_bolas_returns(self) -> None:
+        ctx = make(hand=["bolas"])
+        ctx.play_card("bolas", target_slot=0)
+        ctx.player.hand = []
+        ctx.end_turn()
+        self.assertIn("bolas", ctx.player.hand)
+
+    def test_jackpot_adds_zero_cost(self) -> None:
+        ctx = make(hand=["jackpot"])
+        ctx.play_card("jackpot", target_slot=0)
+        self.assertEqual(len(ctx.player.hand), 3)
+        self.assertTrue(all(ctx.cards[c].cost == 0 for c in ctx.player.hand))
+
+    def test_seeker_strike_offers_three(self) -> None:
+        ctx = make(hand=["seeker_strike"])
+        ctx.play_card("seeker_strike", target_slot=0)
+        sel = ctx.combat.pending_selection
+        self.assertEqual((sel.source, len(sel.candidates)), ("draw", 3))
+
+    def test_fasten_only_defends(self) -> None:
+        ctx = make(hand=["fasten", "defend_ironclad", "ultimate_defend"], energy=3)
+        ctx.play_card("fasten")
+        ctx.play_card("defend_ironclad")
+        ctx.play_card("ultimate_defend")
+        self.assertEqual(ctx.player.block, 9 + 15)
+
+    def test_splash_is_kept_out_of_pools(self) -> None:
+        pool = SIM.rewards.reward_pool(DATA[1], "colorless")
+        self.assertNotIn("splash", pool)
+        self.assertNotIn("beacon_of_hope", pool)
+
+
+class RelicCombatTest(unittest.TestCase):
+    def test_catalog(self) -> None:
+        self.assertEqual(len([r for r in RELICS.values() if r.relic_id != "circlet"]), 124)
+
+    def test_combat_start_relics(self) -> None:
+        ctx = make(relics=["anchor", "vajra", "oddly_smooth_stone", "bronze_scales", "gorget", "lantern",
+                           "bag_of_marbles", "red_mask", "akabeko", "blood_vial"], hand=None, hp=50)
+        p = ctx.player
+        self.assertEqual(p.block, 10)
+        self.assertEqual((p.powers["strength"], p.powers["dexterity"], p.powers["thorns"], p.powers["plating"],
+                          p.powers["vigor"]), (1, 1, 3, 4, 8))
+        self.assertEqual(m0(ctx).powers.get("vulnerable"), 1)
+        self.assertEqual(m0(ctx).powers.get("weak"), 1)
+
+    def test_bag_of_preparation_and_lantern(self) -> None:
+        ctx = make(relics=["bag_of_preparation", "lantern"], hand=None, energy=None)
+        self.assertEqual(len(ctx.player.hand), 7)
+
+    def test_pen_nib_tenth_attack(self) -> None:
+        ctx = make(relics=["pen_nib"], hand=["strike_ironclad"] * 10, energy=10)
+        for _ in range(9):
+            ctx.play_card("strike_ironclad", target_slot=0)
+        self.assertEqual(m0(ctx).hp, 200 - 54)
+        ctx.play_card("strike_ironclad", target_slot=0)
+        self.assertEqual(m0(ctx).hp, 200 - 54 - 12)
+
+    def test_shuriken_kunai_fan(self) -> None:
+        ctx = make(relics=["shuriken", "kunai", "ornamental_fan"], hand=["strike_ironclad"] * 3)
+        for _ in range(3):
+            ctx.play_card("strike_ironclad", target_slot=0)
+        self.assertEqual(ctx.player.powers["strength"], 1)
+        self.assertEqual(ctx.player.powers["dexterity"], 1)
+        self.assertEqual(ctx.player.block, 4)
+
+    def test_orichalcum_and_ripple_basin(self) -> None:
+        ctx = make(relics=["orichalcum", "ripple_basin"], hand=[])
+        ctx.end_turn()  # 6 + 4 block before the Butt (12)
+        self.assertEqual(ctx.player.hp, 98)
+
+    def test_tungsten_rod_and_beating_remnant(self) -> None:
+        ctx = make(relics=["tungsten_rod"], hand=[])
+        ctx.end_turn()
+        self.assertEqual(ctx.player.hp, 89)
+        ctx = make(relics=["beating_remnant"], hand=["hemokinesis", "offering"], energy=3)
+        ctx.play_card("hemokinesis", target_slot=0)  # 2
+        ctx.play_card("offering")  # 6
+        ctx.lose_hp(30)
+        self.assertEqual(ctx.player.hp, 80)
+
+    def test_lizard_tail_once_per_run(self) -> None:
+        ctx = make(relics=["lizard_tail"], hp=5, hand=[])
+        ctx.end_turn()
+        self.assertEqual(ctx.player.hp, 2)
+        self.assertTrue(ctx.player.relic_state["lizard_tail_used"])
+
+    def test_centennial_puzzle_and_self_forming_clay(self) -> None:
+        ctx = make(relics=["centennial_puzzle", "self_forming_clay"], hand=["hemokinesis"])
+        ctx.play_card("hemokinesis", target_slot=0)
+        self.assertEqual(len(ctx.player.hand), 3)
+        self.assertEqual(ctx.player.powers["block_next_turn"], 3)
+
+    def test_red_skull_toggles(self) -> None:
+        ctx = make(relics=["red_skull"], hand=[], hp=100)
+        ctx.lose_hp(51)
+        self.assertEqual(ctx.player.powers["strength"], 3)
+        ctx.heal_player(10)
+        self.assertNotIn("strength", ctx.player.powers)
+
+    def test_ice_cream_and_sturdy_clamp(self) -> None:
+        ctx = make(relics=["ice_cream", "sturdy_clamp"], hand=[], energy=2)
+        ctx.player.block = 30
+        ctx.end_turn()
+        self.assertEqual(ctx.player.energy, 5)
+        self.assertEqual(ctx.player.block, 10)
+
+    def test_gremlin_horn_charons_abacus(self) -> None:
+        ctx = make(["nibbit", "nibbit"], relics=["gremlin_horn", "charons_ashes"], hand=["true_grit", "strike_ironclad"])
+        ctx.combat.monsters[1].hp = 3
+        ctx.play_card("true_grit")  # exhausts the Strike: 3 to all kills the second Nibbit
+        self.assertFalse(ctx.combat.monsters[1].alive)
+        self.assertEqual(ctx.player.energy, 3)
+
+    def test_damage_relics(self) -> None:
+        ctx = make(relics=["strike_dummy", "miniature_cannon", "paper_phrog"], hand=["strike_ironclad+1"])
+        m0(ctx).powers["vulnerable"] = 1
+        ctx.play_card("strike_ironclad+1", target_slot=0)
+        self.assertEqual(m0(ctx).hp, 200 - int((9 + 6) * 1.75))
+
+    def test_chemical_x(self) -> None:
+        ctx = make(relics=["chemical_x"], hand=["whirlwind"], energy=1)
+        ctx.play_card("whirlwind")
+        self.assertEqual(m0(ctx).hp, 185)
+
+    def test_ruined_helmet_and_vambrace(self) -> None:
+        ctx = make(relics=["ruined_helmet", "vambrace"], hand=["inflame", "defend_ironclad", "defend_ironclad"])
+        ctx.play_card("inflame")
+        ctx.play_card("defend_ironclad")
+        ctx.play_card("defend_ironclad")
+        self.assertEqual(ctx.player.powers["strength"], 4)
+        self.assertEqual(ctx.player.block, 15)
+
+    def test_belt_buckle(self) -> None:
+        ctx = make(relics=["belt_buckle"], potions=["block_potion"], hand=[])
+        self.assertNotIn("dexterity", ctx.player.powers)
+        ctx.use_potion(0)
+        self.assertEqual(ctx.player.powers["dexterity"], 2)
+
+    def test_reptile_trinket(self) -> None:
+        ctx = make(relics=["reptile_trinket"], potions=["block_potion"], hand=[])
+        ctx.use_potion(0)
+        self.assertEqual(ctx.player.powers["strength"], 3)
+        ctx.end_turn()
+        self.assertNotIn("strength", ctx.player.powers)
+
+    def test_turn_count_relics(self) -> None:
+        ctx = make(relics=["horn_cleat", "captains_wheel", "candelabra", "chandelier", "happy_flower"], hand=[])
+        ctx.end_turn()
+        self.assertEqual(ctx.player.energy, 3 + 2)
+        self.assertEqual(ctx.player.block, 14)
+        ctx.player.hand = []
+        ctx.end_turn()
+        self.assertEqual(ctx.player.energy, 3 + 3 + 1)
+        self.assertEqual(ctx.player.block, 18)
+
+    def test_mummified_hand_and_game_piece(self) -> None:
+        ctx = make(relics=["mummified_hand", "game_piece"], hand=["inflame", "bludgeon"])
+        ctx.play_card("inflame")
+        self.assertEqual(ctx.effective_cost("bludgeon"), 0)
+        self.assertEqual(len(ctx.player.hand), 2)
+
+    def test_razor_tooth_upgrades_played(self) -> None:
+        ctx = make(relics=["razor_tooth"], hand=["strike_ironclad"])
+        ctx.play_card("strike_ironclad", target_slot=0)
+        self.assertEqual(ctx.player.discard_pile, ["strike_ironclad+1"])
+
+    def test_unceasing_top(self) -> None:
+        ctx = make(relics=["unceasing_top"], hand=["defend_ironclad"])
+        ctx.play_card("defend_ironclad")
+        self.assertEqual(len(ctx.player.hand), 1)
+
+    def test_ghost_seed_and_ringing_triangle(self) -> None:
+        ctx = make(relics=["ghost_seed"], hand=["strike_ironclad", "bash"])
+        ctx.end_turn()
+        self.assertIn("strike_ironclad", ctx.player.exhaust_pile)
+        self.assertNotIn("bash", ctx.player.exhaust_pile)
+
+    def test_screaming_flagon_and_stone_calendar(self) -> None:
+        ctx = make(relics=["screaming_flagon"], hand=[])
+        ctx.end_turn()
+        self.assertEqual(m0(ctx).hp, 180)
+
+    def test_unsettling_lamp_doubles_first_debuff(self) -> None:
+        ctx = make(relics=["unsettling_lamp"], hand=["bash", "bash"], energy=4)
+        ctx.play_card("bash", target_slot=0)
+        self.assertEqual(m0(ctx).powers["vulnerable"], 4)
+        ctx.play_card("bash", target_slot=0)
+        self.assertEqual(m0(ctx).powers["vulnerable"], 6)
+
+    def test_sling_of_courage_elite_only(self) -> None:
+        ctx = make(relics=["sling_of_courage"], room="elite", hand=[])
+        self.assertEqual(ctx.player.powers["strength"], 2)
+
+
+class RunRelicTest(unittest.TestCase):
+    def _run(self, relics=(), seed=3):
+        loop = SIM.RunLoop(seed=seed)
+        loop.reset()
+        loop.state.player.relics.extend(relics)
+        loop.step("choose_event_option:0")
+        return loop
+
+    def test_pickups(self) -> None:
+        loop = self._run()
+        st = loop.state
+        p = st.player
+        for rid in ("mango", "potion_belt", "old_coin", "whetstone"):
+            loop._obtain_relic(rid, return_to=SIM.Screen.MAP)
+        self.assertEqual(p.max_hp, 94)
+        self.assertEqual(len(p.potions), 5)
+        self.assertEqual(p.gold, 399)
+        self.assertEqual(sum(1 for c in p.deck if c == "strike_ironclad+1" or c == "bash+1"), 2)
+
+    def test_enchant_pickup_and_damage(self) -> None:
+        loop = self._run()
+        st = loop.state
+        loop._obtain_relic("gnarled_hammer", return_to=SIM.Screen.MAP)
+        self.assertEqual(st.screen, SIM.Screen.CARD_SELECT)
+        self.assertEqual(st.deck_select.count, 3)
+        loop.step("select_card:0")
+        loop.step("confirm_selection")
+        enchanted = [c for c in st.player.deck if getattr(c, "enchant", None) == "sharp"]
+        self.assertEqual(len(enchanted), 1)
+        self.assertEqual(st.screen, SIM.Screen.MAP)
+
+    def test_eggs_and_lucky_fysh(self) -> None:
+        loop = self._run(["molten_egg", "lucky_fysh"])
+        loop._add_card_to_deck("pommel_strike")
+        self.assertEqual(loop.state.player.deck[-1], "pommel_strike+1")
+        self.assertEqual(loop.state.player.gold, 114)
+
+    def test_bowler_hat_and_dragon_fruit(self) -> None:
+        loop = self._run(["bowler_hat", "dragon_fruit"])
+        loop._gain_gold(20)
+        self.assertEqual(loop.state.player.gold, 124)
+        self.assertEqual(loop.state.player.max_hp, 81)
+
+    def test_rest_relics(self) -> None:
+        loop = self._run(["girya", "shovel", "regal_pillow", "miniature_tent"])
+        st = loop.state
+        st.player.hp = 20
+        loop._enter_rest()
+        texts = [c["text"].split(":")[0] for c in loop._packet()["candidates"]]
+        self.assertEqual(texts, ["Rest", "Smith", "Train", "Dig"])
+        loop.step("choose_rest_option:0")
+        self.assertEqual(st.player.hp, 20 + 24 + 15)
+        self.assertFalse(st.rest_used)  # Miniature Tent: more options
+        loop.step("choose_rest_option:1")  # Train
+        self.assertEqual(st.player.relic_state["girya"], 1)
+
+    def test_membership_card_halves_prices(self) -> None:
+        loop = self._run(["membership_card"])
+        st = loop.state
+        st.player.gold = 999
+        loop._enter_shop()
+        removal = next(i for i in st.shop if i.category == "card_removal")
+        self.assertEqual(removal.price, 37)
+
+    def test_treasure_has_a_relic(self) -> None:
+        loop = self._run()
+        st = loop.state
+        gold = st.player.gold
+        loop._enter_treasure()
+        self.assertTrue(42 <= st.player.gold - gold <= 52)
+        self.assertEqual(len(st.treasure_relics), 1)
+        relic = st.treasure_relics[0]
+        loop.step("claim_treasure_relic:0")
+        self.assertIn(relic, st.player.relics)
+        self.assertNotIn(relic, [r for bag in st.relic_bag.values() for r in bag])
+
+    def test_elite_reward_has_relic_and_white_star(self) -> None:
+        loop = self._run(["white_star", "white_beast_statue"])
+        loop._open_combat_rewards("elite", took_damage=True)
+        kinds = [r.kind for r in loop.state.rewards]
+        self.assertEqual(kinds, ["gold", "potion", "relic", "card", "card"])
+        self.assertTrue(all(loop.cards[c].rarity == "rare" for c in loop.state.rewards[-1].cards))
+
+    def test_potion_reward_needs_a_free_slot(self) -> None:
+        loop = self._run(["white_beast_statue"])
+        st = loop.state
+        st.player.potions = ["block_potion", "fire_potion", "weak_potion"]
+        loop._open_combat_rewards("monster", took_damage=True)
+        ids = [c["id"] for c in loop._packet()["candidates"]]
+        self.assertNotIn("claim_reward:1", ids)
+        self.assertIn("discard_potion:0", ids)
+        loop.step("discard_potion:0")
+        self.assertIn("claim_reward:1", [c["id"] for c in loop._packet()["candidates"]])
+
+    def test_orrery_opens_five_card_rewards(self) -> None:
+        loop = self._run()
+        loop._obtain_relic("orrery", return_to=SIM.Screen.MAP)
+        st = loop.state
+        self.assertEqual(st.screen, SIM.Screen.REWARDS)
+        self.assertEqual([r.kind for r in st.rewards], ["card"] * 5)
+        loop.step("proceed")
+        self.assertEqual(st.screen, SIM.Screen.MAP)
+
+
+if __name__ == "__main__":
+    unittest.main()
