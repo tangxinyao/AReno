@@ -84,7 +84,9 @@ class ResetShapeTest(unittest.TestCase):
 
     def test_initial_decision_point_is_neow(self) -> None:
         self.assertEqual(self.packet["decision_point"], "neow_bonus")
-        self.assertEqual([c["id"] for c in self.packet["candidates"]], ["choose_event_option:0"])
+        ids = [c["id"] for c in self.packet["candidates"]]
+        self.assertIn("choose_event_option:0", ids)
+        self.assertTrue(all(x.startswith("select_relic:") or x == "choose_event_option:0" for x in ids))
         self.assertFalse(self.packet["done"])
         self.assertEqual(self.packet["step"], 0)
         self.assertEqual(self.packet["reward"], 0.0)

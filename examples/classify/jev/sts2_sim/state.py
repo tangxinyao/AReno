@@ -269,6 +269,9 @@ class RunState:
     shared_relic_bag: dict[str, list[str]] = field(default_factory=dict)
     # Where leaving the rewards screen goes (a relic's bonus rewards from a shop ...).
     rewards_return: str | None = None
+    # Ancient event state: which event (NEOW/OROBAS/...) and the 3 relic choices.
+    ancient_event: str | None = None
+    ancient_choices: list[str] = field(default_factory=list)
 
     def is_terminal(self) -> bool:
         return self.outcome != Outcome.UNDECIDED or self.screen == Screen.GAME_OVER

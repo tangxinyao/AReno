@@ -195,7 +195,7 @@ def load_relics(path: Path | None = None) -> dict[str, RelicSchema]:
             game_id=_get_str(e, "game_id", where),
             name=_get_str(e, "name", where),
             rarity=_get_in(e, "rarity", RELIC_RARITIES, where),
-            pool=_get_in(e, "pool", frozenset({"ironclad", "shared"}), where),
+            pool=_get_in(e, "pool", frozenset({"ironclad", "shared", "ancient"}), where),
             description=_get_str(e, "description", where),
             in_shops=bool(e.get("in_shops", True)),
             stops_after_act3_chest=bool(e.get("stops_after_act3_chest", False)),
@@ -203,6 +203,18 @@ def load_relics(path: Path | None = None) -> dict[str, RelicSchema]:
         _require_unique(out, r.relic_id, where="relics")
         out[r.relic_id] = r
     return out
+
+
+def load_ancient_event_pools(path: Path | None = None) -> dict[str, tuple[str, ...]]:
+    """Per-ancient-event relic pool (DARV, NEOW, OROBAS, PAEL, TEZCATARA, NONUPEIPE, TANX, VAKUU).
+
+    Game IDs resolved against `load_relics`; order mirrors the codex entry so
+    reward rolls on the same stream stay reproducible.
+    """
+
+    raw = _read_json(path or DATA_ROOT / "ancient_events.json")
+    _require_type(raw, dict, "ancient_events")
+    return {ev: tuple(ids) for ev, ids in raw.items()}
 
 
 def load_all() -> tuple[dict[str, PowerSchema], dict[str, CardSchema], dict[str, MonsterSchema]]:

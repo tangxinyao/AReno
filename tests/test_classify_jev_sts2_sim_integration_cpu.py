@@ -38,10 +38,9 @@ class NeowToCombatTest(unittest.TestCase):
 
     def test_reset_starts_at_neow_with_skip_only(self) -> None:
         self.assertEqual(self.reset_packet["screen"], self.sim.Screen.NEOW)
-        self.assertEqual(
-            [c["id"] for c in self.reset_packet["candidates"]],
-            ["choose_event_option:0"],
-        )
+        ids = [c["id"] for c in self.reset_packet["candidates"]]
+        self.assertIn("choose_event_option:0", ids)
+        self.assertTrue(all(x.startswith("select_relic:") or x == "choose_event_option:0" for x in ids))
 
     def test_skip_enters_an_act1_weak_pool_combat(self) -> None:
         packet = self.loop.step("choose_event_option:0")

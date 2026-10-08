@@ -176,7 +176,10 @@ class RunLoopTest(unittest.TestCase):
         self.assertEqual(packet["decision_point"], self.sim.DecisionPoint.NEOW_BONUS)
         self.assertFalse(packet["done"])
         self.assertEqual(packet["step"], 0)
-        self.assertEqual([c["id"] for c in packet["candidates"]], ["choose_event_option:0"])
+        ids = [c["id"] for c in packet["candidates"]]
+        self.assertIn("choose_event_option:0", ids)
+        # Neow is the Act 1 Ancient event: three relic choices plus the skip.
+        self.assertTrue(all(x.startswith("select_relic:") or x == "choose_event_option:0" for x in ids))
 
     def test_skip_transitions_to_combat(self) -> None:
         """Skipping Neow opens the map; row 1 is all Monster rooms (weak pool)."""

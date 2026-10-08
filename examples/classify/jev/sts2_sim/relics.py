@@ -196,6 +196,14 @@ class RelicEngine(RelicHooks):
             c.apply_power(self.p, "plating", 4)
         if self.has("bronze_scales"):
             c.apply_power(self.p, "thorns", 3)
+        # Ancient relics
+        if self.has("very_hot_cocoa"):
+            c.gain_energy(4)
+        if c.room == "elite" and self.has("booming_conch"):
+            c.draw(2)
+        if self.has("philosophers_stone"):
+            for m in c.alive_monsters():
+                c._change_power(m, "strength", 1, allow_negative=True)
         self.potions_changed()
         self.hp_changed()
 
@@ -225,6 +233,40 @@ class RelicEngine(RelicHooks):
             c.gain_strength(2)
             for m in c.alive_monsters():
                 c._change_power(m, "strength", 1, allow_negative=True)
+        # Ancient relics: "Gain [energy:1] at the start of each turn."
+        for rid in ("ectoplasm", "sozu", "spiked_gauntlets", "philosophers_stone",
+                    "prismatic_gem", "blood_soaked_rose", "velvet_choker",
+                    "whispering_earring", "pumpkin_candle", "toasty_mittens",
+                    "blessed_antler"):
+            if self.has(rid):
+                c.gain_energy(1)
+        if self.has("sai"):
+            self._block(7)
+        if self.has("paels_blood"):
+            c.draw(1)
+        if turn >= 3 and self.has("paels_flesh"):
+            c.gain_energy(1)
+        if self.has("snecko_eye"):
+            c.draw(2)
+        if self.has("crossbow"):
+            pool = [cid for cid in c.generation_pool() if c.cards[cid].card_type == "attack"]
+            if pool:
+                ref = c.add_to_hand(c.rng.stream("card_generation").choice(pool))
+                ref.cost_override = 0
+                ref.free_turn = True
+        if self.has("fiddle"):
+            c.draw(2)
+        if self.has("toasty_mittens"):
+            pile = self.p.draw_pile
+            if pile:
+                top = pile.pop()
+                c.exhaust_card(top)
+                self._block(1)
+        if self.has("seal_of_gold") and self.p.gold >= 5:
+            self.p.gold -= 5
+            c.gain_energy(1)
+        if self.has("brilliant_scarf"):
+            self.n["brilliant_scarf_count"] = 0
         if turn == 2 and self.has("horn_cleat"):
             self._block(14)
         if turn == 3 and self.has("captains_wheel"):

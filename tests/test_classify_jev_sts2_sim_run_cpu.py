@@ -280,7 +280,7 @@ class RunFlowTest(unittest.TestCase):
         st.player.hp = 30
         loop.step("choose_map_node:0")
         self.assertEqual(st.player.hp, 30 + int(50 * 0.8))
-        loop.step("choose_event_option:0")
+        loop.step("skip_relic_selection")
         packet = loop._packet()
         self.assertTrue(all(c["text"].startswith("go to Monster (row 1") for c in packet["candidates"]))
         loop.step("choose_map_node:0")

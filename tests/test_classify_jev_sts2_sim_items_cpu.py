@@ -308,7 +308,7 @@ class ColorlessCardTest(unittest.TestCase):
 
 class RelicCombatTest(unittest.TestCase):
     def test_catalog(self) -> None:
-        self.assertEqual(len([r for r in RELICS.values() if r.relic_id != "circlet"]), 124)
+        self.assertEqual(len([r for r in RELICS.values() if r.relic_id != "circlet"]), 216)
 
     def test_combat_start_relics(self) -> None:
         ctx = make(relics=["anchor", "vajra", "oddly_smooth_stone", "bronze_scales", "gorget", "lantern",
@@ -571,6 +571,135 @@ class RunRelicTest(unittest.TestCase):
         self.assertEqual([r.kind for r in st.rewards], ["card"] * 5)
         loop.step("proceed")
         self.assertEqual(st.screen, SIM.Screen.MAP)
+
+
+class AncientEventTest(unittest.TestCase):
+    def test_neow_offers_three_relics_and_skip(self) -> None:
+        loop = SIM.RunLoop(seed=3)
+        packet = loop.reset()
+        ids = [c["id"] for c in packet["candidates"]]
+        self.assertIn("choose_event_option:0", ids)
+        picks = [i for i in ids if i.startswith("select_relic:")]
+        self.assertEqual(len(picks), 3)
+        # All relic picks resolve to Ancient-rarity relics from the Neow pool.
+        choices = loop.state.ancient_choices
+        self.assertEqual(len(choices), 3)
+        for rid in choices:
+            self.assertEqual(RELICS[rid].rarity, "ancient")
+            self.assertEqual(RELICS[rid].pool, "ancient")
+        self.assertEqual(loop.state.ancient_event, "NEOW")
+
+    def test_select_relic_adds_it_and_opens_map(self) -> None:
+        loop = SIM.RunLoop(seed=3)
+        loop.reset()
+        choice = loop.state.ancient_choices[0]
+        loop.step("select_relic:0")
+        # Should land on map (or a reward if the pickup opened one).
+        self.assertIn(choice, loop.state.player.relics)
+        self.assertEqual(loop.state.ancient_choices, [])
+        self.assertIsNone(loop.state.ancient_event)
+
+    def test_skip_leaves_without_relic(self) -> None:
+        loop = SIM.RunLoop(seed=3)
+        loop.reset()
+        pre_relics = list(loop.state.player.relics)
+        loop.step("choose_event_option:0")
+        self.assertEqual(loop.state.player.relics, pre_relics)
+        self.assertEqual(loop.state.screen, SIM.Screen.MAP)
+
+    def test_act_specific_ancients_pick_the_right_pool(self) -> None:
+        pools = SIM.load_ancient_event_pools()
+        # The sim's act-ancient mapping (run.py:_ACT_ANCIENTS).
+        for act, ancient_ids in (("overgrowth", ("NEOW",)),
+                                 ("underdocks", ("NEOW",)),
+                                 ("hive", ("OROBAS", "PAEL", "TEZCATARA")),
+                                 ("glory", ("NONUPEIPE", "TANX", "VAKUU"))):
+            for ev in ancient_ids:
+                self.assertIn(ev, pools)
+                for gid in pools[ev]:
+                    rid = gid.lower()
+                    self.assertIn(rid, RELICS, f"{ev} references missing relic {gid}")
+                    self.assertEqual(RELICS[rid].rarity, "ancient")
+
+
+class AncientRelicPickupTest(unittest.TestCase):
+    def _run(self, seed=3):
+        loop = SIM.RunLoop(seed=seed)
+        loop.reset()
+        loop.step("choose_event_option:0")  # skip Neow
+        return loop
+
+    def test_gold_and_hp_pickups(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        base_gold = p.gold
+        loop._obtain_relic("golden_pearl", return_to=SIM.Screen.MAP)
+        loop._obtain_relic("signet_ring", return_to=SIM.Screen.MAP)
+        loop._obtain_relic("nutritious_oyster", return_to=SIM.Screen.MAP)
+        loop._obtain_relic("looming_fruit", return_to=SIM.Screen.MAP)
+        self.assertEqual(p.gold, base_gold + 150 + 999)
+        self.assertEqual(p.max_hp, 80 + 11 + 31)
+
+    def test_curse_pickup_adds_curse_and_gold(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        before_gold = p.gold
+        before_curses = sum(1 for c in p.deck if c == "greed")
+        loop._obtain_relic("cursed_pearl", return_to=SIM.Screen.MAP)
+        self.assertEqual(p.gold, before_gold + 333)
+        self.assertEqual(sum(1 for c in p.deck if c == "greed"), before_curses + 1)
+
+    def test_capsule_grants_random_relic(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        before = len(p.relics)
+        loop._obtain_relic("small_capsule", return_to=SIM.Screen.MAP)
+        # small_capsule itself + 1 rolled relic
+        self.assertEqual(len(p.relics), before + 2)
+
+    def test_sand_castle_upgrades_six_random_cards(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        upgradable = [i for i, c in enumerate(p.deck)
+                      if loop.cards[c].upgrade_of is not None]
+        self.assertGreaterEqual(len(upgradable), 6)
+        loop._obtain_relic("sand_castle", return_to=SIM.Screen.MAP)
+        after_upgrades = sum(1 for c in p.deck if str(c).endswith("+1"))
+        self.assertGreaterEqual(after_upgrades, 6)
+
+
+class AncientRelicCombatTest(unittest.TestCase):
+    # `make()` resets hand/energy after start_combat, so tests here check
+    # side effects that survive the reset: block, enemy powers, deck piles.
+
+    def test_sai_grants_block(self) -> None:
+        ctx = make(relics=["sai"], hand=[])
+        self.assertEqual(ctx.player.block, 7)
+
+    def test_paels_blood_draws_extra_card(self) -> None:
+        # Don't override hand so the opening draw survives.
+        ctx = make(relics=["paels_blood"])
+        self.assertEqual(len(ctx.player.hand), 6)
+
+    def test_snecko_eye_draws_two_extra(self) -> None:
+        ctx = make(relics=["snecko_eye"])
+        self.assertEqual(len(ctx.player.hand), 7)
+
+    def test_booming_conch_elite_draw(self) -> None:
+        ctx = make(relics=["booming_conch"], room="elite")
+        self.assertEqual(len(ctx.player.hand), 7)
+        ctx2 = make(relics=["booming_conch"], room="monster")
+        self.assertEqual(len(ctx2.player.hand), 5)
+
+    def test_philosophers_stone_buffs_enemies(self) -> None:
+        ctx = make(relics=["philosophers_stone"], hand=[])
+        for m in ctx.combat.monsters:
+            self.assertGreaterEqual(m.powers.get("strength", 0), 1)
+
+    def test_crossbow_adds_free_attack_to_hand(self) -> None:
+        ctx = make(relics=["crossbow"])
+        attack_count = sum(1 for cid in ctx.player.hand if ctx.cards[cid].card_type == "attack")
+        self.assertGreaterEqual(attack_count, 1)
 
 
 if __name__ == "__main__":

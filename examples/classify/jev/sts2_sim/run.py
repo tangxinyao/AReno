@@ -52,7 +52,7 @@ from .effects import EffectQueue
 from .encounters import build_roster
 from .enums import Character, CombatPhase, DecisionPoint, Outcome, Screen
 from .hooks import HookBus
-from .loader import load_all, load_encounters, load_potions, load_relics
+from .loader import load_all, load_ancient_event_pools, load_encounters, load_potions, load_relics
 from .potion_effects import random_potion
 from .relics import RelicEngine, gold_gained
 from .rng import Rng
@@ -90,6 +90,14 @@ IRONCLAD_STARTING_DECK: tuple[str, ...] = (
 IRONCLAD_STARTING_RELIC = "burning_blood"
 ACT1_VARIANTS: tuple[str, ...] = ("overgrowth", "underdocks")
 LATER_ACTS: tuple[str, ...] = ("hive", "glory")
+# Which ancient event rolls at each act's Ancient room.
+# From codex `acts.json` -> `ancients` field.
+_ACT_ANCIENTS: dict[str, tuple[str, ...]] = {
+    "overgrowth": ("NEOW",),
+    "underdocks": ("NEOW",),
+    "hive": ("OROBAS", "PAEL", "TEZCATARA"),
+    "glory": ("NONUPEIPE", "TANX", "VAKUU"),
+}
 FIRST_COMBAT_POOL = _WEAK_POOL
 _RELIC_RARITIES = ("common", "uncommon", "rare", "shop")
 _UNREMOVABLE = frozenset({"ascenders_bane", "curse_of_the_bell"})
@@ -243,6 +251,8 @@ class RunLoop:
             self._encounters = load_encounters(monster_ids=set(self._monsters))
             self._potions = load_potions()
             self._relics = load_relics()
+            self._ancient_pools = load_ancient_event_pools()
+            self._gid_to_rid = {r.game_id: rid for rid, r in self._relics.items()}
             self._reward_pool = rewards.reward_pool(self._cards)
             self._colorless_pool = rewards.reward_pool(self._cards, "colorless")
         asc = self._ascension
@@ -284,6 +294,7 @@ class RunLoop:
             self._fill_relic_bags()
             self._generate_acts()
             self._enter_act_map(0)
+            self._open_ancient_event()
         self._state.screen = Screen.NEOW
         self._state.room = "ancient"
         return self._packet()
@@ -303,9 +314,20 @@ class RunLoop:
         name, args = actions.parse_action(action_id)
         screen = state.screen
         if screen == Screen.NEOW:
-            self._leave_neow()
+            if name == actions.SELECT_RELIC:
+                idx = int(args[0])
+                rid = state.ancient_choices[idx]
+                state.ancient_choices = []
+                state.ancient_event = None
+                self._obtain_relic(rid, return_to=Screen.MAP)
+                if state.screen == Screen.NEOW:
+                    self._leave_neow()
+            else:
+                state.ancient_choices = []
+                state.ancient_event = None
+                self._leave_neow()
         elif screen == Screen.ANCIENT:
-            self._enter_map_screen()
+            self._step_ancient(name, args)
         elif screen == Screen.MAP:
             self._choose_map_node(int(args[0]))
         elif screen == Screen.COMBAT:
@@ -553,6 +575,110 @@ class RunLoop:
             if cands:
                 self._open_deck_select("enchant", cands, count, return_to, min_count=0 if fewer else None,
                                        enchant=enchant, enchant_amount=amount)
+        elif relic_id == "nutritious_oyster":
+            self._gain_max_hp(11)
+        elif relic_id == "looming_fruit":
+            self._gain_max_hp(31)
+        elif relic_id == "golden_pearl":
+            self._gain_gold(150)
+        elif relic_id == "signet_ring":
+            self._gain_gold(999)
+        elif relic_id == "cursed_pearl":
+            self._add_card_if_exists(p, "greed")
+            self._gain_gold(333)
+        elif relic_id == "neows_torment":
+            self._add_card_if_exists(p, "neows_fury")
+        elif relic_id == "storybook":
+            self._add_card_if_exists(p, "brightest_flame")
+        elif relic_id == "tanxs_whistle":
+            self._add_card_if_exists(p, "whistle")
+        elif relic_id == "jewelry_box":
+            self._add_card_if_exists(p, "apotheosis")
+        elif relic_id == "distinguished_cape":
+            self._lose_max_hp(9)
+            for _ in range(3):
+                self._add_card_if_exists(p, "apparition")
+        elif relic_id == "blood_soaked_rose":
+            self._add_card_if_exists(p, "enthralled")
+        elif relic_id == "preserved_fog":
+            self._add_card_if_exists(p, "folly")
+        elif relic_id == "sere_talon":
+            stream = self.rng.stream("relic_pickup")
+            curses = sorted(c.card_id for c in self.cards.values() if c.card_type == "curse"
+                            and c.card_id not in _UNREMOVABLE)
+            if curses:
+                stream.shuffle(curses)
+                for cid in curses[:2]:
+                    p.deck.append(CardRef(cid))
+        elif relic_id == "small_capsule":
+            stream = self.rng.stream("relic_pickup")
+            self._offer_random_shared_relic(stream, return_to)
+        elif relic_id == "large_capsule":
+            stream = self.rng.stream("relic_pickup")
+            for _ in range(2):
+                self._offer_random_shared_relic(stream, return_to)
+            p.deck.append(CardRef("strike_ironclad"))
+            p.deck.append(CardRef("defend_ironclad"))
+        elif relic_id == "pomander":
+            self._upgrade_random_any(1)
+        elif relic_id == "yummy_cookie":
+            self._upgrade_random_any(4)
+        elif relic_id == "sand_castle":
+            self._upgrade_random_any(6)
+        elif relic_id == "precarious_shears":
+            self._lose_hp(13)
+            cands = [i for i, c in enumerate(p.deck) if c not in _UNREMOVABLE]
+            if cands:
+                self._open_deck_select("remove", cands, 2, return_to)
+        elif relic_id == "precise_scissors":
+            cands = [i for i, c in enumerate(p.deck) if c not in _UNREMOVABLE]
+            if cands:
+                self._open_deck_select("remove", cands, 1, return_to)
+        elif relic_id == "empty_cage":
+            cands = [i for i, c in enumerate(p.deck) if c not in _UNREMOVABLE]
+            if cands:
+                self._open_deck_select("remove", cands, 2, return_to)
+        elif relic_id == "stone_humidifier":
+            # Resting raises Max HP: handled at rest time via relic_state flag.
+            p.relic_state.setdefault("stone_humidifier", True)
+
+    def _add_card_if_exists(self, player, card_id: str) -> None:
+        if card_id in self.cards:
+            player.deck.append(CardRef(card_id))
+
+    def _upgrade_random_any(self, count: int) -> None:
+        p = self.state.player
+        cands = [i for i, c in enumerate(p.deck) if self.cards[c].upgrade_of is not None]
+        if not cands:
+            return
+        stream = self.rng.stream("relic_pickup")
+        stream.shuffle(cands)
+        for i in cands[:count]:
+            p.deck[i] = CardRef(self.cards[p.deck[i]].upgrade_of, like=p.deck[i])
+
+    def _offer_random_shared_relic(self, stream, return_to: str) -> None:
+        p = self.state.player
+        pool = sorted(r.relic_id for r in self._relics.values()
+                      if r.pool in ("shared", "ironclad")
+                      and r.rarity in _RELIC_RARITIES
+                      and r.relic_id not in p.relics)
+        if not pool:
+            return
+        rid = stream.choice(pool)
+        self._obtain_relic(rid, return_to=return_to)
+
+    def _lose_hp(self, amount: int) -> None:
+        p = self.state.player
+        if amount <= 0 or p is None:
+            return
+        p.hp = max(1, p.hp - amount)
+
+    def _lose_max_hp(self, amount: int) -> None:
+        p = self.state.player
+        if amount <= 0 or p is None:
+            return
+        p.max_hp = max(1, p.max_hp - amount)
+        p.hp = min(p.hp, p.max_hp)
 
     def _push_reward(self, item: RewardItem, return_to: str) -> None:
         state = self.state
@@ -584,6 +710,27 @@ class RunLoop:
         state.map_coord = state.map.start
         self._enter_map_screen()
 
+    def _step_ancient(self, name: str, args: tuple[str, ...]) -> None:
+        state = self.state
+        if name == actions.SELECT_RELIC:
+            idx = int(args[0])
+            rid = state.ancient_choices[idx]
+            state.ancient_choices = []
+            state.ancient_event = None
+            self._obtain_relic(rid, return_to=Screen.MAP)
+            if state.screen == Screen.ANCIENT:
+                self._enter_map_screen()
+            return
+        if name == actions.CHOOSE_EVENT_OPTION:
+            # Legacy "proceed" path for old traces.
+            state.ancient_choices = []
+            state.ancient_event = None
+            self._enter_map_screen()
+            return
+        state.ancient_choices = []
+        state.ancient_event = None
+        self._enter_map_screen()
+
     def _enter_map_screen(self) -> None:
         self.state.screen = Screen.MAP
         self.state.room = None
@@ -609,6 +756,7 @@ class RunLoop:
         state.room = room
         if room == "ancient":
             self._ancient_heal()
+            self._open_ancient_event()
             state.screen = Screen.ANCIENT
             return
         if room in ("monster", "elite", "boss"):
@@ -674,6 +822,26 @@ class RunLoop:
         missing = p.max_hp - p.hp
         if missing > 0:
             p.hp += int(missing * 0.8) if self.state.ascension >= ASC_WEARY_TRAVELER else missing
+
+    def _open_ancient_event(self) -> None:
+        """Pick the act's ancient and roll 3 unowned relics from its pool."""
+
+        state = self.state
+        p = state.player
+        assert p is not None
+        act = state.acts[state.act_index].act
+        stream = self.rng.stream("ancient_event")
+        event_id = stream.choice(_ACT_ANCIENTS[act])
+        state.ancient_event = event_id
+        pool_gids = self._ancient_pools.get(event_id, ())
+        candidates = []
+        for gid in pool_gids:
+            rid = self._gid_to_rid.get(gid)
+            if rid is None or rid in p.relics:
+                continue
+            candidates.append(rid)
+        stream.shuffle(candidates)
+        state.ancient_choices = candidates[:3]
 
     # ------------------------------------------------------------------
     # Combat
@@ -1140,9 +1308,17 @@ class RunLoop:
         state = self.state
         screen = state.screen
         if screen == Screen.NEOW:
-            return [Decision(id=actions.NEOW_SKIP, text="skip Neow (stub)")]
+            out = [Decision(id=actions.format_action(actions.SELECT_RELIC, i),
+                            text=f"take {self._relic_text(r)}")
+                   for i, r in enumerate(state.ancient_choices)]
+            out.append(Decision(id=actions.NEOW_SKIP, text="skip Neow"))
+            return out
         if screen == Screen.ANCIENT:
-            return [Decision(id=actions.format_action(actions.CHOOSE_EVENT_OPTION, 0), text="proceed")]
+            out = [Decision(id=actions.format_action(actions.SELECT_RELIC, i),
+                            text=f"take {self._relic_text(r)}")
+                   for i, r in enumerate(state.ancient_choices)]
+            out.append(Decision(id=actions.SKIP_RELIC_SELECTION, text="leave ancient"))
+            return out
         if screen == Screen.MAP:
             return self._map_decisions()
         if screen == Screen.COMBAT:
