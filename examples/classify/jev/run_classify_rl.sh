@@ -21,6 +21,10 @@
 #   BASE_PORT           — first serve_decisions port; round k uses BASE_PORT+k (default 8125)
 #   HEALTH_RETRIES      — /health poll retries at 2s each (default 90 = 3 min)
 #   PYTHON              — python interpreter (default python3.11, falls back to python3)
+#   EXTRA_TRAIN_ARGS    — appended verbatim to every train_rl.py invocation
+#                         (word-split on spaces; wrap values with spaces in
+#                         quotes within the string itself if needed)
+#   EXTRA_ROLLOUT_ARGS  — appended verbatim to every rollout_sts2_sim.py invocation
 #
 # Produces per round:
 #   ${OUT_DIR}/rollouts/round_<i>.jsonl
@@ -28,9 +32,21 @@
 #   ${OUT_DIR}/logs/round_<i>.log
 #   ${OUT_DIR}/logs/server_<i>.log     (round >= 1)
 #
-# Example on DGX Spark:
-#   ROUNDS=5 EPISODES=512 BASE_CKPT=inclusionai/ling-3.0-tiny \
-#     ./examples/classify/jev/run_classify_rl.sh
+# Examples on DGX Spark:
+#
+#   Head-only training (Ling-3.0-tiny 9B, fits a 24 GB consumer GPU):
+#     EXTRA_TRAIN_ARGS="--freeze-backbone --head-lr 5e-4" \
+#       BASE_CKPT=inclusionai/ling-3.0-tiny \
+#       ./examples/classify/jev/run_classify_rl.sh
+#
+#   Full-parameter PPO with 8-bit AdamW (~60 GB on 9B):
+#     EXTRA_TRAIN_ARGS="--adam-8bit --backbone-lr 1e-5 --head-lr 2e-4 --clip-range 0.15" \
+#       BASE_CKPT=inclusionai/ling-3.0-tiny \
+#       ./examples/classify/jev/run_classify_rl.sh
+#
+#   Larger rollout horizon:
+#     EXTRA_ROLLOUT_ARGS="--max-steps 600 --gamma 0.995" \
+#       ./examples/classify/jev/run_classify_rl.sh
 
 set -euo pipefail
 
@@ -50,6 +66,13 @@ TEMPERATURE="${TEMPERATURE:-1.0}"
 BASE_PORT="${BASE_PORT:-8125}"
 HEALTH_RETRIES="${HEALTH_RETRIES:-90}"
 PYTHON="${PYTHON:-}"
+EXTRA_TRAIN_ARGS="${EXTRA_TRAIN_ARGS:-}"
+EXTRA_ROLLOUT_ARGS="${EXTRA_ROLLOUT_ARGS:-}"
+# Split by shell word-splitting so the loop below forwards them as
+# individual argv entries. `read -ra` is the safest way to tokenize
+# with `set -u` active — the array stays empty when the input is empty.
+read -ra EXTRA_TRAIN_ARGV <<< "${EXTRA_TRAIN_ARGS}"
+read -ra EXTRA_ROLLOUT_ARGV <<< "${EXTRA_ROLLOUT_ARGS}"
 
 if [ -z "${PYTHON}" ]; then
   if command -v python3.11 >/dev/null 2>&1; then
@@ -77,6 +100,8 @@ echo "Epochs:            ${EPOCHS}"
 echo "Max steps:         ${MAX_STEPS}"
 echo "Decisions/step:    ${DECISIONS_PER_STEP}"
 echo "Out dir:           ${OUT_DIR}"
+echo "Extra train args:  ${EXTRA_TRAIN_ARGS:-<none>}"
+echo "Extra roll args:   ${EXTRA_ROLLOUT_ARGS:-<none>}"
 echo
 
 echo "[env check] GPU availability"
@@ -186,6 +211,7 @@ for ROUND in $(seq 0 $((ROUNDS - 1))); do
     --episodes "${EPISODES}" \
     --out "${JSONL}" \
     --seed-start "$((ROUND * EPISODES))" \
+    ${EXTRA_ROLLOUT_ARGV[@]+"${EXTRA_ROLLOUT_ARGV[@]}"} \
     2>&1 | tee -a "${ROUND_LOG}"
 
   cleanup_server
@@ -199,6 +225,7 @@ for ROUND in $(seq 0 $((ROUNDS - 1))); do
     --epochs "${EPOCHS}" \
     --max-steps "${MAX_STEPS}" \
     --decisions-per-step "${DECISIONS_PER_STEP}" \
+    ${EXTRA_TRAIN_ARGV[@]+"${EXTRA_TRAIN_ARGV[@]}"} \
     2>&1 | tee -a "${ROUND_LOG}"
 
   PREV_CKPT="$(latest_step_dir "${CKPT_OUT}")"
