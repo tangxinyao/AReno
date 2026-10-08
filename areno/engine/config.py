@@ -54,6 +54,11 @@ class OptimizerConfig:
     # head-only warmup that holds the backbone LR at zero for the first steps.
     score_head_lr: float | None = None
     score_head_warmup_steps: int = 0
+    # Freeze the backbone entirely (keeps the score head trainable). The
+    # engine still honors `lr=0` for weight updates; this flag is a signal
+    # for future engine-side support that drops optimizer state for frozen
+    # params. ClassifyRLTrainerConfig forces lr=0 whenever this is True.
+    freeze_backbone: bool = False
 
     def __post_init__(self) -> None:
         if self.adam_4bit and self.adam_8bit:

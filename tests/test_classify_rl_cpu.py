@@ -328,6 +328,38 @@ class ClassifyRLConfigTest(unittest.TestCase):
                 algo="classify_rl", ckpt="unused", dataset_path="unused", backend="cuda", entropy_weight=-1.0
             )
 
+    def test_freeze_backbone_defaults_to_false(self):
+        config = ClassifyRLTrainerConfig(
+            algo="classify_rl", ckpt="unused", dataset_path="unused", backend="cuda",
+        )
+        self.assertFalse(config.freeze_backbone)
+        optimizer = OptimizerConfig(**config.optimizer_config())
+        self.assertFalse(optimizer.freeze_backbone)
+
+    def test_freeze_backbone_forces_optimizer_lr_zero(self):
+        config = ClassifyRLTrainerConfig(
+            algo="classify_rl", ckpt="unused", dataset_path="unused", backend="cuda",
+            optimizer_lr=1e-4, freeze_backbone=True,
+        )
+        self.assertEqual(config.optimizer_lr, 0.0)
+
+    def test_freeze_backbone_propagates_to_optimizer_config(self):
+        config = ClassifyRLTrainerConfig(
+            algo="classify_rl", ckpt="unused", dataset_path="unused", backend="cuda",
+            freeze_backbone=True,
+        )
+        optimizer = OptimizerConfig(**config.optimizer_config())
+        self.assertTrue(optimizer.freeze_backbone)
+        self.assertEqual(optimizer.lr, 0.0)
+        self.assertEqual(optimizer.score_head_lr, config.score_head_lr)
+
+    def test_freeze_backbone_still_requires_positive_head_lr(self):
+        with self.assertRaisesRegex(ValueError, "score_head_lr"):
+            ClassifyRLTrainerConfig(
+                algo="classify_rl", ckpt="unused", dataset_path="unused", backend="cuda",
+                freeze_backbone=True, score_head_lr=0.0,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

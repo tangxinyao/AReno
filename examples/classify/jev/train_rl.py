@@ -49,6 +49,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--backbone-lr", type=float, default=1e-5)
     parser.add_argument("--head-lr", type=float, default=1e-4)
     parser.add_argument("--head-warmup-steps", type=int, default=0)
+    parser.add_argument("--freeze-backbone", action="store_true",
+                        help="skip backbone updates; score head still trains at --head-lr "
+                             "(forces backbone LR to 0 regardless of --backbone-lr)")
     parser.add_argument("--clip-range", type=float, default=0.2)
     parser.add_argument("--entropy-weight", type=float, default=0.0)
     parser.add_argument("--sft-weight", type=float, default=0.0, help="CE anchor against sft_target (if present)")
@@ -111,6 +114,7 @@ def main() -> None:
         max_seq_len=args.max_seq_len,
         score_head_lr=args.head_lr,
         score_head_warmup_steps=args.head_warmup_steps,
+        freeze_backbone=args.freeze_backbone,
         seed=args.seed,
     )
     config = resolve_model_refs_for_config(config)

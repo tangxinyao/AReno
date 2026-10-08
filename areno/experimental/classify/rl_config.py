@@ -29,6 +29,7 @@ class ClassifyRLTrainerConfig(TrainerConfig):
     max_seq_len: int = 1536
     score_head_lr: float = 2.0e-4
     score_head_warmup_steps: int = 0
+    freeze_backbone: bool = False
     seed: int = 17
 
     def __post_init__(self) -> None:
@@ -51,6 +52,11 @@ class ClassifyRLTrainerConfig(TrainerConfig):
             raise ValueError("score_head_lr must be positive")
         if self.score_head_warmup_steps < 0:
             raise ValueError("score_head_warmup_steps must be non-negative")
+        if self.freeze_backbone:
+            # Head-only training. Force the backbone LR to 0 so the optimizer
+            # cannot update it even if upstream code forwards a nonzero value
+            # from `--backbone-lr`. Score head still trains at score_head_lr.
+            self.optimizer_lr = 0.0
 
     def optimizer_config(self) -> dict:
         """Add the score-head LR group and head-only warmup."""
@@ -58,6 +64,7 @@ class ClassifyRLTrainerConfig(TrainerConfig):
         config = TrainerConfig.optimizer_config(self)
         config["score_head_lr"] = self.score_head_lr
         config["score_head_warmup_steps"] = self.score_head_warmup_steps
+        config["freeze_backbone"] = self.freeze_backbone
         return config
 
     def cuda_config(self):
