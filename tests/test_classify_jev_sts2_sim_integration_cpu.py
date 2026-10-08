@@ -40,11 +40,11 @@ class NeowToCombatTest(unittest.TestCase):
         self.assertEqual(self.reset_packet["screen"], self.sim.Screen.NEOW)
         self.assertEqual(
             [c["id"] for c in self.reset_packet["candidates"]],
-            ["skip"],
+            ["choose_event_option:0"],
         )
 
     def test_skip_enters_combat_with_jaw_worm(self) -> None:
-        packet = self.loop.step("skip")
+        packet = self.loop.step("choose_event_option:0")
         self.assertEqual(packet["screen"], self.sim.Screen.COMBAT)
         self.assertEqual(packet["decision_point"], self.sim.DecisionPoint.COMBAT_PLAY)
         combat = self.loop.state.combat
@@ -53,13 +53,13 @@ class NeowToCombatTest(unittest.TestCase):
         self.assertEqual(combat.monsters[0].monster_id, "jaw_worm")
 
     def test_initial_combat_candidates_include_strikes_defends_bash_and_end_turn(self) -> None:
-        packet = self.loop.step("skip")
+        packet = self.loop.step("choose_event_option:0")
         ids = {c["id"] for c in packet["candidates"]}
         # Hand is drawn from the standard Ironclad deck; expect at least one
         # of each affordable base card type after shuffle. Strike + Defend
         # are both cost 1 (affordable with 3 energy); Bash costs 2.
-        has_strike = any(i.startswith("play:strike:") for i in ids)
-        has_defend = any(i == "play:defend" for i in ids)
+        has_strike = any(i.startswith("play_card:strike:") for i in ids)
+        has_defend = any(i == "play_card:defend" for i in ids)
         self.assertTrue(has_strike or has_defend, "no cost-1 card in opening hand??")
         self.assertIn("end_turn", ids)
 
@@ -72,7 +72,7 @@ class CombatControlTest(unittest.TestCase):
         self.sim = _import_sim()
         self.loop = self.sim.RunLoop(seed=42)
         self.loop.reset()
-        self.loop.step("skip")
+        self.loop.step("choose_event_option:0")
 
     def test_end_turn_runs_enemy_phase_and_returns_to_player(self) -> None:
         hp_before = self.loop.state.player.hp
@@ -88,7 +88,7 @@ class CombatControlTest(unittest.TestCase):
 
     def test_malformed_play_rejected(self) -> None:
         with self.assertRaisesRegex(self.sim.RunLoopError, "illegal action"):
-            self.loop.step("play:")
+            self.loop.step("play_card:")
 
 
 class CombatToVictoryTest(unittest.TestCase):
@@ -99,7 +99,7 @@ class CombatToVictoryTest(unittest.TestCase):
         self.sim = _import_sim()
         self.loop = self.sim.RunLoop(seed=42)
         self.loop.reset()
-        self.loop.step("skip")
+        self.loop.step("choose_event_option:0")
 
     def test_strike_to_victory_drops_run_into_game_over(self) -> None:
         worm = self.loop.state.combat.monsters[0]
@@ -110,12 +110,12 @@ class CombatToVictoryTest(unittest.TestCase):
             # Guarantee a strike by planting it.
             hand.append("strike")
             self.loop.state.player.energy = 3
-        packet = self.loop.step("play:strike:0")
+        packet = self.loop.step("play_card:strike:0")
         self.assertTrue(packet["done"])
         self.assertEqual(packet["screen"], self.sim.Screen.GAME_OVER)
         self.assertEqual(packet["outcome"], self.sim.Outcome.VICTORY)
         self.assertEqual(packet["decision_point"], self.sim.DecisionPoint.GAME_OVER)
-        self.assertEqual([c["id"] for c in packet["candidates"]], ["terminal"])
+        self.assertEqual([c["id"] for c in packet["candidates"]], ["menu_select:main_menu"])
 
     def test_cannot_step_after_game_over(self) -> None:
         worm = self.loop.state.combat.monsters[0]
@@ -124,9 +124,9 @@ class CombatToVictoryTest(unittest.TestCase):
         if "strike" not in hand:
             hand.append("strike")
             self.loop.state.player.energy = 3
-        self.loop.step("play:strike:0")
+        self.loop.step("play_card:strike:0")
         with self.assertRaisesRegex(self.sim.RunLoopError, "terminal"):
-            self.loop.step("terminal")
+            self.loop.step("menu_select:main_menu")
 
 
 class CombatToDefeatTest(unittest.TestCase):
@@ -138,7 +138,7 @@ class CombatToDefeatTest(unittest.TestCase):
         self.loop.reset()
         self.loop.state.player.hp = 5
         self.loop.state.player.max_hp = 5
-        self.loop.step("skip")
+        self.loop.step("choose_event_option:0")
 
     def test_end_turn_lethal_chomp_sets_defeat(self) -> None:
         packet = self.loop.step("end_turn")
@@ -154,7 +154,7 @@ class CandidateFilteringTest(unittest.TestCase):
         self.sim = _import_sim()
         self.loop = self.sim.RunLoop(seed=42)
         self.loop.reset()
-        self.loop.step("skip")
+        self.loop.step("choose_event_option:0")
 
     def test_bash_disappears_when_energy_too_low(self) -> None:
         # Plant a known hand: bash only.
@@ -162,7 +162,7 @@ class CandidateFilteringTest(unittest.TestCase):
         self.loop.state.player.energy = 1  # bash costs 2
         packet = self.loop._packet()
         ids = {c["id"] for c in packet["candidates"]}
-        self.assertNotIn("play:bash:0", ids)
+        self.assertNotIn("play_card:bash:0", ids)
         self.assertEqual(ids, {"end_turn"})
 
     def test_bash_appears_with_enough_energy(self) -> None:
@@ -170,13 +170,13 @@ class CandidateFilteringTest(unittest.TestCase):
         self.loop.state.player.energy = 2
         packet = self.loop._packet()
         ids = {c["id"] for c in packet["candidates"]}
-        self.assertIn("play:bash:0", ids)
+        self.assertIn("play_card:bash:0", ids)
 
     def test_duplicate_cards_deduplicate_in_candidates(self) -> None:
         self.loop.state.player.hand[:] = ["strike", "strike", "strike"]
         self.loop.state.player.energy = 3
         packet = self.loop._packet()
-        strike_candidates = [c for c in packet["candidates"] if c["id"].startswith("play:strike")]
+        strike_candidates = [c for c in packet["candidates"] if c["id"].startswith("play_card:strike")]
         # One candidate per alive enemy slot, deduplicated by card_id.
         alive = sum(1 for m in self.loop.state.combat.monsters if m.alive)
         self.assertEqual(len(strike_candidates), alive)
@@ -186,9 +186,9 @@ class CandidateFilteringTest(unittest.TestCase):
         self.loop.state.player.energy = 3
         packet = self.loop._packet()
         ids = {c["id"] for c in packet["candidates"]}
-        self.assertNotIn("play:wound", ids)
-        self.assertNotIn("play:wound:0", ids)
-        self.assertTrue(any(i.startswith("play:strike") for i in ids))
+        self.assertNotIn("play_card:wound", ids)
+        self.assertNotIn("play_card:wound:0", ids)
+        self.assertTrue(any(i.startswith("play_card:strike") for i in ids))
 
     def test_hand_of_only_unplayables_leaves_only_end_turn(self) -> None:
         self.loop.state.player.hand[:] = ["wound", "wound"]

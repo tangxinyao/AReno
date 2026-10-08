@@ -2,12 +2,13 @@
 
 Phase 0 only exposes the skeleton types (Rng, HookBus, EffectQueue, RunLoop)
 needed by later phases; `RunLoop.reset()` yields a Neow screen and
-`step("skip")` drops the run into `game_over` immediately. See `NOTICE.md`
+`step(actions.NEOW_SKIP)` starts the first combat. See `NOTICE.md`
 for attribution against the three reference sims.
 """
 
 from __future__ import annotations
 
+from . import actions
 from .combat import CombatContext, CombatError
 from .effects import Effect, EffectQueue
 from .enums import ALL_CHARACTERS, Character, CombatPhase, DecisionPoint, Outcome, Screen
@@ -28,6 +29,7 @@ from .schemas import (
 from .state import CombatState, MonsterState, PlayerState, RunState
 
 __all__ = [
+    "actions",
     "ALL_CHARACTERS",
     "Character",
     "CardSchema",

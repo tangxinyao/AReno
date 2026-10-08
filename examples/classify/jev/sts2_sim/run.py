@@ -1,17 +1,17 @@
 """RunLoop with Phase 1 combat wired in.
 
 Phase 0 shipped a Neow -> game_over stub; Phase 1 closes that loop by
-promoting the Neow `skip` action into "start the first combat", driving
+promoting the Neow skip action into "start the first combat", driving
 CombatContext for every player decision, and transitioning to game_over
 when combat ends. Later phases replace the hard-coded Jaw Worm fight with
 map/event-driven combat encounters.
 
-Action id vocabulary (per decision point):
-  neow:        "skip"
-  combat:      "play:{card_id}"               for non-targeted cards
-               "play:{card_id}:{enemy_slot}"  for single_enemy cards
+Action ids use STS2MCP action names (see `actions.py`):
+  neow:        "choose_event_option:0"             (skip stub)
+  combat:      "play_card:{card_id}"               for non-targeted cards
+               "play_card:{card_id}:{enemy_slot}"  for single_enemy cards
                "end_turn"
-  game_over:   "terminal"
+  game_over:   "menu_select:main_menu"
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from . import actions
 from .combat import CombatContext, CombatError
 from .effects import EffectQueue
 from .enums import Character, CombatPhase, DecisionPoint, Outcome, Screen
@@ -57,8 +58,8 @@ class RunLoop:
     """Owns one run's state. Not thread-safe; one RunLoop per worker.
 
     Phase 1 behavior:
-      reset()            -> Neow screen, candidate ["skip"].
-      step("skip")       -> transitions to combat (Jaw Worm) and reports
+      reset()            -> Neow screen, candidate ["choose_event_option:0"].
+      step(NEOW_SKIP)    -> transitions to combat (Jaw Worm) and reports
                             the player's combat_play candidates for turn 1.
       step(play/end_turn) -> delegates to CombatContext.
       combat ends        -> screen = game_over, outcome = victory/death.
@@ -198,18 +199,15 @@ class RunLoop:
     def _handle_combat_action(self, action_id: str) -> None:
         assert self._combat_ctx is not None
         try:
-            if action_id == "end_turn":
+            name, args = actions.parse_action(action_id)
+            if name == actions.END_TURN and not args:
                 self._combat_ctx.end_turn()
-                return
-            if not action_id.startswith("play:"):
-                raise RunLoopError(f"unknown combat action {action_id!r}")
-            parts = action_id.split(":")
-            if len(parts) == 2:
-                self._combat_ctx.play_card(parts[1])
-            elif len(parts) == 3:
-                self._combat_ctx.play_card(parts[1], target_slot=int(parts[2]))
+            elif name == actions.PLAY_CARD and len(args) == 1:
+                self._combat_ctx.play_card(args[0])
+            elif name == actions.PLAY_CARD and len(args) == 2:
+                self._combat_ctx.play_card(args[0], target_slot=int(args[1]))
             else:
-                raise RunLoopError(f"malformed combat action {action_id!r}")
+                raise RunLoopError(f"unknown combat action {action_id!r}")
         except CombatError as exc:
             # Legal-set check should have caught these, so a CombatError here
             # means a bug in the enumerator. Surface it as a RunLoopError so
@@ -229,11 +227,11 @@ class RunLoop:
     def _decisions(self) -> list[Decision]:
         assert self._state is not None
         if self._state.screen == Screen.NEOW:
-            return [Decision(id="skip", text="skip Neow (Phase 1 stub)")]
+            return [Decision(id=actions.NEOW_SKIP, text="skip Neow (Phase 1 stub)")]
         if self._state.screen == Screen.COMBAT:
             return self._combat_decisions()
         if self._state.screen == Screen.GAME_OVER:
-            return [Decision(id="terminal", text="<game_over>")]
+            return [Decision(id=actions.GAME_OVER_MAIN_MENU, text="<game_over>")]
         raise RunLoopError(f"no decision table for screen {self._state.screen!r}")
 
     def _combat_decisions(self) -> list[Decision]:
@@ -266,15 +264,15 @@ class RunLoop:
                 for monster in combat.monsters:
                     if monster.alive:
                         decisions.append(Decision(
-                            id=f"play:{card_id}:{monster.slot}",
+                            id=actions.format_action(actions.PLAY_CARD, card_id, monster.slot),
                             text=f"play {card.name} vs {monster.name}#{monster.slot}",
                         ))
             else:
                 decisions.append(Decision(
-                    id=f"play:{card_id}",
+                    id=actions.format_action(actions.PLAY_CARD, card_id),
                     text=f"play {card.name}",
                 ))
-        decisions.append(Decision(id="end_turn", text="end turn"))
+        decisions.append(Decision(id=actions.END_TURN, text="end turn"))
         return decisions
 
     def _packet(self) -> dict[str, Any]:

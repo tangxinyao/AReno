@@ -24,8 +24,8 @@ Each JSONL row the trainer consumes:
     {"prompt": str, "candidates": [str, ...],
      "chosen": int, "old_logp": float, "advantage": float}
 
-Decisions with fewer than two legal candidates (Neow `skip`, game-over
-`terminal`) are dropped since grouped-softmax PPO needs K>=2 per group.
+Decisions with fewer than two legal candidates (Neow
+`choose_event_option:0`, game-over `menu_select:main_menu`) are dropped since grouped-softmax PPO needs K>=2 per group.
 """
 
 from __future__ import annotations

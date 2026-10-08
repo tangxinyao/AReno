@@ -2,7 +2,7 @@
 
 Covers only what Phase 0 built: RNG stream determinism and independence,
 HookBus priority + registration order, EffectQueue FIFO/LIFO, and the
-minimal reset -> step("skip") -> game_over run loop. Combat / map / cards
+minimal reset -> step("choose_event_option:0") -> game_over run loop. Combat / map / cards
 land in Phase 1+ with their own tests.
 """
 
@@ -165,7 +165,7 @@ class RunLoopTest(unittest.TestCase):
     def test_requires_reset_before_step_or_properties(self) -> None:
         loop = self._loop()
         with self.assertRaises(self.sim.RunLoopError):
-            loop.step("skip")
+            loop.step("choose_event_option:0")
         with self.assertRaises(self.sim.RunLoopError):
             _ = loop.state
 
@@ -176,20 +176,20 @@ class RunLoopTest(unittest.TestCase):
         self.assertEqual(packet["decision_point"], self.sim.DecisionPoint.NEOW_BONUS)
         self.assertFalse(packet["done"])
         self.assertEqual(packet["step"], 0)
-        self.assertEqual([c["id"] for c in packet["candidates"]], ["skip"])
+        self.assertEqual([c["id"] for c in packet["candidates"]], ["choose_event_option:0"])
 
     def test_skip_transitions_to_combat(self) -> None:
         """Phase 1 behavior: skip Neow now enters a Jaw Worm combat."""
 
         loop = self._loop()
         loop.reset()
-        packet = loop.step("skip")
+        packet = loop.step("choose_event_option:0")
         self.assertFalse(packet["done"])
         self.assertEqual(packet["screen"], self.sim.Screen.COMBAT)
         self.assertEqual(packet["decision_point"], self.sim.DecisionPoint.COMBAT_PLAY)
-        # Candidates must include at least one play:* and end_turn.
+        # Candidates must include at least one play_card:* and end_turn.
         ids = {c["id"] for c in packet["candidates"]}
-        self.assertTrue(any(i.startswith("play:") for i in ids))
+        self.assertTrue(any(i.startswith("play_card:") for i in ids))
         self.assertIn("end_turn", ids)
 
     def test_illegal_action_rejected(self) -> None:
@@ -213,6 +213,60 @@ class RunLoopTest(unittest.TestCase):
         self.assertIsNotNone(loop.hooks)
         self.assertEqual(loop.state.player.hp, 80)
         self.assertEqual(loop.state.player.gold, 99)
+
+
+class ActionIdTest(unittest.TestCase):
+    """Action ids share STS2MCP's singleplayer action names."""
+
+    def setUp(self) -> None:
+        self.actions = _import_sim().actions
+
+    def test_vocabulary_matches_sts2mcp_singleplayer_actions(self) -> None:
+        # Mirrors the switch in Gennadiyev/STS2MCP McpMod.Actions.cs plus the
+        # menu_select special case in McpMod.cs.
+        expected = {
+            "menu_select", "play_card", "use_potion", "discard_potion", "end_turn",
+            "choose_map_node", "choose_event_option", "advance_dialogue",
+            "choose_rest_option", "shop_purchase", "claim_reward",
+            "select_card_reward", "skip_card_reward", "proceed", "select_card",
+            "confirm_selection", "cancel_selection", "select_bundle",
+            "confirm_bundle_selection", "cancel_bundle_selection",
+            "combat_select_card", "combat_confirm_selection", "select_relic",
+            "skip_relic_selection", "claim_treasure_relic",
+            "crystal_sphere_set_tool", "crystal_sphere_click_cell",
+            "crystal_sphere_proceed",
+        }
+        self.assertEqual(set(self.actions.MCP_ACTIONS), expected)
+
+    def test_format_parse_roundtrip(self) -> None:
+        a = self.actions
+        aid = a.format_action(a.PLAY_CARD, "strike", 0)
+        self.assertEqual(aid, "play_card:strike:0")
+        self.assertEqual(a.parse_action(aid), ("play_card", ("strike", "0")))
+        self.assertEqual(a.parse_action("end_turn"), ("end_turn", ()))
+
+    def test_rejects_unknown_name_and_bad_args(self) -> None:
+        a = self.actions
+        with self.assertRaises(ValueError):
+            a.format_action("play", "strike")
+        with self.assertRaises(ValueError):
+            a.format_action(a.PLAY_CARD, "a:b")
+        with self.assertRaises(ValueError):
+            a.parse_action("play:strike")
+        with self.assertRaises(ValueError):
+            a.parse_action("play_card:")
+
+    def test_every_emitted_candidate_is_an_mcp_action(self) -> None:
+        sim = _import_sim()
+        loop = sim.RunLoop(seed=0)
+        packet = loop.reset()
+        for _ in range(200):
+            for cand in packet["candidates"]:
+                self.actions.parse_action(cand["id"])
+            if packet["done"]:
+                break
+            packet = loop.step(packet["candidates"][0]["id"])
+        self.assertTrue(packet["done"])
 
 
 if __name__ == "__main__":

@@ -84,7 +84,7 @@ class ResetShapeTest(unittest.TestCase):
 
     def test_initial_decision_point_is_neow(self) -> None:
         self.assertEqual(self.packet["decision_point"], "neow_bonus")
-        self.assertEqual([c["id"] for c in self.packet["candidates"]], ["skip"])
+        self.assertEqual([c["id"] for c in self.packet["candidates"]], ["choose_event_option:0"])
         self.assertFalse(self.packet["done"])
         self.assertEqual(self.packet["step"], 0)
         self.assertEqual(self.packet["reward"], 0.0)
@@ -113,8 +113,8 @@ class SeedDeterminismTest(unittest.TestCase):
         b2 = self.shim.Sts2SimBackend()
         r1 = b1.reset({"character": "ironclad", "ascension": 0, "episode_scope": "full_run", "seed": "SEEDA"})
         r2 = b2.reset({"character": "ironclad", "ascension": 0, "episode_scope": "full_run", "seed": "SEEDA"})
-        s1 = b1.step({"episode_id": r1["episode_id"], "action_id": "skip"})
-        s2 = b2.step({"episode_id": r2["episode_id"], "action_id": "skip"})
+        s1 = b1.step({"episode_id": r1["episode_id"], "action_id": "choose_event_option:0"})
+        s2 = b2.step({"episode_id": r2["episode_id"], "action_id": "choose_event_option:0"})
         self.assertEqual(
             [c["id"] for c in s1["candidates"]],
             [c["id"] for c in s2["candidates"]],
@@ -125,8 +125,8 @@ class SeedDeterminismTest(unittest.TestCase):
         b2 = self.shim.Sts2SimBackend()
         r1 = b1.reset({"character": "ironclad", "ascension": 0, "episode_scope": "full_run", "seed": "SEEDA"})
         r2 = b2.reset({"character": "ironclad", "ascension": 0, "episode_scope": "full_run", "seed": "SEEDZ"})
-        s1 = b1.step({"episode_id": r1["episode_id"], "action_id": "skip"})
-        s2 = b2.step({"episode_id": r2["episode_id"], "action_id": "skip"})
+        s1 = b1.step({"episode_id": r1["episode_id"], "action_id": "choose_event_option:0"})
+        s2 = b2.step({"episode_id": r2["episode_id"], "action_id": "choose_event_option:0"})
         # Enemy HP rolls and shuffle both pull from the master seed; at least one
         # of (candidates, info.hp) should differ for distinct seeds.
         same_candidates = [c["id"] for c in s1["candidates"]] == [c["id"] for c in s2["candidates"]]
@@ -150,14 +150,14 @@ class EndToEndFlowTest(unittest.TestCase):
         self.episode_id = self.reset_packet["episode_id"]
 
     def test_skip_transitions_to_combat_play(self) -> None:
-        packet = self.backend.step({"episode_id": self.episode_id, "action_id": "skip"})
+        packet = self.backend.step({"episode_id": self.episode_id, "action_id": "choose_event_option:0"})
         self.assertEqual(packet["decision_point"], "combat_play")
         self.assertFalse(packet["done"])
         ids = {c["id"] for c in packet["candidates"]}
         self.assertIn("end_turn", ids)
 
     def test_greedy_policy_reaches_terminal(self) -> None:
-        packet = self.backend.step({"episode_id": self.episode_id, "action_id": "skip"})
+        packet = self.backend.step({"episode_id": self.episode_id, "action_id": "choose_event_option:0"})
         for _ in range(50):
             if packet["done"]:
                 break
@@ -168,7 +168,7 @@ class EndToEndFlowTest(unittest.TestCase):
         self.assertIn(packet["info"]["outcome"], ("win", "loss"))
 
     def test_terminal_reward_sign_matches_outcome(self) -> None:
-        packet = self.backend.step({"episode_id": self.episode_id, "action_id": "skip"})
+        packet = self.backend.step({"episode_id": self.episode_id, "action_id": "choose_event_option:0"})
         for _ in range(50):
             if packet["done"]:
                 break
@@ -188,21 +188,21 @@ class EpisodeIsolationTest(unittest.TestCase):
 
     def test_unknown_episode_id_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "unknown episode_id"):
-            self.backend.step({"episode_id": "nope", "action_id": "skip"})
+            self.backend.step({"episode_id": "nope", "action_id": "choose_event_option:0"})
 
     def test_close_removes_episode(self) -> None:
         r = self.backend.reset({"character": "ironclad", "ascension": 0, "episode_scope": "full_run"})
         self.backend.close(r["episode_id"])
         with self.assertRaisesRegex(ValueError, "unknown episode_id"):
-            self.backend.step({"episode_id": r["episode_id"], "action_id": "skip"})
+            self.backend.step({"episode_id": r["episode_id"], "action_id": "choose_event_option:0"})
 
     def test_two_episodes_independent(self) -> None:
         r1 = self.backend.reset({"character": "ironclad", "ascension": 0, "episode_scope": "full_run"})
         r2 = self.backend.reset({"character": "ironclad", "ascension": 0, "episode_scope": "full_run"})
         self.assertNotEqual(r1["episode_id"], r2["episode_id"])
-        self.backend.step({"episode_id": r1["episode_id"], "action_id": "skip"})
+        self.backend.step({"episode_id": r1["episode_id"], "action_id": "choose_event_option:0"})
         # Episode 2 is still at neow.
-        p2 = self.backend.step({"episode_id": r2["episode_id"], "action_id": "skip"})
+        p2 = self.backend.step({"episode_id": r2["episode_id"], "action_id": "choose_event_option:0"})
         self.assertEqual(p2["step"], 1)
 
 
@@ -219,7 +219,7 @@ class ActionShapeTest(unittest.TestCase):
 
     def test_rejects_illegal_action_at_neow(self) -> None:
         with self.assertRaisesRegex(ValueError, "RunLoop rejected"):
-            self.backend.step({"episode_id": self.episode_id, "action_id": "play:bash:0"})
+            self.backend.step({"episode_id": self.episode_id, "action_id": "play_card:bash:0"})
 
 
 if __name__ == "__main__":
