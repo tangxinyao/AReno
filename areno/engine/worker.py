@@ -31,6 +31,7 @@ from areno.engine.inference import InferCacheSpec, InferenceManager
 from areno.engine.modeling import (
     build_model_on_device,
     build_optimizer,
+    configure_backbone_training,
     configure_multimodal_training,
     param_grad,
     unwrap_model,
@@ -85,6 +86,10 @@ class ArenoWorker:
                 device=self.device,
                 model_path=None if config.dummy_load else config.model_path,
             )
+        # Must run after attach_score_head so the head's params are known;
+        # must run before build_optimizer so the filter below sees the
+        # requires_grad flags set here.
+        configure_backbone_training(self.model, config.optimizer, trainable=config.role == "train")
         self.adapter_registry = (
             initialize_lora(self.model, config.lora, seed=config.lora_seed) if config.lora is not None else None
         )
@@ -96,6 +101,12 @@ class ArenoWorker:
         optimizer_parameters = (
             self.adapter_registry.parameters() if self.adapter_registry is not None else self.model.parameters()
         )
+        if opt.freeze_backbone:
+            # Drop frozen backbone params from the optimizer so AdamW state
+            # (fp32 master + momentum + variance) is only allocated for the
+            # score head. configure_backbone_training already set
+            # requires_grad=False on the backbone; filter here.
+            optimizer_parameters = [p for p in optimizer_parameters if p.requires_grad]
         self.optimizer = build_optimizer(optimizer_parameters, opt, ctx) if config.role == "train" else None
         self.grad_clip_norm = opt.grad_clip_norm
         self.base_lr = opt.lr

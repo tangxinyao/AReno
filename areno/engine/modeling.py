@@ -133,3 +133,35 @@ def configure_multimodal_training(model: torch.nn.Module, optimizer_config, *, t
         base_lr=optimizer_config.lr,
         trainable=trainable,
     )
+
+
+def configure_backbone_training(model: torch.nn.Module, optimizer_config, *, trainable: bool) -> None:
+    """Freeze every param outside `score_head` when optimizer_config.freeze_backbone is set.
+
+    Head-only training on a classify checkpoint: once the score head is
+    attached, flip `requires_grad=False` on all other params so the
+    optimizer caller can filter them out and skip allocating optimizer
+    state (fp32 master + Adam momentum/variance). On a 9B backbone this
+    skips ~72 GB of AdamW state in fp32-master mode, ~18 GB with
+    adam-8bit, and ~9 GB with adam-4bit — fitting a 128 GB DGX Spark
+    comfortably.
+
+    No-op when `trainable=False` (reference / rollout roles never train
+    anyway) or when the flag isn't set. Raises if the flag is set but
+    the model has no `score_head` attribute — the only reason to freeze
+    the backbone in this path is to keep training the head.
+    """
+
+    if not trainable or not optimizer_config.freeze_backbone:
+        return
+    unwrapped = unwrap_model(model)
+    score_head = getattr(unwrapped, "score_head", None)
+    if score_head is None:
+        raise ValueError(
+            "optimizer.freeze_backbone requires an attached score_head "
+            "(enable RuntimeConfig.score_head so attach_score_head runs first)"
+        )
+    score_head_param_ids = {id(p) for p in score_head.parameters()}
+    for param in unwrapped.parameters():
+        if id(param) not in score_head_param_ids:
+            param.requires_grad = False
