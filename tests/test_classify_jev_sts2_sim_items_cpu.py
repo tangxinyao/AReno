@@ -835,6 +835,62 @@ class AncientRunHookTest(unittest.TestCase):
         self.assertEqual(loop.state.player.gold, 0)
         self.assertEqual(len(loop.state.player.deck), before + 5)
 
+    def test_pandoras_box_transforms_all_starters(self) -> None:
+        loop = self._run()
+        before = list(loop.state.player.deck)
+        count_strikes = sum(1 for c in before if c == "strike_ironclad")
+        count_defends = sum(1 for c in before if c == "defend_ironclad")
+        loop._obtain_relic("pandoras_box", return_to=SIM.Screen.MAP)
+        after = loop.state.player.deck
+        # Strikes and defends gone (transformed to other Ironclad cards).
+        self.assertEqual(sum(1 for c in after if c == "strike_ironclad"), 0)
+        self.assertEqual(sum(1 for c in after if c == "defend_ironclad"), 0)
+        self.assertEqual(len(after), len(before))  # count unchanged
+        self.assertEqual(sum(1 for c in before if c == "bash"),
+                         sum(1 for c in after if c == "bash"))  # Bash untouched
+
+    def test_astrolabe_opens_transform_three(self) -> None:
+        loop = self._run()
+        loop._obtain_relic("astrolabe", return_to=SIM.Screen.MAP)
+        self.assertEqual(loop.state.screen, SIM.Screen.CARD_SELECT)
+        self.assertEqual(loop.state.deck_select.purpose, "transform")
+        self.assertEqual(loop.state.deck_select.count, 3)
+        self.assertEqual(loop.state.deck_select.enchant, "upgrade")
+
+    def test_new_leaf_opens_single_transform(self) -> None:
+        loop = self._run()
+        loop._obtain_relic("new_leaf", return_to=SIM.Screen.MAP)
+        self.assertEqual(loop.state.screen, SIM.Screen.CARD_SELECT)
+        self.assertEqual(loop.state.deck_select.purpose, "transform")
+        self.assertEqual(loop.state.deck_select.count, 1)
+
+    def test_claws_opens_transform_up_to_six(self) -> None:
+        loop = self._run()
+        loop._obtain_relic("claws", return_to=SIM.Screen.MAP)
+        self.assertEqual(loop.state.screen, SIM.Screen.CARD_SELECT)
+        self.assertIn(loop.state.deck_select.purpose, ("transform", "transform_into"))
+        self.assertEqual(loop.state.deck_select.min_count, 0)
+
+    def test_paels_wing_grants_relic_every_two_skips(self) -> None:
+        loop = self._run()
+        loop._obtain_relic("paels_wing", return_to=SIM.Screen.MAP)
+        p = loop.state.player
+        # Simulate 2 card-reward skips via the step handler.
+        for _ in range(2):
+            # Set up a card_reward in rewards and screen.
+            loop.state.rewards = [SIM.rewards.RewardItem(kind="card",
+                                                        cards=[SIM.CardRef("strike_ironclad")])] \
+                if hasattr(SIM.rewards, 'RewardItem') else [__import__('classify_jev_sts2_sim_for_tests.state',
+                        fromlist=['RewardItem']).RewardItem(kind="card",
+                                                            cards=[SIM.CardRef("strike_ironclad")])]
+            loop.state.card_reward = [SIM.CardRef("strike_ironclad")]
+            loop.state.card_reward_item = 0
+            loop.state.screen = SIM.Screen.CARD_REWARD
+            loop._step_card_reward("skip_card_reward", ())
+        self.assertEqual(p.relic_state["paels_wing_sacrifices"], 2)
+        # After the 2nd sacrifice, a relic reward should have been pushed.
+        self.assertTrue(any(r.kind == "relic" for r in loop.state.rewards))
+
 
 if __name__ == "__main__":
     unittest.main()

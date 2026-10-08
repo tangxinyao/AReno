@@ -666,6 +666,43 @@ class RunLoop:
             # by marking a run-level counter the encounter builder can read
             # later; currently a stub (data-only).
             p.relic_state["fur_coat"] = 7
+        elif relic_id == "pandoras_box":
+            targets = [i for i, c in enumerate(p.deck)
+                       if c == "strike_ironclad" or c == "defend_ironclad"]
+            self._transform_cards(targets)
+        elif relic_id == "astrolabe":
+            cands = [i for i, c in enumerate(p.deck) if c not in _UNREMOVABLE]
+            if cands:
+                self._open_deck_select("transform", cands, 3, return_to, enchant="upgrade")
+        elif relic_id == "new_leaf":
+            cands = [i for i, c in enumerate(p.deck) if c not in _UNREMOVABLE]
+            if cands:
+                self._open_deck_select("transform", cands, 1, return_to)
+        elif relic_id == "claws":
+            cands = [i for i, c in enumerate(p.deck) if c not in _UNREMOVABLE]
+            if cands:
+                # Transform up to 6 cards; player may pick fewer.
+                target = "maul" if "maul" in self.cards else None
+                purpose = "transform_into" if target else "transform"
+                self._open_deck_select(purpose, cands, min(6, len(cands)), return_to,
+                                       min_count=0, enchant=target)
+        elif relic_id == "archaic_tooth":
+            # "Transform a starter card into an ancient version". No ancient
+            # cards in sim yet -- just transform one Strike or Defend into a
+            # random reward-pool card as a stub.
+            cands = [i for i, c in enumerate(p.deck)
+                     if c == "strike_ironclad" or c == "defend_ironclad"]
+            if cands:
+                stream = self.rng.stream("relic_pickup")
+                self._transform_cards([stream.choice(cands)])
+        elif relic_id == "toy_box":
+            # 4 Wax Relics; the "every 3 combats transform leftmost" mechanic
+            # is a stub -- just mark the counter.
+            p.relic_state["toy_box_wax"] = 4
+        elif relic_id == "paels_wing":
+            # Sacrifice card rewards -> relic every 2 sacrifices. Tracked in
+            # relic_state and consumed on SKIP_CARD_REWARD.
+            p.relic_state.setdefault("paels_wing_sacrifices", 0)
         elif relic_id == "scroll_boxes":
             # Lose all gold; pick 1 of 2 packs of cards. Simplified: add 5
             # random reward-pool cards and keep the gold loss.
@@ -692,6 +729,30 @@ class RunLoop:
         stream.shuffle(cands)
         for i in cands[:count]:
             p.deck[i] = CardRef(self.cards[p.deck[i]].upgrade_of, like=p.deck[i])
+
+    def _transform_cards(self, indices, *, upgrade: bool = False) -> None:
+        """Replace each deck[i] with a random Ironclad reward-pool card.
+
+        Transforms cannot roll the same card id; upgrade=True rolls the + form
+        when it exists.
+        """
+
+        p = self.state.player
+        stream = self.rng.stream("relic_pickup")
+        pool = list(self._reward_pool)
+        for i in indices:
+            if not pool:
+                continue
+            current = str(p.deck[i])
+            options = [c for c in pool if c != current]
+            if not options:
+                continue
+            new_id = stream.choice(options)
+            if upgrade:
+                card = self.cards[new_id]
+                if card.upgrade_of is not None:
+                    new_id = card.upgrade_of
+            p.deck[i] = CardRef(new_id)
 
     def _offer_random_shared_relic(self, stream, return_to: str) -> None:
         p = self.state.player
@@ -1069,9 +1130,18 @@ class RunLoop:
 
     def _step_card_reward(self, name: str, args: tuple[str, ...]) -> None:
         state = self.state
+        p = state.player
         assert state.card_reward is not None and state.card_reward_item is not None
         if name == actions.SELECT_CARD_REWARD:
             self._add_card_to_deck(state.card_reward[int(args[0])])
+        elif name == actions.SKIP_CARD_REWARD and "paels_wing" in p.relics:
+            # Ancient: every 2 sacrifices to Pael grants a relic.
+            n = p.relic_state.get("paels_wing_sacrifices", 0) + 1
+            p.relic_state["paels_wing_sacrifices"] = n
+            if n % 2 == 0:
+                stream = self.rng.stream("rewards")
+                self._push_reward(RewardItem(kind="relic", relic=self._next_relic(stream)),
+                                  Screen.REWARDS)
         state.rewards.pop(state.card_reward_item)
         state.card_reward = None
         state.card_reward_item = None
@@ -1200,6 +1270,13 @@ class RunLoop:
                 ref = deck[idx] if isinstance(deck[idx], CardRef) else CardRef(deck[idx])
                 ref.enchant, ref.enchant_amount = sel.enchant, sel.enchant_amount
                 deck[idx] = ref
+        elif sel.purpose == "transform":
+            self._transform_cards(sel.selected, upgrade=sel.enchant == "upgrade")
+        elif sel.purpose == "transform_into":
+            target = sel.enchant  # repurposed field holds the target card id
+            if target in self.cards:
+                for idx in sel.selected:
+                    deck[idx] = CardRef(target)
         if state.rewards and state.screen != Screen.REWARDS and state.rewards_return is None:
             state.rewards_return = state.screen
             state.screen = Screen.REWARDS
