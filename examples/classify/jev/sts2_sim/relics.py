@@ -204,6 +204,39 @@ class RelicEngine(RelicHooks):
         if self.has("philosophers_stone"):
             for m in c.alive_monsters():
                 c._change_power(m, "strength", 1, allow_negative=True)
+        if self.has("delicate_frond"):
+            # Fill empty potion slots with random potions.
+            from .potion_effects import reward_potions
+            stream = c.rng.stream("potion_generation")
+            options = reward_potions(c._potion_defs)
+            while None in self.p.potions and options:
+                self.p.potions[self.p.potions.index(None)] = stream.choice(options).potion_id
+        if self.has("jeweled_mask"):
+            # Pull a random Power from the draw pile to the hand, free to play.
+            pile = self.p.draw_pile
+            cand_ix = [i for i, cid in enumerate(pile) if c.cards[cid].card_type == "power"]
+            if cand_ix:
+                ix = c.rng.stream("card_select").choice(cand_ix)
+                ref = pile.pop(ix)
+                if not isinstance(ref, CardRef):
+                    ref = CardRef(ref)
+                ref.free_turn = True
+                self.p.hand.append(ref)
+        if self.has("blessed_antler"):
+            # Shuffle 3 Dazed into the draw pile.
+            if "dazed" in c.cards:
+                for _ in range(3):
+                    c.add_card_to_pile("dazed", "draw_random")
+        if self.has("radiant_pearl"):
+            if "luminesce" in c.cards:
+                c.add_to_hand("luminesce").free_turn = True
+        if self.has("choices_paradox"):
+            # Pick 1 of 5 random generated cards; here we just add 1 random
+            # generation-pool card to hand (the player can't currently pick
+            # from a floating choice in this sim).
+            pool = c.generation_pool()
+            if pool:
+                c.add_to_hand(c.rng.stream("card_generation").choice(pool)).free_turn = True
         self.potions_changed()
         self.hp_changed()
 
@@ -421,6 +454,9 @@ class RelicEngine(RelicHooks):
     def after_shuffle(self) -> None:
         if self.has("the_abacus"):
             self._block(6)
+        # Ancient: Biiig Hug grants block whenever the draw pile is shuffled.
+        if self.has("biiig_hug"):
+            self._block(5)
 
     def after_hp_lost(self, amount: int, *, attack: bool, player_turn: bool) -> None:
         c = self.c

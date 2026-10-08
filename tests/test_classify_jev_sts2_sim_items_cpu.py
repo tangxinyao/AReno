@@ -742,6 +742,35 @@ class AncientRelicCombatTest(unittest.TestCase):
         ctx.end_turn()
         self.assertEqual(ctx.player.energy, 3 + 2)
 
+    def test_diamond_diadem_halves_damage_when_quiet(self) -> None:
+        # Compare: with Diadem (0 plays), damage is halved vs. without.
+        ctx_no = make(["nibbit"], hand=[], hp=200)
+        ctx_no.end_turn()
+        damage_no = ctx_no.player.max_hp - ctx_no.player.hp
+        ctx = make(["nibbit"], relics=["diamond_diadem"], hand=[], hp=200)
+        ctx.end_turn()
+        damage_yes = ctx.player.max_hp - ctx.player.hp
+        self.assertLess(damage_yes, damage_no)
+
+    def test_jeweled_mask_pulls_power_from_draw(self) -> None:
+        deck = ["strike_ironclad"] * 5 + ["inflame"]
+        ctx = make(relics=["jeweled_mask"], deck=deck)
+        self.assertIn("inflame", ctx.player.hand)
+
+    def test_blessed_antler_shuffles_three_dazed(self) -> None:
+        ctx = make(relics=["blessed_antler"], hand=[])
+        all_cards = ctx.player.hand + ctx.player.draw_pile + ctx.player.discard_pile
+        self.assertEqual(sum(1 for c in all_cards if c == "dazed"), 3)
+
+    def test_biiig_hug_grants_block_on_shuffle(self) -> None:
+        ctx = make(relics=["biiig_hug"], hand=[], deck=["strike_ironclad"] * 2)
+        # Force an empty draw pile and trigger a reshuffle via draw.
+        ctx.player.draw_pile = []
+        ctx.player.discard_pile = [SIM.CardRef("strike_ironclad")]
+        before = ctx.player.block
+        ctx.draw(1)
+        self.assertGreaterEqual(ctx.player.block, before + 5)
+
 
 class AncientRunHookTest(unittest.TestCase):
     def _run(self, seed=3):
@@ -776,6 +805,35 @@ class AncientRunHookTest(unittest.TestCase):
         loop._open_combat_rewards("elite", took_damage=False)
         relic_rewards = [r for r in loop.state.rewards if r.kind == "relic"]
         self.assertEqual(len(relic_rewards), 2)
+
+    def test_beautiful_bracelet_opens_enchant_selection(self) -> None:
+        loop = self._run()
+        loop._obtain_relic("beautiful_bracelet", return_to=SIM.Screen.MAP)
+        self.assertEqual(loop.state.screen, SIM.Screen.CARD_SELECT)
+        self.assertEqual(loop.state.deck_select.enchant, "swift")
+        self.assertEqual(loop.state.deck_select.count, 3)
+
+    def test_paels_claw_auto_enchants_defends(self) -> None:
+        loop = self._run()
+        loop._obtain_relic("paels_claw", return_to=SIM.Screen.MAP)
+        defends = [c for c in loop.state.player.deck if c == "defend_ironclad"]
+        self.assertGreater(len(defends), 0)
+        for c in defends:
+            self.assertEqual(getattr(c, "enchant", None), "imbued")
+
+    def test_biiig_hug_opens_four_card_removal(self) -> None:
+        loop = self._run()
+        loop._obtain_relic("biiig_hug", return_to=SIM.Screen.MAP)
+        self.assertEqual(loop.state.screen, SIM.Screen.CARD_SELECT)
+        self.assertEqual(loop.state.deck_select.purpose, "remove")
+        self.assertEqual(loop.state.deck_select.count, 4)
+
+    def test_scroll_boxes_zeros_gold_and_adds_cards(self) -> None:
+        loop = self._run()
+        before = len(loop.state.player.deck)
+        loop._obtain_relic("scroll_boxes", return_to=SIM.Screen.MAP)
+        self.assertEqual(loop.state.player.gold, 0)
+        self.assertEqual(len(loop.state.player.deck), before + 5)
 
 
 if __name__ == "__main__":

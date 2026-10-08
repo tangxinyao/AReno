@@ -1069,6 +1069,11 @@ class CombatContext:
             dmg = self._powered_amount(base, monster, p)
             if p.powers.get("colossus", 0) > 0 and monster.powers.get("vulnerable", 0) > 0:
                 dmg //= 2
+            # Ancient: Diamond Diadem halves incoming damage when the player
+            # has played at most 2 cards this turn.
+            if (self.relics.has("diamond_diadem")
+                    and self.combat.cards_played_this_turn <= 2):
+                dmg //= 2
             absorbed = min(p.block, dmg)
             p.block -= absorbed
             unblocked = dmg - absorbed

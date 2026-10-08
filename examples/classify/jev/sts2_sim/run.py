@@ -121,6 +121,11 @@ _PICKUP_ENCHANTS = {
     "kifuda": ("adroit", 3, 3, True, ("attack", "skill", "power")),
     "punch_dagger": ("momentum", 5, 1, False, ("attack",)),
     "royal_stamp": ("royally_approved", 0, 1, False, ("attack", "skill")),
+    # Ancient relics -- 'enchant K cards' upon pickup.
+    "beautiful_bracelet": ("swift", 3, 3, False, ("attack", "skill", "power")),
+    "tri_boomerang": ("instinct", 1, 3, False, ("attack",)),
+    "paels_growth": ("sharp", 3, 1, False, ("attack", "skill", "power")),
+    "electric_shrymp": ("imbued", 1, 1, False, ("skill",)),
 }
 _ENCHANT_NAMES = {"sharp": "Sharp", "adroit": "Adroit", "momentum": "Momentum",
                   "royally_approved": "Royally Approved", "swift": "Swift"}
@@ -641,6 +646,38 @@ class RunLoop:
         elif relic_id == "stone_humidifier":
             # Resting raises Max HP: handled at rest time via relic_state flag.
             p.relic_state.setdefault("stone_humidifier", True)
+        elif relic_id == "paels_claw":
+            # Auto-enchant every Defend in the deck with Imbued (stubbed).
+            for ref in p.deck:
+                if ref == "defend_ironclad" or ref == "defend_ironclad+1":
+                    if not isinstance(ref, CardRef):
+                        continue
+                    ref.enchant, ref.enchant_amount = "imbued", 1
+        elif relic_id == "biiig_hug":
+            # Remove 4 cards; after-shuffle grants block (handled in RelicEngine).
+            cands = [i for i, c in enumerate(p.deck) if c not in _UNREMOVABLE]
+            if cands:
+                self._open_deck_select("remove", cands, 4, return_to)
+        elif relic_id == "paels_horn":
+            for _ in range(2):
+                self._add_card_if_exists(p, "relax")
+        elif relic_id == "fur_coat":
+            # 7 random combats are flagged as "weak enemies". We approximate
+            # by marking a run-level counter the encounter builder can read
+            # later; currently a stub (data-only).
+            p.relic_state["fur_coat"] = 7
+        elif relic_id == "scroll_boxes":
+            # Lose all gold; pick 1 of 2 packs of cards. Simplified: add 5
+            # random reward-pool cards and keep the gold loss.
+            p.gold = 0
+            stream = self.rng.stream("relic_pickup")
+            pool = list(self._reward_pool)
+            if pool:
+                stream.shuffle(pool)
+                for cid in pool[:5]:
+                    p.deck.append(CardRef(cid))
+        elif relic_id == "lees_waffle":
+            pass  # already handled above
 
     def _add_card_if_exists(self, player, card_id: str) -> None:
         if card_id in self.cards:
