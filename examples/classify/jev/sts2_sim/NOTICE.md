@@ -31,3 +31,7 @@ reading the following public reimplementations:
 Where this code borrows a non-trivial algorithmic shape (e.g. hook dispatch
 ordering, RNG stream layout) from one of the above, the file-level docstring
 notes which project the pattern came from.
+
+`data/sts2_card_ids.json` is a list of STS2 card identifiers only (no card
+text or numbers), derived from r33hab/sts2's `data/id_map.json` and
+`data/card_id_classes.json` (MIT) at commit b745217.

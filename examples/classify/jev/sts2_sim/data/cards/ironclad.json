@@ -1,48 +1,48 @@
 [
   {
-    "card_id": "strike",
+    "card_id": "strike_ironclad",
     "name": "Strike",
     "cost": 1,
     "card_type": "attack",
     "rarity": "basic",
     "target": "single_enemy",
-    "upgrade_of": "strike+1",
+    "upgrade_of": "strike_ironclad+1",
     "effects": [
       {"verb": "deal_damage", "args": {"amount": 6, "target_scope": "single_enemy", "hits": 1}}
     ]
   },
   {
-    "card_id": "strike+1",
+    "card_id": "strike_ironclad+1",
     "name": "Strike+",
     "cost": 1,
     "card_type": "attack",
     "rarity": "basic",
     "target": "single_enemy",
-    "upgraded_from": "strike",
+    "upgraded_from": "strike_ironclad",
     "effects": [
       {"verb": "deal_damage", "args": {"amount": 9, "target_scope": "single_enemy", "hits": 1}}
     ]
   },
   {
-    "card_id": "defend",
+    "card_id": "defend_ironclad",
     "name": "Defend",
     "cost": 1,
     "card_type": "skill",
     "rarity": "basic",
     "target": "self",
-    "upgrade_of": "defend+1",
+    "upgrade_of": "defend_ironclad+1",
     "effects": [
       {"verb": "gain_block", "args": {"amount": 5, "target_scope": "self"}}
     ]
   },
   {
-    "card_id": "defend+1",
+    "card_id": "defend_ironclad+1",
     "name": "Defend+",
     "cost": 1,
     "card_type": "skill",
     "rarity": "basic",
     "target": "self",
-    "upgraded_from": "defend",
+    "upgraded_from": "defend_ironclad",
     "effects": [
       {"verb": "gain_block", "args": {"amount": 8, "target_scope": "self"}}
     ]

@@ -86,8 +86,8 @@ def _render_state_text(state: Any) -> str:
         alive = [m for m in combat.monsters if m.alive]
         if alive:
             enemy_strs = [
-                f"{m.name}#{m.slot}[{m.hp}/{m.max_hp} block={m.block} intent={m.queued_move or '?'}]"
-                for m in alive
+                f"{m.name}#{pos}[{m.hp}/{m.max_hp} block={m.block} intent={m.queued_move or '?'}]"
+                for pos, m in enumerate(alive)
             ]
             lines.append("enemies=" + ", ".join(enemy_strs))
         else:

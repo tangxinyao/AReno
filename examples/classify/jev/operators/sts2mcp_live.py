@@ -23,6 +23,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+import time
 import urllib.error
 import urllib.request
 import uuid
@@ -391,15 +392,36 @@ class Sts2McpLiveBackend:
     There is exactly one episode (whatever run the game is showing), so
     `reset` only snapshots the current screen; starting a run is left to
     the human or to `menu_select` outside this adapter.
+
+    STS2MCP enqueues actions and answers before they resolve (play_card
+    goes through the game's ActionQueue), so a GET right after a POST can
+    still show the pre-action hand and invite a double play. `step`
+    therefore polls until the state differs from the pre-action state and
+    then reads the same state twice in a row (settled), or until
+    `settle_timeout` elapses.
     """
 
     BACKEND_ID = "sts2mcp-live"
 
-    def __init__(self, client: Sts2McpClient | None = None):
+    def __init__(
+        self,
+        client: Sts2McpClient | None = None,
+        *,
+        settle_timeout: float = 10.0,
+        poll_interval: float = 0.2,
+        sleep=time.sleep,
+        clock=time.monotonic,
+    ):
         self._client = client or Sts2McpClient()
+        self._settle_timeout = settle_timeout
+        self._poll_interval = poll_interval
+        self._sleep = sleep
+        self._clock = clock
         self._episode_id: str | None = None
         self._step = 0
         self._last: list[Candidate] = []
+        self._last_state: dict[str, Any] | None = None
+        self.last_settled = True
 
     def reset(self, request: dict[str, Any] | None = None) -> dict[str, Any]:
         self._episode_id = (request or {}).get("episode_id") or str(uuid.uuid4())
@@ -409,6 +431,7 @@ class Sts2McpLiveBackend:
     def observe(self) -> dict[str, Any]:
         """Re-read the game without acting (use while candidates are empty)."""
 
+        self.last_settled = True
         return self._packet(self._client.get_state())
 
     def step(self, request: dict[str, Any]) -> dict[str, Any]:
@@ -420,10 +443,25 @@ class Sts2McpLiveBackend:
         if result.get("status") != "ok":
             raise RuntimeError(f"STS2MCP rejected {action_id!r}: {result.get('error') or result.get('message') or result}")
         self._step += 1
-        return self.observe()
+        return self._packet(self._wait_settled(self._last_state))
+
+    def _wait_settled(self, before: dict[str, Any] | None) -> dict[str, Any]:
+        deadline = self._clock() + self._settle_timeout
+        prev = None
+        while True:
+            state = self._client.get_state()
+            if state != before and state == prev:
+                self.last_settled = True
+                return state
+            if self._clock() >= deadline:
+                self.last_settled = False
+                return state
+            prev = state
+            self._sleep(self._poll_interval)
 
     def _packet(self, state: dict[str, Any]) -> dict[str, Any]:
         assert self._episode_id is not None, "call reset() first"
+        self._last_state = state
         self._last = enumerate_candidates(state)
         done = state.get("state_type") == "game_over"
         return {
@@ -435,5 +473,6 @@ class Sts2McpLiveBackend:
             "state_text": render_state_text(state),
             "state_struct": state,
             "candidates": [{"id": c.id, "text": c.text} for c in self._last],
-            "info": {"backend": self.BACKEND_ID, "state_type": state.get("state_type")},
+            "info": {"backend": self.BACKEND_ID, "state_type": state.get("state_type"),
+                     "settled": self.last_settled},
         }

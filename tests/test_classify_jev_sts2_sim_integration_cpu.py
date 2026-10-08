@@ -58,8 +58,8 @@ class NeowToCombatTest(unittest.TestCase):
         # Hand is drawn from the standard Ironclad deck; expect at least one
         # of each affordable base card type after shuffle. Strike + Defend
         # are both cost 1 (affordable with 3 energy); Bash costs 2.
-        has_strike = any(i.startswith("play_card:strike:") for i in ids)
-        has_defend = any(i == "play_card:defend" for i in ids)
+        has_strike = any(i.startswith("play_card:strike_ironclad:") for i in ids)
+        has_defend = any(i == "play_card:defend_ironclad" for i in ids)
         self.assertTrue(has_strike or has_defend, "no cost-1 card in opening hand??")
         self.assertIn("end_turn", ids)
 
@@ -106,11 +106,11 @@ class CombatToVictoryTest(unittest.TestCase):
         worm.hp = 5  # one Strike (6) will kill
         # Find a Strike in hand and target it at slot 0.
         hand = self.loop.state.player.hand
-        if "strike" not in hand:
+        if "strike_ironclad" not in hand:
             # Guarantee a strike by planting it.
-            hand.append("strike")
+            hand.append("strike_ironclad")
             self.loop.state.player.energy = 3
-        packet = self.loop.step("play_card:strike:0")
+        packet = self.loop.step("play_card:strike_ironclad:0")
         self.assertTrue(packet["done"])
         self.assertEqual(packet["screen"], self.sim.Screen.GAME_OVER)
         self.assertEqual(packet["outcome"], self.sim.Outcome.VICTORY)
@@ -121,10 +121,10 @@ class CombatToVictoryTest(unittest.TestCase):
         worm = self.loop.state.combat.monsters[0]
         worm.hp = 5
         hand = self.loop.state.player.hand
-        if "strike" not in hand:
-            hand.append("strike")
+        if "strike_ironclad" not in hand:
+            hand.append("strike_ironclad")
             self.loop.state.player.energy = 3
-        self.loop.step("play_card:strike:0")
+        self.loop.step("play_card:strike_ironclad:0")
         with self.assertRaisesRegex(self.sim.RunLoopError, "terminal"):
             self.loop.step("menu_select:main_menu")
 
@@ -173,22 +173,22 @@ class CandidateFilteringTest(unittest.TestCase):
         self.assertIn("play_card:bash:0", ids)
 
     def test_duplicate_cards_deduplicate_in_candidates(self) -> None:
-        self.loop.state.player.hand[:] = ["strike", "strike", "strike"]
+        self.loop.state.player.hand[:] = ["strike_ironclad", "strike_ironclad", "strike_ironclad"]
         self.loop.state.player.energy = 3
         packet = self.loop._packet()
-        strike_candidates = [c for c in packet["candidates"] if c["id"].startswith("play_card:strike")]
+        strike_candidates = [c for c in packet["candidates"] if c["id"].startswith("play_card:strike_ironclad")]
         # One candidate per alive enemy slot, deduplicated by card_id.
         alive = sum(1 for m in self.loop.state.combat.monsters if m.alive)
         self.assertEqual(len(strike_candidates), alive)
 
     def test_unplayable_wound_filtered_from_candidates(self) -> None:
-        self.loop.state.player.hand[:] = ["wound", "strike"]
+        self.loop.state.player.hand[:] = ["wound", "strike_ironclad"]
         self.loop.state.player.energy = 3
         packet = self.loop._packet()
         ids = {c["id"] for c in packet["candidates"]}
         self.assertNotIn("play_card:wound", ids)
         self.assertNotIn("play_card:wound:0", ids)
-        self.assertTrue(any(i.startswith("play_card:strike") for i in ids))
+        self.assertTrue(any(i.startswith("play_card:strike_ironclad") for i in ids))
 
     def test_hand_of_only_unplayables_leaves_only_end_turn(self) -> None:
         self.loop.state.player.hand[:] = ["wound", "wound"]
@@ -196,6 +196,36 @@ class CandidateFilteringTest(unittest.TestCase):
         packet = self.loop._packet()
         ids = {c["id"] for c in packet["candidates"]}
         self.assertEqual(ids, {"end_turn"})
+
+
+class AliveTargetPositionTest(unittest.TestCase):
+    """Target args are positions among alive enemies (STS2MCP drops the dead
+    from battle.enemies), not spawn slots."""
+
+    def test_position_shifts_after_first_enemy_dies(self) -> None:
+        sim = _import_sim()
+        run_mod = sys.modules[sim.__name__ + ".run"]
+        loop = sim.RunLoop(seed=3)
+        loop.reset()
+        original = run_mod.PHASE1_FIRST_COMBAT
+        run_mod.PHASE1_FIRST_COMBAT = ("red_louse", "green_louse")
+        try:
+            packet = loop.step(sim.actions.NEOW_SKIP)
+        finally:
+            run_mod.PHASE1_FIRST_COMBAT = original
+        ids = {c["id"] for c in packet["candidates"]}
+        self.assertIn("play_card:strike_ironclad:1", ids)
+
+        first, second = loop.state.combat.monsters
+        first.hp = 0  # kill slot 0 directly
+        packet = loop._packet()
+        ids = {c["id"] for c in packet["candidates"]}
+        self.assertIn("play_card:strike_ironclad:0", ids)
+        self.assertNotIn("play_card:strike_ironclad:1", ids)
+
+        hp_before = second.hp
+        loop.step("play_card:strike_ironclad:0")
+        self.assertLess(second.hp, hp_before)
 
 
 if __name__ == "__main__":

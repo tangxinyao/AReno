@@ -238,7 +238,7 @@ Required args:
 Pipeline:
   1. Count every card_id in hand + draw_pile + discard_pile +
      exhaust_pile where the substring "strike" appears in the id. All
-     authored Strike-family ids follow snake_case ("strike",
+     authored Strike-family ids follow snake_case ("strike_ironclad",
      "pommel_strike", "twin_strike", "perfected_strike", upgraded
      variants) so a plain substring match is sufficient and matches
      STS wording ("cards containing 'Strike'").

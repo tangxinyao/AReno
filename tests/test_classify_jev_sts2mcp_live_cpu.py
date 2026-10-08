@@ -40,9 +40,9 @@ def _combat_state():
         "player": {
             "hp": 70, "max_hp": 80, "gold": 99, "block": 0, "energy": 3, "max_energy": 3,
             "hand": [
-                _card(0, "STRIKE_R", "Strike", target="AnyEnemy"),
-                _card(1, "STRIKE_R", "Strike", target="AnyEnemy"),
-                _card(2, "DEFEND_R", "Defend", target="Self"),
+                _card(0, "STRIKE_IRONCLAD", "Strike", target="AnyEnemy"),
+                _card(1, "STRIKE_IRONCLAD", "Strike", target="AnyEnemy"),
+                _card(2, "DEFEND_IRONCLAD", "Defend", target="Self"),
                 _card(3, "BASH", "Bash", target="AnyEnemy", upgraded=True, cost="2"),
                 _card(4, "WOUND", "Wound", can_play=False),
             ],
@@ -77,7 +77,7 @@ class CombatCandidatesTest(unittest.TestCase):
         self.assertEqual(
             [c.id for c in self.cands],
             [
-                "play_card:strike_r:0", "play_card:strike_r:1", "play_card:defend_r",
+                "play_card:strike_ironclad:0", "play_card:strike_ironclad:1", "play_card:defend_ironclad",
                 "play_card:bash+1:0", "play_card:bash+1:1",
                 "use_potion:0:0", "use_potion:0:1", "use_potion:1",
                 "end_turn",
@@ -86,10 +86,10 @@ class CombatCandidatesTest(unittest.TestCase):
 
     def test_duplicate_cards_play_first_copy_with_entity_target(self) -> None:
         self.assertEqual(
-            self.by_id["play_card:strike_r:1"].request,
+            self.by_id["play_card:strike_ironclad:1"].request,
             {"action": "play_card", "card_index": 0, "target": "LOUSE_1"},
         )
-        self.assertEqual(self.by_id["play_card:defend_r"].request, {"action": "play_card", "card_index": 2})
+        self.assertEqual(self.by_id["play_card:defend_ironclad"].request, {"action": "play_card", "card_index": 2})
         self.assertEqual(self.by_id["play_card:bash+1:0"].request["card_index"], 3)
 
     def test_potion_and_end_turn_requests(self) -> None:
@@ -109,7 +109,7 @@ class CombatCandidatesTest(unittest.TestCase):
 
     def test_state_text(self) -> None:
         text = self.live.render_state_text(_combat_state())
-        self.assertIn("hand=strike_r x2, defend_r, bash+1, wound", text)
+        self.assertIn("hand=strike_ironclad x2, defend_ironclad, bash+1, wound", text)
         self.assertIn("Louse#1[11/12 block=0 intent=Buff Strength=1]", text)
         self.assertIn("potions=Fire Potion, Swift Potion", text)
 
@@ -123,7 +123,7 @@ class ScreenCandidatesTest(unittest.TestCase):
 
     def test_hand_select(self) -> None:
         state = {"state_type": "hand_select", "hand_select": {
-            "cards": [_card(0, "STRIKE_R", "Strike"), _card(1, "DEFEND_R", "Defend")], "can_confirm": True}}
+            "cards": [_card(0, "STRIKE_IRONCLAD", "Strike"), _card(1, "DEFEND_IRONCLAD", "Defend")], "can_confirm": True}}
         self.assertEqual(self._ids_and_requests(state), [
             ("combat_select_card:0", {"action": "combat_select_card", "card_index": 0}),
             ("combat_select_card:1", {"action": "combat_select_card", "card_index": 1}),
@@ -181,7 +181,7 @@ class ScreenCandidatesTest(unittest.TestCase):
         self.assertEqual([i for i, _ in self._ids_and_requests(tr)], ["claim_treasure_relic:0", "proceed"])
         self.assertEqual(self._ids_and_requests({"state_type": "treasure", "treasure": {"message": "Opening chest..."}}), [])
         cs = {"state_type": "card_select", "card_select": {
-            "cards": [_card(0, "STRIKE_R", "Strike")], "can_confirm": False, "can_cancel": True}}
+            "cards": [_card(0, "STRIKE_IRONCLAD", "Strike")], "can_confirm": False, "can_cancel": True}}
         self.assertEqual([i for i, _ in self._ids_and_requests(cs)], ["select_card:0", "cancel_selection"])
         bs = {"state_type": "bundle_select", "bundle_select": {
             "bundles": [{"index": 0, "cards": []}, {"index": 1, "cards": []}], "can_confirm": True}}
@@ -228,17 +228,17 @@ class LiveBackendTest(unittest.TestCase):
     def test_step_posts_mapped_request_and_reobserves(self) -> None:
         go = {"state_type": "game_over", "game_over": {"options": ["main_menu"]}}
         fake = _FakeClient([_combat_state(), go])
-        backend = self.live.Sts2McpLiveBackend(fake)
+        backend = self.live.Sts2McpLiveBackend(fake, sleep=lambda _: None)
         packet = backend.reset()
         self.assertEqual(packet["decision_point"], "combat_play")
         self.assertFalse(packet["done"])
-        packet = backend.step({"action_id": "play_card:strike_r:1"})
+        packet = backend.step({"action_id": "play_card:strike_ironclad:1"})
         self.assertEqual(fake.posts, [{"action": "play_card", "card_index": 0, "target": "LOUSE_1"}])
         self.assertTrue(packet["done"])
         self.assertEqual(packet["step"], 1)
 
     def test_rejects_unknown_action(self) -> None:
-        backend = self.live.Sts2McpLiveBackend(_FakeClient([_combat_state()]))
+        backend = self.live.Sts2McpLiveBackend(_FakeClient([_combat_state()]), sleep=lambda _: None)
         backend.reset()
         with self.assertRaises(ValueError):
             backend.step({"action_id": "play_card:carnage"})
@@ -248,10 +248,82 @@ class LiveBackendTest(unittest.TestCase):
             def post(self, body):
                 return {"status": "error", "error": "Card requires a target."}
 
-        backend = self.live.Sts2McpLiveBackend(_ErrClient([_combat_state()]))
+        backend = self.live.Sts2McpLiveBackend(_ErrClient([_combat_state()]), sleep=lambda _: None)
         backend.reset()
         with self.assertRaisesRegex(RuntimeError, "requires a target"):
             backend.step({"action_id": "end_turn"})
+
+
+class _ScriptedClient:
+    """get_state() walks through a script; post() just records."""
+
+    def __init__(self, script):
+        self.script = list(script)
+        self.gets = 0
+        self.posts = []
+
+    def get_state(self):
+        state = self.script[min(self.gets, len(self.script) - 1)]
+        self.gets += 1
+        return state
+
+    def post(self, body):
+        self.posts.append(body)
+        return {"status": "ok"}
+
+
+class SettleWaitTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.live = _import_live()
+
+    def test_waits_past_stale_pre_action_state(self) -> None:
+        before = _combat_state()
+        after = _combat_state()
+        after["player"]["hand"] = after["player"]["hand"][1:]  # strike left the hand
+        after["player"]["energy"] = 2
+        # reset read, then 2 stale reads, then the new state twice.
+        client = _ScriptedClient([before, before, before, after, after])
+        backend = self.live.Sts2McpLiveBackend(client, sleep=lambda _: None)
+        backend.reset()
+        packet = backend.step({"action_id": "play_card:strike_ironclad:0"})
+        self.assertTrue(packet["info"]["settled"])
+        self.assertIn("energy=2/3", packet["state_text"])
+        self.assertEqual(client.gets, 5)
+
+    def test_times_out_and_reports_unsettled(self) -> None:
+        state = _combat_state()
+        now = [0.0]
+
+        def fake_sleep(dt):
+            now[0] += dt
+
+        backend = self.live.Sts2McpLiveBackend(
+            _ScriptedClient([state]), settle_timeout=1.0, poll_interval=0.25,
+            sleep=fake_sleep, clock=lambda: now[0],
+        )
+        backend.reset()
+        packet = backend.step({"action_id": "end_turn"})
+        self.assertFalse(packet["info"]["settled"])
+
+
+class SimIdParityTest(unittest.TestCase):
+    """Live card keys for STS2 ids the sim implements must equal sim card ids."""
+
+    def test_live_keys_exist_in_sim(self) -> None:
+        live = _import_live()
+        sim_root = Path(__file__).resolve().parents[1] / "examples" / "classify" / "jev" / "sts2_sim"
+        spec = importlib.util.spec_from_file_location(
+            "classify_jev_sts2_sim_for_live_parity", sim_root / "__init__.py",
+            submodule_search_locations=[str(sim_root)],
+        )
+        sim = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = sim
+        spec.loader.exec_module(sim)
+        _, cards, _ = sim.load_all()
+        for game_id, upgraded in [("STRIKE_IRONCLAD", False), ("DEFEND_IRONCLAD", True), ("BASH", True),
+                                  ("PERFECTED_STRIKE", False), ("SHRUG_IT_OFF", False)]:
+            key = live.card_key({"id": game_id, "is_upgraded": upgraded})
+            self.assertIn(key, cards, game_id)
 
 
 if __name__ == "__main__":

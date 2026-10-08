@@ -118,6 +118,8 @@ def main() -> None:
                 log.write(json.dumps(row, ensure_ascii=False) + "\n")
                 log.flush()
             packet = backend.step({"action_id": chosen})
+            if not packet["info"]["settled"]:
+                logging.warning("stage=unsettled after=%s; acting on the latest state anyway", chosen)
     finally:
         if log is not None:
             log.close()

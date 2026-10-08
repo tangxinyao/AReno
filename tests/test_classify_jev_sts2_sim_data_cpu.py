@@ -110,14 +110,14 @@ class CardsLoadingTest(unittest.TestCase):
         self.assertTrue(self.cards["carnage+1"].ethereal)
 
     def test_strike_damage_six(self) -> None:
-        strike = self.cards["strike"]
+        strike = self.cards["strike_ironclad"]
         self.assertEqual(strike.cost, 1)
         self.assertEqual(strike.card_type, "attack")
         self.assertEqual(strike.effects[0].verb, "deal_damage")
         self.assertEqual(strike.effects[0].args["amount"], 6)
 
     def test_strike_plus_upgrades_to_nine(self) -> None:
-        self.assertEqual(self.cards["strike+1"].effects[0].args["amount"], 9)
+        self.assertEqual(self.cards["strike_ironclad+1"].effects[0].args["amount"], 9)
 
     def test_bash_applies_vulnerable(self) -> None:
         bash = self.cards["bash"]
@@ -508,6 +508,39 @@ class LoaderValidationTest(unittest.TestCase):
         )
         with self.assertRaisesRegex(self.sim.SimDataError, "sequence_index required"):
             self.sim.load_enemies(path, power_ids=set())
+
+
+class Sts2CardIdAlignmentTest(unittest.TestCase):
+    """Sim card ids must be real STS2 ids (lower-cased) so live STS2MCP
+    candidates (`play_card:<id>`) line up with sim candidates. Cards that
+    only exist in STS1 are listed explicitly until they are replaced."""
+
+    STS1_ONLY = frozenset({
+        "carnage", "cleave", "clothesline", "combust", "intimidate", "metallicize",
+        "pummel", "reckless_charge", "seeing_red", "wild_strike",
+    })
+
+    def setUp(self) -> None:
+        import json
+
+        sim = _import_sim()
+        self.sts2 = json.loads((sim.DATA_ROOT / "sts2_card_ids.json").read_text())
+        _, self.cards, _ = sim.load_all()
+        self.sim = sim
+
+    def test_every_sim_card_is_sts2_or_listed_sts1_only(self) -> None:
+        known = set(self.sts2["all"])
+        bases = {cid.removesuffix("+1") for cid in self.cards}
+        unknown = sorted(bases - known - self.STS1_ONLY)
+        self.assertEqual(unknown, [], "add the STS2 id or list the card as STS1-only")
+        stale = sorted(self.STS1_ONLY & known)
+        self.assertEqual(stale, [], "these are real STS2 ids; drop them from STS1_ONLY")
+
+    def test_starting_deck_uses_sts2_ironclad_ids(self) -> None:
+        from importlib import import_module
+
+        run = import_module(self.sim.__name__ + ".run")
+        self.assertLessEqual(set(run.IRONCLAD_STARTING_DECK), set(self.sts2["ironclad"]))
 
 
 if __name__ == "__main__":

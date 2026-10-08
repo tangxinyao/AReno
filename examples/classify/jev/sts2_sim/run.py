@@ -9,7 +9,9 @@ map/event-driven combat encounters.
 Action ids use STS2MCP action names (see `actions.py`):
   neow:        "choose_event_option:0"             (skip stub)
   combat:      "play_card:{card_id}"               for non-targeted cards
-               "play_card:{card_id}:{enemy_slot}"  for single_enemy cards
+               "play_card:{card_id}:{enemy_pos}"   for single_enemy cards
+                 (enemy_pos = index among alive enemies, matching
+                  STS2MCP's battle.enemies list which omits the dead)
                "end_turn"
   game_over:   "menu_select:main_menu"
 """
@@ -37,8 +39,8 @@ _START_ENERGY = 3
 # Phase 1 scaffold: fixed starting deck and first encounter. Phase 3 will
 # replace this with map-driven selection.
 IRONCLAD_STARTING_DECK: tuple[str, ...] = (
-    "strike", "strike", "strike", "strike", "strike",
-    "defend", "defend", "defend", "defend",
+    "strike_ironclad", "strike_ironclad", "strike_ironclad", "strike_ironclad", "strike_ironclad",
+    "defend_ironclad", "defend_ironclad", "defend_ironclad", "defend_ironclad",
     "bash",
 )
 PHASE1_FIRST_COMBAT: tuple[str, ...] = ("jaw_worm",)
@@ -205,7 +207,7 @@ class RunLoop:
             elif name == actions.PLAY_CARD and len(args) == 1:
                 self._combat_ctx.play_card(args[0])
             elif name == actions.PLAY_CARD and len(args) == 2:
-                self._combat_ctx.play_card(args[0], target_slot=int(args[1]))
+                self._combat_ctx.play_card(args[0], target_slot=self._alive_monsters()[int(args[1])].slot)
             else:
                 raise RunLoopError(f"unknown combat action {action_id!r}")
         except CombatError as exc:
@@ -261,12 +263,11 @@ class RunLoop:
             if card.cost > player.energy:
                 continue
             if card.target == "single_enemy":
-                for monster in combat.monsters:
-                    if monster.alive:
-                        decisions.append(Decision(
-                            id=actions.format_action(actions.PLAY_CARD, card_id, monster.slot),
-                            text=f"play {card.name} vs {monster.name}#{monster.slot}",
-                        ))
+                for pos, monster in enumerate(self._alive_monsters()):
+                    decisions.append(Decision(
+                        id=actions.format_action(actions.PLAY_CARD, card_id, pos),
+                        text=f"play {card.name} vs {monster.name}#{pos}",
+                    ))
             else:
                 decisions.append(Decision(
                     id=actions.format_action(actions.PLAY_CARD, card_id),
@@ -274,6 +275,10 @@ class RunLoop:
                 ))
         decisions.append(Decision(id=actions.END_TURN, text="end turn"))
         return decisions
+
+    def _alive_monsters(self) -> list:
+        assert self._state is not None and self._state.combat is not None
+        return [m for m in self._state.combat.monsters if m.alive]
 
     def _packet(self) -> dict[str, Any]:
         assert self._state is not None

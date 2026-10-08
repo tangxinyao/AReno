@@ -240,19 +240,19 @@ class ActionIdTest(unittest.TestCase):
 
     def test_format_parse_roundtrip(self) -> None:
         a = self.actions
-        aid = a.format_action(a.PLAY_CARD, "strike", 0)
-        self.assertEqual(aid, "play_card:strike:0")
-        self.assertEqual(a.parse_action(aid), ("play_card", ("strike", "0")))
+        aid = a.format_action(a.PLAY_CARD, "strike_ironclad", 0)
+        self.assertEqual(aid, "play_card:strike_ironclad:0")
+        self.assertEqual(a.parse_action(aid), ("play_card", ("strike_ironclad", "0")))
         self.assertEqual(a.parse_action("end_turn"), ("end_turn", ()))
 
     def test_rejects_unknown_name_and_bad_args(self) -> None:
         a = self.actions
         with self.assertRaises(ValueError):
-            a.format_action("play", "strike")
+            a.format_action("play", "strike_ironclad")
         with self.assertRaises(ValueError):
             a.format_action(a.PLAY_CARD, "a:b")
         with self.assertRaises(ValueError):
-            a.parse_action("play:strike")
+            a.parse_action("play:strike_ironclad")
         with self.assertRaises(ValueError):
             a.parse_action("play_card:")
 
