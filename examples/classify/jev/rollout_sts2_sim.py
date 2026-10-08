@@ -1,24 +1,31 @@
-"""Rollout worker: drives the in-house sts2_sim via `Sts2SimBackend` and
-dumps decisions.jsonl in the shape `train_rl.py` consumes.
+"""Rollout worker: drives sts2_sim and dumps decisions.jsonl.
 
-Each row the trainer expects:
+Renders prompts and candidates through `dataset_loader.question_prefix` /
+`render_candidate` so the strings a `--policy server` rollout saves match
+byte-for-byte what `serve_decisions.py` encodes internally — otherwise
+training-time tokenization would diverge from the policy that produced
+`old_logp` and PPO's ratio would be miscalibrated.
+
+Three policies:
+
+  --policy random   uniform over legal candidates. `old_logp = -log(K)`.
+                    Use for the cold start (iter 0).
+  --policy greedy   always picks index 0. `old_logp = 0` (deterministic).
+                    Debug mode; not valid for PPO's off-policy correction.
+  --policy server   POSTs each decision to a running `serve_decisions.py`,
+                    parses `logits`, applies `--temperature`, samples a
+                    candidate, records `old_logp = log_softmax(logits/T)[chosen]`.
+                    This is the loop iter k>=1 drives: load ckpt_{k-1}
+                    into the server, rollout against it, train on the
+                    collected decisions.
+
+Each JSONL row the trainer consumes:
 
     {"prompt": str, "candidates": [str, ...],
      "chosen": int, "old_logp": float, "advantage": float}
 
-This script runs `--episodes` episodes with a uniform-random behavior
-policy (or `--policy greedy` to just pick the first candidate), scores
-each decision with its episode's terminal reward discounted back to that
-step, z-scores advantages across the whole batch, and writes one JSONL
-line per decision. Decisions with fewer than two legal candidates (Neow
-`skip`, game-over `terminal`) are filtered because the grouped-softmax
-PPO loss needs at least two options per group.
-
-    python examples/classify/jev/rollout_sts2_sim.py \\
-        --episodes 256 --out /tmp/sts2_sim_decisions.jsonl
-
-Pair with `train_rl.py` for the training step; `run_classify_rl.sh`
-runs both back-to-back.
+Decisions with fewer than two legal candidates (Neow `skip`, game-over
+`terminal`) are dropped since grouped-softmax PPO needs K>=2 per group.
 """
 
 from __future__ import annotations
@@ -29,25 +36,35 @@ import logging
 import math
 import random
 import sys
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # dataset_loader
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))  # AReno root
 
+from dataset_loader import ANSWER_MARK, question_prefix, render_candidate  # noqa: E402
 from examples.classify.jev.operators.sts2_sim import Sts2SimBackend  # noqa: E402
 
 
-STATE_MARK = "<|sts2:state|>"
-QUESTION_MARK = "<|sts2:question|>"
-ANSWER_MARK = "<|sts2:answer|>"
+INSTRUCTION_BY_POINT = {
+    "neow_bonus":   "Pick a Neow bonus to accept.",
+    "map_select":   "Choose which map room to enter next.",
+    "combat_play":  "Pick an action in combat (play a card or end the turn).",
+    "card_reward":  "Pick a card reward (or skip).",
+    "rest_site":    "Decide what to do at the rest site.",
+    "shop":         "Decide what to buy at the shop (or skip).",
+    "event_choice": "Pick an event option.",
+    "boss_relic":   "Pick a boss relic.",
+    "game_over":    "Game over.",
+}
 
 
 @dataclass(slots=True)
 class _DecisionRecord:
     """One multi-candidate decision point captured during rollout."""
 
-    episode_index: int
-    step_index: int
     prompt: str
     candidates: list[str]
     chosen: int
@@ -56,35 +73,99 @@ class _DecisionRecord:
     steps_until_terminal: int = 0
 
 
-def render_prompt(state_text: str, decision_point: str) -> str:
-    return (
-        f"{STATE_MARK}\n"
-        f"{state_text}\n"
-        f"{QUESTION_MARK}\n"
-        f"decision_point={decision_point}\n"
-    )
+def _build_question(decision_point: str, candidates: list[dict]) -> dict:
+    return {
+        "type": "choice",
+        "instructions": INSTRUCTION_BY_POINT.get(decision_point, f"Pick an action at {decision_point}."),
+        "criteria": {c["id"]: c["text"] for c in candidates},
+    }
 
 
-def render_candidate(index: int, cand: dict) -> str:
-    return f"[{index}] id={cand['id']} :: {cand['text']}\n{ANSWER_MARK}"
+def _render(state_text: str, question: dict) -> tuple[str, list[str]]:
+    prompt = question_prefix(state_text, question)
+    rendered = [
+        render_candidate(question, i) + "\n" + ANSWER_MARK
+        for i in range(len(question["criteria"]))
+    ]
+    return prompt, rendered
 
 
-def _pick(policy: str, k: int, rng: random.Random) -> int:
-    if policy == "greedy":
-        return 0
-    return rng.randrange(k)
+# ---------------------------------------------------------------------------
+# Policies
 
+def _policy_random(k: int, rng: random.Random) -> tuple[int, float]:
+    idx = rng.randrange(k)
+    return idx, -math.log(k)
+
+
+def _policy_greedy(k: int) -> tuple[int, float]:
+    del k
+    return 0, 0.0
+
+
+class _ServerPolicy:
+    """HTTP client against serve_decisions.py's /api/alpha/decisions."""
+
+    def __init__(self, server_url: str, temperature: float, model_name: str, timeout: float):
+        self._url = server_url.rstrip("/") + "/api/alpha/decisions"
+        self._temperature = max(temperature, 1e-6)
+        self._model = model_name
+        self._timeout = timeout
+
+    def pick(self, state_text: str, candidates: list[dict], rng: random.Random) -> tuple[int, float]:
+        question = _build_question("", candidates)  # decision_point ignored for server call
+        # The server does its own prompt rendering via question_prefix, so we
+        # only need to pass raw state + the question block. The resulting
+        # logits are keyed by the candidate ids we provided in criteria.
+        body = {
+            "model": self._model,
+            "state": state_text if state_text else "<empty>",
+            "questions": {"q": question},
+        }
+        try:
+            payload = json.dumps(body).encode("utf-8")
+            req = urllib.request.Request(
+                self._url, data=payload, method="POST",
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=self._timeout) as resp:
+                reply = json.loads(resp.read().decode("utf-8"))
+        except (urllib.error.URLError, OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"server decision call failed: {exc}") from exc
+
+        answer = reply["answers"]["q"]
+        logits = answer["logits"]  # dict: candidate_id -> raw score
+        ids_in_order = [c["id"] for c in candidates]
+        scaled = [logits[c] / self._temperature for c in ids_in_order]
+        m = max(scaled)
+        exps = [math.exp(v - m) for v in scaled]
+        total = sum(exps)
+        probs = [v / total for v in exps]
+        # Sample from the empirical distribution.
+        r = rng.random()
+        acc = 0.0
+        chosen = len(probs) - 1
+        for i, p in enumerate(probs):
+            acc += p
+            if r <= acc:
+                chosen = i
+                break
+        return chosen, math.log(max(probs[chosen], 1e-12))
+
+
+# ---------------------------------------------------------------------------
+# Episode loop
 
 def run_episode(
     backend: Sts2SimBackend,
-    episode_index: int,
     seed_label: str,
     *,
     policy: str,
+    server_policy: _ServerPolicy | None,
     max_steps: int,
     rng: random.Random,
 ) -> tuple[list[_DecisionRecord], float]:
-    """Returns the sampled decision records and the final terminal reward."""
+    """Returns the captured decision records and the final terminal reward."""
 
     packet = backend.reset({
         "character": "ironclad",
@@ -95,34 +176,42 @@ def run_episode(
     episode_id = packet["episode_id"]
     records: list[_DecisionRecord] = []
 
-    for step in range(max_steps):
+    for _ in range(max_steps):
         if packet["done"]:
             break
         candidates = packet["candidates"]
         if not candidates:
             break
-        chosen_idx = _pick(policy, len(candidates), rng)
-        if len(candidates) >= 2:
-            # Only record decisions the trainer can consume; single-candidate
-            # points like Neow's skip and the game-over terminal are dropped.
+        k = len(candidates)
+        question = _build_question(packet["decision_point"], candidates)
+        prompt_text, rendered = _render(packet["state_text"], question)
+
+        if policy == "random":
+            chosen_idx, old_logp = _policy_random(k, rng)
+        elif policy == "greedy":
+            chosen_idx, old_logp = _policy_greedy(k)
+        elif policy == "server":
+            assert server_policy is not None
+            chosen_idx, old_logp = server_policy.pick(packet["state_text"], candidates, rng)
+        else:
+            raise ValueError(f"unknown policy {policy!r}")
+
+        if k >= 2:
             records.append(_DecisionRecord(
-                episode_index=episode_index,
-                step_index=packet["step"],
-                prompt=render_prompt(packet["state_text"], packet["decision_point"]),
-                candidates=[render_candidate(i, c) for i, c in enumerate(candidates)],
+                prompt=prompt_text,
+                candidates=rendered,
                 chosen=chosen_idx,
-                old_logp=-math.log(len(candidates)),
+                old_logp=old_logp,
             ))
+
         chosen_id = candidates[chosen_idx]["id"]
         packet = backend.step({
             "episode_id": episode_id,
             "action_id": chosen_id,
-            "old_logp": -math.log(max(1, len(candidates))),
+            "old_logp": old_logp,
         })
 
     terminal_reward = float(packet["reward"]) if packet["done"] else 0.0
-    # Back-fill each record's distance to the terminal step so advantage
-    # computation can discount properly.
     for i, record in enumerate(records):
         record.terminal_reward = terminal_reward
         record.steps_until_terminal = len(records) - 1 - i
@@ -131,9 +220,7 @@ def run_episode(
 
 
 def _z_score_advantages(records: list[_DecisionRecord], gamma: float) -> list[float]:
-    returns = [
-        r.terminal_reward * (gamma ** r.steps_until_terminal) for r in records
-    ]
+    returns = [r.terminal_reward * (gamma ** r.steps_until_terminal) for r in records]
     if not returns:
         return []
     mean = sum(returns) / len(returns)
@@ -159,11 +246,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--seed-start", type=int, default=0)
     parser.add_argument("--max-steps", type=int, default=400)
-    parser.add_argument("--policy", choices=["random", "greedy"], default="random")
+    parser.add_argument("--policy", choices=["random", "greedy", "server"], default="random")
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--log-every", type=int, default=25)
-    parser.add_argument("--sampling-seed", type=int, default=17,
-                        help="seed for the behavior-policy RNG (not the sim's run seeds)")
+    parser.add_argument("--sampling-seed", type=int, default=17)
+
+    parser.add_argument("--server-url", default="http://127.0.0.1:8125",
+                        help="serve_decisions.py base URL for --policy server")
+    parser.add_argument("--server-model", default="sts2_sim",
+                        help="`model` field submitted to serve_decisions (echoed, not validated)")
+    parser.add_argument("--temperature", type=float, default=1.0,
+                        help="sampling temperature for --policy server (also recorded in old_logp)")
+    parser.add_argument("--server-timeout", type=float, default=60.0)
     return parser.parse_args()
 
 
@@ -173,6 +267,15 @@ def main() -> None:
 
     backend = Sts2SimBackend()
     rng = random.Random(args.sampling_seed)
+    server_policy = None
+    if args.policy == "server":
+        server_policy = _ServerPolicy(
+            server_url=args.server_url,
+            temperature=args.temperature,
+            model_name=args.server_model,
+            timeout=args.server_timeout,
+        )
+        logging.info("stage=policy server_url=%s temperature=%.3f", args.server_url, args.temperature)
 
     all_records: list[_DecisionRecord] = []
     terminal_rewards: list[float] = []
@@ -180,8 +283,9 @@ def main() -> None:
     for ep in range(args.episodes):
         seed_label = f"ROLLOUT-{args.seed_start + ep:05d}"
         records, terminal = run_episode(
-            backend, episode_index=ep, seed_label=seed_label,
-            policy=args.policy, max_steps=args.max_steps, rng=rng,
+            backend, seed_label,
+            policy=args.policy, server_policy=server_policy,
+            max_steps=args.max_steps, rng=rng,
         )
         all_records.extend(records)
         terminal_rewards.append(terminal)
@@ -211,6 +315,7 @@ def main() -> None:
         "wins": wins,
         "win_rate": wins / max(1, args.episodes),
         "mean_terminal_reward": sum(terminal_rewards) / max(1, len(terminal_rewards)),
+        "policy": args.policy,
     }
     logging.info("stage=rollout_done out=%s stats=%s", args.out, stats)
 
