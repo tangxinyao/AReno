@@ -701,6 +701,82 @@ class AncientRelicCombatTest(unittest.TestCase):
         attack_count = sum(1 for cid in ctx.player.hand if ctx.cards[cid].card_type == "attack")
         self.assertGreaterEqual(attack_count, 1)
 
+    def test_throwing_axe_doubles_first_card(self) -> None:
+        # Play Strike once; Throwing Axe should replay it a second time.
+        ctx = make(relics=["throwing_axe"], hand=["strike_ironclad"])
+        base = m0(ctx).hp
+        ctx.play_card("strike_ironclad", target_slot=0)
+        self.assertEqual(base - m0(ctx).hp, 2 * 6)
+        # Second strike should NOT be replayed.
+        ctx.player.hand = [SIM.CardRef("strike_ironclad")]
+        base2 = m0(ctx).hp
+        ctx.play_card("strike_ironclad", target_slot=0)
+        self.assertEqual(base2 - m0(ctx).hp, 6)
+
+    def test_iron_club_draws_every_4(self) -> None:
+        ctx = make(relics=["iron_club"], hand=["defend_ironclad"] * 4, energy=10,
+                   deck=["strike_ironclad"] * 20)
+        for _ in range(4):
+            ctx.play_card("defend_ironclad")
+        # 4 cards played -> +1 draw. Hand = 4 - 4 + 1 = 1.
+        self.assertEqual(len(ctx.player.hand), 1)
+
+    def test_brilliant_scarf_refunds_fifth_card(self) -> None:
+        ctx = make(relics=["brilliant_scarf"], hand=["defend_ironclad"] * 6, energy=10)
+        for _ in range(4):
+            ctx.play_card("defend_ironclad")
+        energy_pre = ctx.player.energy
+        ctx.play_card("defend_ironclad")  # the 5th play, refunded
+        self.assertEqual(ctx.player.energy, energy_pre)
+
+    def test_music_box_adds_ethereal_copy_of_first_attack(self) -> None:
+        ctx = make(relics=["music_box"], hand=["strike_ironclad"])
+        ctx.play_card("strike_ironclad", target_slot=0)
+        # Hand gained an Ethereal copy; attacks after the first don't duplicate.
+        hand_cards = list(ctx.player.hand)
+        self.assertEqual(sum(1 for c in hand_cards if c == "strike_ironclad"), 1)
+        self.assertTrue(hand_cards[0].ethereal)
+
+    def test_paels_tears_banks_unspent_energy(self) -> None:
+        ctx = make(relics=["paels_tears"], hand=[], energy=2)
+        ctx.end_turn()
+        self.assertEqual(ctx.player.energy, 3 + 2)
+
+
+class AncientRunHookTest(unittest.TestCase):
+    def _run(self, seed=3):
+        loop = SIM.RunLoop(seed=seed)
+        loop.reset()
+        loop.step("choose_event_option:0")
+        return loop
+
+    def test_stone_humidifier_grants_max_hp_on_rest(self) -> None:
+        loop = self._run()
+        loop._obtain_relic("stone_humidifier", return_to=SIM.Screen.MAP)
+        p = loop.state.player
+        before = p.max_hp
+        loop.state.screen = SIM.Screen.REST
+        loop.state.rest_used = False
+        loop._step_rest("choose_rest_option", ("0",))
+        self.assertEqual(p.max_hp, before + 5)
+
+    def test_lava_rock_adds_two_relics_to_act1_boss(self) -> None:
+        loop = self._run()
+        loop._obtain_relic("lava_rock", return_to=SIM.Screen.MAP)
+        loop.state.room = "boss"
+        loop.state.act_index = 0
+        loop._open_combat_rewards("boss", took_damage=False)
+        relic_rewards = [r for r in loop.state.rewards if r.kind == "relic"]
+        self.assertEqual(len(relic_rewards), 2)
+
+    def test_black_star_adds_elite_relic(self) -> None:
+        loop = self._run()
+        loop._obtain_relic("black_star", return_to=SIM.Screen.MAP)
+        loop.state.room = "elite"
+        loop._open_combat_rewards("elite", took_damage=False)
+        relic_rewards = [r for r in loop.state.rewards if r.kind == "relic"]
+        self.assertEqual(len(relic_rewards), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

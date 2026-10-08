@@ -987,6 +987,13 @@ class RunLoop:
             items.append(RewardItem(kind="potion", potion=random_potion(self._potions, stream)))
         if room == "elite":
             items.append(RewardItem(kind="relic", relic=self._next_relic(stream)))
+            # Ancient: black_star drops an extra relic from elites.
+            if "black_star" in p.relics:
+                items.append(RewardItem(kind="relic", relic=self._next_relic(stream)))
+        if room == "boss" and state.act_index == 0 and "lava_rock" in p.relics:
+            # Ancient: Act 1 boss drops 2 relics.
+            items.append(RewardItem(kind="relic", relic=self._next_relic(stream)))
+            items.append(RewardItem(kind="relic", relic=self._next_relic(stream)))
         items.append(self._card_reward_item(room, took_damage=took_damage))
         if room == "monster" and "prayer_wheel" in p.relics:
             items.append(self._card_reward_item(room, took_damage=took_damage))
@@ -1104,6 +1111,9 @@ class RunLoop:
                 for _ in range(2):
                     if None in p.potions:
                         p.potions[p.potions.index(None)] = random_potion(self._potions, stream)
+            # Ancient: stone_humidifier raises Max HP by 5 whenever you Rest.
+            if "stone_humidifier" in p.relics:
+                self._gain_max_hp(5)
             self._finish_rest_option(option)
         elif option == "SMITH":
             self._open_deck_select("upgrade", self._upgradable_deck(), 1, Screen.REST, cancelable=True)

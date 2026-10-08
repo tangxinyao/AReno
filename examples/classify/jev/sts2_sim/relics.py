@@ -267,6 +267,9 @@ class RelicEngine(RelicHooks):
             c.gain_energy(1)
         if self.has("brilliant_scarf"):
             self.n["brilliant_scarf_count"] = 0
+        banked = self.n.pop("paels_tears_banked", 0)
+        if banked:
+            c.gain_energy(banked)
         if turn == 2 and self.has("horn_cleat"):
             self._block(14)
         if turn == 3 and self.has("captains_wheel"):
@@ -317,12 +320,26 @@ class RelicEngine(RelicHooks):
         return discard_any_then_draw(self.c) if self.p.hand else None
 
     def before_card_played(self, card: CardSchema, ref: Any, energy_spent: int) -> None:
+        c = self.c
         if card.card_type == "attack" and self.has("pen_nib"):
             self.pen_nib_armed = self._count("pen_nib", 10)
         else:
             self.pen_nib_armed = False
         if energy_spent >= 2 and self.has("intimidating_helmet"):
             self._block(4)
+        # Ancient: throwing_axe doubles the first card played each combat.
+        if self.has("throwing_axe") and c.combat.cards_played_this_combat == 0 and ref is not None:
+            ref.replay = (getattr(ref, "replay", 0) or 0) + 1
+        # Ancient: brilliant_scarf makes the 5th card each turn free (refund).
+        if (self.has("brilliant_scarf") and energy_spent > 0
+                and c.combat.cards_played_this_turn == 4):
+            c.gain_energy(energy_spent)
+        # Ancient: music_box adds an Ethereal copy of the first attack each turn.
+        if (self.has("music_box") and card.card_type == "attack"
+                and not self.n.get("music_box")):
+            self.n["music_box"] = 1
+            copy = c.add_to_hand(str(ref))
+            copy.ethereal = True
 
     def after_card_resolved(self, card: CardSchema) -> None:
         if card.card_type == "power" and self.has("game_piece"):
@@ -360,6 +377,9 @@ class RelicEngine(RelicHooks):
                 self._block(7)
             if self.has("mummified_hand"):
                 self._mummified_hand()
+        # Ancient: iron_club draws 1 every 4 cards played.
+        if self._count("iron_club", 4):
+            c.draw(1)
         if self.has("rainbow_ring") and not self.n.get("rainbow_ring_paid"):
             self.rainbow.add(card.card_type)
             if {"attack", "skill", "power"} <= self.rainbow:
@@ -440,6 +460,25 @@ class RelicEngine(RelicHooks):
         if self.has("gremlin_horn") and self.c.combat.outcome is None:
             self.c.gain_energy(1)
             self.c.draw(1)
+        # Ancient: war_hammer upgrades 4 random cards on elite kill (counts
+        # from monster.monster_id -> encounter rooms is non-trivial; use a
+        # per-combat flag set from the roster at combat start).
+        if (self.has("war_hammer") and self.c.room == "elite"
+                and not self.n.get("war_hammer_done")
+                and all(not m.alive for m in self.c.combat.monsters)):
+            self.n["war_hammer_done"] = 1
+            self._upgrade_deck_random(4)
+
+    def _upgrade_deck_random(self, count: int) -> None:
+        cards = self.c.cards
+        p = self.p
+        cands = [i for i, cid in enumerate(p.deck) if cards[cid].upgrade_of is not None]
+        if not cands:
+            return
+        stream = self.c.rng.stream("relic_pickup")
+        stream.shuffle(cands)
+        for i in cands[:count]:
+            p.deck[i] = CardRef(cards[p.deck[i]].upgrade_of, like=p.deck[i])
 
     def hand_emptied(self) -> None:
         if self.has("unceasing_top") and not self.p.hand:
@@ -462,6 +501,19 @@ class RelicEngine(RelicHooks):
                 c.damage_monster_unpowered(t, 6)
         if self.has("ripple_basin") and attacks == 0:
             self._block(4)
+        # Ancient: paels_tears banks unspent energy for the next turn.
+        if self.has("paels_tears") and self.p.energy > 0:
+            self.n["paels_tears_banked"] = self.p.energy
+        # Ancient: paels_eye punishes an empty turn (first time per combat).
+        if (self.has("paels_eye") and c.combat.cards_played_this_turn == 0
+                and not self.n.get("paels_eye_done")):
+            self.n["paels_eye_done"] = 1
+            # Exhaust the hand, take damage. Hand flush happens right after.
+            for cid in list(self.p.hand):
+                c.exhaust_card(cid)
+            c.damage_player(6)
+        # Reset per-turn flags for the next turn.
+        self.n.pop("music_box", None)
 
     def after_flush(self) -> None:
         if self.ethereal_exhausts and self.has("joss_paper"):
