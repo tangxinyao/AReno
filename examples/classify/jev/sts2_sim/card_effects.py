@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import Callable, Iterator
 
 from .combat import CombatContext, Play, SelectionRequest
+from .state import CardRef, index_ref, remove_ref
 
 
 CardFn = Callable[[CombatContext, Play], object]
@@ -66,7 +67,8 @@ def _exhaust_random_from_hand(c: CombatContext, *, card_type: str | None = None)
 
 
 def _bonus(c: CombatContext, p: Play) -> int:
-    return c.combat.bonus_damage.get(p.card.card_id, 0) + p.bonus
+    del c
+    return (p.ref.bonus if p.ref is not None else 0) + p.bonus
 
 
 # ---------------------------------------------------------------------------
@@ -99,13 +101,23 @@ def slimed(c, p):
     c.draw(_v(p, "cards"))
 
 
+@card("FRANTIC_ESCAPE")
+def frantic_escape(c, p):
+    # "Increase Sandpit by 1. Increase the cost of this card by 1."
+    pit = next((m for m in c.alive_monsters() if m.powers.get("sandpit", 0) > 0), None)
+    if pit is not None:
+        pit.powers["sandpit"] += 1
+    if p.ref is not None:
+        p.ref.cost_bump += 1
+
+
 # ---------------------------------------------------------------------------
 # Attacks
 
 @card("ANGER")
 def anger(c, p):
     _hit(c, p, _v(p, "damage"))
-    c.player.discard_pile.append(p.card.card_id)
+    c.player.discard_pile.append(CardRef(p.card.card_id))
 
 
 @card("ASHEN_STRIKE")
@@ -196,7 +208,7 @@ def headbutt(c, p) -> Iterator[SelectionRequest]:
         chosen = yield SelectionRequest(source="discard", candidates=list(range(len(pile))),
                                         count=1, purpose="to_draw_top")
         for cid in chosen:
-            pile.remove(cid)
+            remove_ref(pile, cid)
             c.player.draw_pile.append(cid)
 
 
@@ -312,7 +324,7 @@ def thrash(c, p):
             gain = ec.v("damage")
         else:
             gain = ec.vars.get("calculation_base", 0)
-        p.bonus += gain + c.combat.bonus_damage.get(eaten, 0)
+        p.bonus += gain + getattr(eaten, "bonus", 0)
 
 
 @card("THUNDERCLAP")
@@ -362,7 +374,7 @@ def armaments(c, p) -> Iterator[SelectionRequest]:
     if req.candidates:
         chosen = yield req
         for cid in chosen:
-            c.upgrade_in_hand(c.player.hand.index(cid))
+            c.upgrade_in_hand(index_ref(c.player.hand, cid))
 
 
 @card("BATTLE_TRANCE")
@@ -492,8 +504,7 @@ def infernal_blade(c, p):
         return
     pool = c.generation_pool("attack")
     pick = c.rng.stream("card_generation").choice(pool)
-    c.add_to_hand(pick)
-    c.combat.free_this_turn[pick] = c.combat.free_this_turn.get(pick, 0) + 1
+    c.add_to_hand(pick).free_turn = True
 
 
 @card("NOT_YET")
@@ -520,7 +531,7 @@ def primal_force(c, p):
     hand = c.player.hand
     for i, cid in enumerate(hand):
         if c.cards[cid].card_type == "attack":
-            hand[i] = rock
+            hand[i] = CardRef(rock)
 
 
 @card("RAGE")

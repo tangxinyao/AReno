@@ -457,5 +457,427 @@
   "monsters": [
    "waterfall_giant"
   ]
+ },
+ {
+  "encounter_id": "bowlbugs_weak",
+  "game_id": "BOWLBUGS_WEAK",
+  "name": "Bowlbugs",
+  "act": "hive",
+  "pool": "weak",
+  "room_type": "monster",
+  "generator": "bowlbugs_weak"
+ },
+ {
+  "encounter_id": "exoskeletons_weak",
+  "game_id": "EXOSKELETONS_WEAK",
+  "name": "Exoskeletons",
+  "act": "hive",
+  "pool": "weak",
+  "room_type": "monster",
+  "monsters": [
+   "exoskeleton",
+   "exoskeleton",
+   "exoskeleton"
+  ]
+ },
+ {
+  "encounter_id": "thieving_hopper_weak",
+  "game_id": "THIEVING_HOPPER_WEAK",
+  "name": "Thieving Hopper",
+  "act": "hive",
+  "pool": "weak",
+  "room_type": "monster",
+  "monsters": [
+   "thieving_hopper"
+  ]
+ },
+ {
+  "encounter_id": "tunneler_weak",
+  "game_id": "TUNNELER_WEAK",
+  "name": "Tunneler",
+  "act": "hive",
+  "pool": "weak",
+  "room_type": "monster",
+  "monsters": [
+   "tunneler"
+  ]
+ },
+ {
+  "encounter_id": "bowlbugs_normal",
+  "game_id": "BOWLBUGS_NORMAL",
+  "name": "Bowlbug Swarm",
+  "act": "hive",
+  "pool": "normal",
+  "room_type": "monster",
+  "generator": "bowlbugs_normal"
+ },
+ {
+  "encounter_id": "chompers_normal",
+  "game_id": "CHOMPERS_NORMAL",
+  "name": "An Automaton Pair",
+  "act": "hive",
+  "pool": "normal",
+  "room_type": "monster",
+  "generator": "chompers"
+ },
+ {
+  "encounter_id": "exoskeletons_normal",
+  "game_id": "EXOSKELETONS_NORMAL",
+  "name": "Many Exoskeletons",
+  "act": "hive",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "exoskeleton",
+   "exoskeleton",
+   "exoskeleton",
+   "exoskeleton"
+  ]
+ },
+ {
+  "encounter_id": "hunter_killer_normal",
+  "game_id": "HUNTER_KILLER_NORMAL",
+  "name": "Hunter Killer",
+  "act": "hive",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "hunter_killer"
+  ]
+ },
+ {
+  "encounter_id": "louse_progenitor_normal",
+  "game_id": "LOUSE_PROGENITOR_NORMAL",
+  "name": "Louse Progenitor",
+  "act": "hive",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "louse_progenitor"
+  ]
+ },
+ {
+  "encounter_id": "mytes_normal",
+  "game_id": "MYTES_NORMAL",
+  "name": "Mass of Mytes",
+  "act": "hive",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "myte",
+   "myte"
+  ]
+ },
+ {
+  "encounter_id": "ovicopter_normal",
+  "game_id": "OVICOPTER_NORMAL",
+  "name": "Ovicopter",
+  "act": "hive",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "ovicopter"
+  ]
+ },
+ {
+  "encounter_id": "slumbering_beetle_normal",
+  "game_id": "SLUMBERING_BEETLE_NORMAL",
+  "name": "Slumber Party",
+  "act": "hive",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "bowlbug_rock",
+   "bowlbug_silk",
+   "slumbering_beetle"
+  ]
+ },
+ {
+  "encounter_id": "spiny_toad_normal",
+  "game_id": "SPINY_TOAD_NORMAL",
+  "name": "Spiny Toad",
+  "act": "hive",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "spiny_toad"
+  ]
+ },
+ {
+  "encounter_id": "the_obscura_normal",
+  "game_id": "THE_OBSCURA_NORMAL",
+  "name": "The Obscura",
+  "act": "hive",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "the_obscura"
+  ]
+ },
+ {
+  "encounter_id": "decimillipede_elite",
+  "game_id": "DECIMILLIPEDE_ELITE",
+  "name": "The Decimillipede",
+  "act": "hive",
+  "pool": "elite",
+  "room_type": "elite",
+  "generator": "decimillipede"
+ },
+ {
+  "encounter_id": "entomancer_elite",
+  "game_id": "ENTOMANCER_ELITE",
+  "name": "Entomancer",
+  "act": "hive",
+  "pool": "elite",
+  "room_type": "elite",
+  "monsters": [
+   "entomancer"
+  ]
+ },
+ {
+  "encounter_id": "infested_prisms_elite",
+  "game_id": "INFESTED_PRISMS_ELITE",
+  "name": "Infested Prism",
+  "act": "hive",
+  "pool": "elite",
+  "room_type": "elite",
+  "monsters": [
+   "infested_prism"
+  ]
+ },
+ {
+  "encounter_id": "kaiser_crab_boss",
+  "game_id": "KAISER_CRAB_BOSS",
+  "name": "Kaiser Crab",
+  "act": "hive",
+  "pool": "boss",
+  "room_type": "boss",
+  "monsters": [
+   "crusher",
+   "rocket"
+  ]
+ },
+ {
+  "encounter_id": "knowledge_demon_boss",
+  "game_id": "KNOWLEDGE_DEMON_BOSS",
+  "name": "Knowledge Demon",
+  "act": "hive",
+  "pool": "boss",
+  "room_type": "boss",
+  "monsters": [
+   "knowledge_demon"
+  ]
+ },
+ {
+  "encounter_id": "the_insatiable_boss",
+  "game_id": "THE_INSATIABLE_BOSS",
+  "name": "The Insatiable",
+  "act": "hive",
+  "pool": "boss",
+  "room_type": "boss",
+  "monsters": [
+   "the_insatiable"
+  ]
+ },
+ {
+  "encounter_id": "devoted_sculptor_weak",
+  "game_id": "DEVOTED_SCULPTOR_WEAK",
+  "name": "Devoted Sculptor",
+  "act": "glory",
+  "pool": "weak",
+  "room_type": "monster",
+  "monsters": [
+   "devoted_sculptor"
+  ]
+ },
+ {
+  "encounter_id": "scrolls_of_biting_weak",
+  "game_id": "SCROLLS_OF_BITING_WEAK",
+  "name": "Scrolls of Biting",
+  "act": "glory",
+  "pool": "weak",
+  "room_type": "monster",
+  "generator": "scrolls_3"
+ },
+ {
+  "encounter_id": "turret_operator_weak",
+  "game_id": "TURRET_OPERATOR_WEAK",
+  "name": "Turret Operator",
+  "act": "glory",
+  "pool": "weak",
+  "room_type": "monster",
+  "monsters": [
+   "living_shield",
+   "turret_operator"
+  ]
+ },
+ {
+  "encounter_id": "axebots_normal",
+  "game_id": "AXEBOTS_NORMAL",
+  "name": "Axebot",
+  "act": "glory",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "axebot"
+  ]
+ },
+ {
+  "encounter_id": "construct_menagerie_normal",
+  "game_id": "CONSTRUCT_MENAGERIE_NORMAL",
+  "name": "Construct Menagerie",
+  "act": "glory",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "punch_construct",
+   "cubex_construct",
+   "cubex_construct"
+  ]
+ },
+ {
+  "encounter_id": "fabricator_normal",
+  "game_id": "FABRICATOR_NORMAL",
+  "name": "Fabricator",
+  "act": "glory",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "fabricator"
+  ]
+ },
+ {
+  "encounter_id": "frog_knight_normal",
+  "game_id": "FROG_KNIGHT_NORMAL",
+  "name": "Frog Knight",
+  "act": "glory",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "frog_knight"
+  ]
+ },
+ {
+  "encounter_id": "globe_head_normal",
+  "game_id": "GLOBE_HEAD_NORMAL",
+  "name": "A Lone Globe Head",
+  "act": "glory",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "globe_head"
+  ]
+ },
+ {
+  "encounter_id": "owl_magistrate_normal",
+  "game_id": "OWL_MAGISTRATE_NORMAL",
+  "name": "Owl Magistrate",
+  "act": "glory",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "owl_magistrate"
+  ]
+ },
+ {
+  "encounter_id": "scrolls_of_biting_normal",
+  "game_id": "SCROLLS_OF_BITING_NORMAL",
+  "name": "Many Scrolls of Biting",
+  "act": "glory",
+  "pool": "normal",
+  "room_type": "monster",
+  "generator": "scrolls_4"
+ },
+ {
+  "encounter_id": "slimed_berserker_normal",
+  "game_id": "SLIMED_BERSERKER_NORMAL",
+  "name": "Slimed Berserker",
+  "act": "glory",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "slimed_berserker"
+  ]
+ },
+ {
+  "encounter_id": "the_lost_and_forgotten_normal",
+  "game_id": "THE_LOST_AND_FORGOTTEN_NORMAL",
+  "name": "Lost and Forgotten",
+  "act": "glory",
+  "pool": "normal",
+  "room_type": "monster",
+  "monsters": [
+   "the_lost",
+   "the_forgotten"
+  ]
+ },
+ {
+  "encounter_id": "knights_elite",
+  "game_id": "KNIGHTS_ELITE",
+  "name": "Knight Gang",
+  "act": "glory",
+  "pool": "elite",
+  "room_type": "elite",
+  "monsters": [
+   "flail_knight",
+   "spectral_knight",
+   "magi_knight"
+  ]
+ },
+ {
+  "encounter_id": "mecha_knight_elite",
+  "game_id": "MECHA_KNIGHT_ELITE",
+  "name": "Mecha Knight",
+  "act": "glory",
+  "pool": "elite",
+  "room_type": "elite",
+  "monsters": [
+   "mecha_knight"
+  ]
+ },
+ {
+  "encounter_id": "soul_nexus_elite",
+  "game_id": "SOUL_NEXUS_ELITE",
+  "name": "Soul Nexus",
+  "act": "glory",
+  "pool": "elite",
+  "room_type": "elite",
+  "monsters": [
+   "soul_nexus"
+  ]
+ },
+ {
+  "encounter_id": "aeonglass_boss",
+  "game_id": "AEONGLASS_BOSS",
+  "name": "Aeonglass",
+  "act": "glory",
+  "pool": "boss",
+  "room_type": "boss",
+  "monsters": [
+   "aeonglass"
+  ]
+ },
+ {
+  "encounter_id": "queen_boss",
+  "game_id": "QUEEN_BOSS",
+  "name": "Queen",
+  "act": "glory",
+  "pool": "boss",
+  "room_type": "boss",
+  "monsters": [
+   "torch_head_amalgam",
+   "queen"
+  ]
+ },
+ {
+  "encounter_id": "test_subject_boss",
+  "game_id": "TEST_SUBJECT_BOSS",
+  "name": "Test Subject",
+  "act": "glory",
+  "pool": "boss",
+  "room_type": "boss",
+  "monsters": [
+   "test_subject"
+  ]
  }
 ]

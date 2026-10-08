@@ -26,12 +26,13 @@ from .schemas import (
     MoveSchema,
     PowerSchema,
 )
-from .state import CombatState, MonsterState, PlayerState, RunState
+from .state import CardRef, CombatState, MonsterState, PlayerState, RunState
 
 __all__ = [
     "actions",
     "ALL_CHARACTERS",
     "Character",
+    "CardRef",
     "CardSchema",
     "CombatContext",
     "CombatError",

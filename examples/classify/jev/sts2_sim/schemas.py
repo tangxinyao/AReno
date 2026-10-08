@@ -125,7 +125,7 @@ INTENTS: Final = frozenset({
 # [base, ascension_value, ascension_level]: the second value applies when the
 # run's ascension >= level (8 = Tough Enemies, 9 = Deadly Enemies).
 MONSTER_VERBS: Final[dict[str, dict[str, Any]]] = {
-    "attack":      {"required": {"damage"}, "optional": {"hits"}},
+    "attack":      {"required": {"damage"}, "optional": {"hits", "hits_grow", "plus_dexterity"}},
     "block":       {"required": {"amount"}, "optional": set()},
     "apply_power": {"required": {"power", "amount", "target"}, "optional": set()},
     "add_card":    {"required": {"card", "pile", "count"}, "optional": set()},
@@ -137,14 +137,17 @@ MONSTER_VERBS: Final[dict[str, dict[str, Any]]] = {
     "special":     {"required": {"name"}, "optional": {"amount"}},
 }
 
-POWER_TARGETS: Final = frozenset({"self", "player", "allies"})
+POWER_TARGETS: Final = frozenset({"self", "player", "allies", "all"})
 CARD_PILES: Final = frozenset({"hand", "discard", "draw_random", "draw_top"})
 
 MONSTER_VERB_DOCS: Final[dict[str, str]] = {
     "attack": "Powered attack on the player: `hits` hits of `damage` (Strength, Vigor, "
-              "Weak, Shrink, Vulnerable apply per hit). Fires Thorns/Flame Barrier/Suck.",
+              "Weak, Shrink, Vulnerable apply per hit). Fires Thorns/Flame Barrier/Suck. "
+              "`hits_grow`: +1 hit per earlier use of the move; `plus_dexterity`: adds the "
+              "monster's Dexterity to the damage.",
     "block": "The monster gains `amount` block (no Dexterity/Frail).",
-    "apply_power": "Apply `amount` of `power` to self / player / every other living ally. "
+    "apply_power": "Apply `amount` of `power` to self / player / every other living ally "
+                   "('allies') / every living monster ('all'). "
                    "Negative amounts on strength/dexterity reduce the stat; debuffs on the "
                    "player respect Artifact.",
     "add_card": "Add `count` copies of status `card` to the player's `pile` "
@@ -170,6 +173,11 @@ AI_CONDITIONS: Final = frozenset({
     "kind_index",     # args.n == position among same kind at encounter build
     "starter",        # args == starter index the encounter dealt (slugs, rats, slimes)
     "has_power",      # the monster currently has power `arg`
+    "flag",           # monster flag `arg` is set (Bowlbug Rock's off-balance)
+    "side_alive_lt",  # fewer than `arg` living monsters on its side, itself included
+    "monster_alive",  # some living monster has id `arg`
+    "below_half_once",  # HP below half and move `arg` never performed
+    "move_count_lt",  # "MOVE:n": the move was performed fewer than n times
 })
 
 
@@ -228,7 +236,7 @@ class MonsterSchema:
     ai_nodes: Mapping[str, AiNode]
     ai_initial: str
     innate_powers: tuple[tuple[str, int, int, int], ...] = ()
-    starting_block: int = 0
+    starting_block: int | tuple[int, int, int] = 0
     notes: str = ""
 
 

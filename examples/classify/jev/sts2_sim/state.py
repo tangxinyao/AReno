@@ -4,10 +4,10 @@ The engine (combat.py) mutates these in place. Keep logic out of the
 dataclasses themselves — only narrow properties for convenience are
 allowed.
 
-Piles hold card ids (strings). Per-instance card state that STS2 keeps on
-the card object (Rampage's growth, Infernal Blade's "free this turn") lives
-in CombatState side tables keyed by card id; see combat.py for the
-approximation that implies when two copies of the same card are in play.
+Piles hold card ids. Inside a combat they are `CardRef`s: strings equal to
+the card id (so `cards[ref]` and `"bash" in hand` keep working) that also
+carry the per-copy state STS2 keeps on the card object -- Rampage growth,
+Frantic Escape's cost increase, Infernal Blade's free-this-turn, Bound.
 """
 
 from __future__ import annotations
@@ -16,6 +16,61 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .enums import CombatPhase, Outcome, Screen
+
+
+class CardRef(str):
+    """One copy of a card in a combat pile; compares and hashes as its card id."""
+
+    def __new__(cls, card_id: str, *, like: "CardRef | str | None" = None) -> "CardRef":
+        obj = super().__new__(cls, card_id)
+        obj.bonus = 0             # Rampage / Thrash growth
+        obj.cost_bump = 0         # Frantic Escape: +1 cost per play, this combat
+        obj.cost_override = None  # a set cost for the rest of combat (None: printed)
+        obj.free_turn = False     # costs 0 until the end of this turn
+        obj.bound = False         # Chains of Binding
+        obj.dampened_from = None  # the upgraded id Dampen took this copy down from
+        if isinstance(like, CardRef):
+            obj.bonus = like.bonus
+            obj.cost_bump = like.cost_bump
+            obj.cost_override = like.cost_override
+            obj.free_turn = like.free_turn
+        return obj
+
+    def __reduce__(self):
+        return (_rebuild_card_ref, (str(self), dict(self.__dict__)))
+
+
+def _rebuild_card_ref(card_id: str, attrs: dict) -> CardRef:
+    ref = CardRef(card_id)
+    ref.__dict__.update(attrs)
+    return ref
+
+
+def as_ref(pile: list, index: int) -> CardRef:
+    """pile[index] as a CardRef, upgrading a bare id in place."""
+
+    item = pile[index]
+    if not isinstance(item, CardRef):
+        item = CardRef(item)
+        pile[index] = item
+    return item
+
+
+def remove_ref(pile: list, ref: str) -> None:
+    """Remove this exact copy (identity first, then the first equal id)."""
+
+    for i, item in enumerate(pile):
+        if item is ref:
+            del pile[i]
+            return
+    pile.remove(ref)
+
+
+def index_ref(pile: list, ref: str) -> int:
+    for i, item in enumerate(pile):
+        if item is ref:
+            return i
+    return pile.index(ref)
 
 
 @dataclass
@@ -74,13 +129,14 @@ class MonsterState:
 class PendingSelection:
     """A card choice the player must make mid-card (Brand, Headbutt ...)."""
 
-    source: str  # "hand" | "discard"
+    source: str  # "hand" | "discard" | "generated" (choose one of `options`)
     candidates: list[int]  # indices into the source pile
     min_count: int
     max_count: int
     purpose: str  # "exhaust" | "upgrade" | "to_draw_top"
     source_card: str
     selected: list[int] = field(default_factory=list)
+    options: list[str] = field(default_factory=list)  # card ids for source "generated"
 
 
 @dataclass
@@ -99,15 +155,22 @@ class CombatState:
     block_gains_this_turn: int = 0
     # Per-combat counters.
     hp_loss_events_this_combat: int = 0
-    # Per-card-id side tables (see module docstring).
-    bonus_damage: dict[str, int] = field(default_factory=dict)
-    free_this_turn: dict[str, int] = field(default_factory=dict)
     # Player debuffs that existed when the last round ended; a debuff not
     # in here was applied this round and skips its first decrement.
     player_debuffs_at_round_start: set[str] = field(default_factory=set)
     pending_selection: PendingSelection | None = None
     # Two-Tailed Rat backups called this combat (shared by the pack, max 3).
     backup_count: int = 0
+    cards_played_this_combat: int = 0
+    # Tender: Strength / Dexterity taken this turn, given back at turn end.
+    tender_taken: int = 0
+    # Chains of Binding: cards bound this turn / whether a Bound card was played.
+    bound_this_turn: int = 0
+    bound_played_this_turn: bool = False
+    # Cards a Thieving Hopper took: (monster, card). Returned if it dies.
+    stolen: list[tuple[MonsterState, str]] = field(default_factory=list)
+    # Knowledge Demon's pending choice: (generated card ids, disintegration amount).
+    curse_choice: tuple[list[str], int] | None = None
 
 
 @dataclass

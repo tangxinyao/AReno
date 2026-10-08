@@ -81,6 +81,44 @@ def _two_tailed_rats(rng: random.Random) -> Roster:
     return [("two_tailed_rat", {"starter": (first + i) % 3, "rat_slot": 2 + i}) for i in range(3)]
 
 
+def _bowlbugs_weak(rng: random.Random) -> Roster:
+    # BowlbugsWeak: the Rock and one of Egg / Nectar.
+    return [("bowlbug_rock", {}), (rng.choice(["bowlbug_egg", "bowlbug_nectar"]), {})]
+
+
+def _bowlbugs_normal(rng: random.Random) -> Roster:
+    # BowlbugsNormal: the Rock and two different workers out of Egg / Silk / Nectar.
+    pool = ["bowlbug_egg", "bowlbug_silk", "bowlbug_nectar"]
+    out: Roster = [("bowlbug_rock", {})]
+    for _ in range(2):
+        out.append((pool.pop(rng.randrange(len(pool))), {}))
+    return out
+
+
+def _scrolls(count: int):
+    def gen(rng: random.Random) -> Roster:
+        # ScrollsOfBiting: consecutive starters; the fourth scroll of the normal
+        # encounter always opens on More Teeth.
+        first = rng.randrange(3)
+        return [("scroll_of_biting", {"starter": 2 if count == 4 and i == 3 else (first + i) % 3})
+                for i in range(count)]
+
+    return gen
+
+
+def _decimillipede(rng: random.Random) -> Roster:
+    # Three segments on consecutive starters (Writhe / Bulk / Constrict).
+    first = rng.randrange(3)
+    return [(f"decimillipede_segment_{part}", {"starter": (first + i) % 3})
+            for i, part in enumerate(("front", "middle", "back"))]
+
+
+def _chompers(rng: random.Random) -> Roster:
+    del rng
+    # ChompersNormal: the second Chomper opens on Screech.
+    return [("chomper", {}), ("chomper", {"start_state": "SCREECH"})]
+
+
 _GENERATORS = {
     "slimes_weak": _slimes_weak,
     "slimes_normal": _slimes_normal,
@@ -90,6 +128,12 @@ _GENERATORS = {
     "corpse_slugs_2": _corpse_slugs(2),
     "corpse_slugs_3": _corpse_slugs(3),
     "two_tailed_rats": _two_tailed_rats,
+    "bowlbugs_weak": _bowlbugs_weak,
+    "bowlbugs_normal": _bowlbugs_normal,
+    "scrolls_3": _scrolls(3),
+    "scrolls_4": _scrolls(4),
+    "decimillipede": _decimillipede,
+    "chompers": _chompers,
 }
 
 

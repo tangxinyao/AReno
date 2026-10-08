@@ -280,6 +280,15 @@ class RunLoop:
         cost = "X" if card.x_cost else self._combat_ctx.effective_cost(card_id)
         return f"{card.name} ({card.card_type}, cost {cost}): {card.description}".rstrip(": ")
 
+    def _generated_label(self, sel, idx: int) -> str:
+        card = self.cards[sel.options[idx]]
+        desc = card.description
+        if sel.purpose == "curse_of_knowledge" and card.card_id == "disintegration":
+            combat = self.state.combat
+            if combat is not None and combat.curse_choice is not None:
+                desc = f"At the end of your turn, take {combat.curse_choice[1]} damage."
+        return f"{card.name}: {desc}"
+
     def _combat_decisions(self) -> list[Decision]:
         assert self._state is not None and self._state.combat is not None and self._cards is not None
         ctx = self._combat_ctx
@@ -293,6 +302,16 @@ class RunLoop:
             )
 
         sel = combat.pending_selection
+        if sel is not None and sel.source == "generated":
+            out = []
+            if len(sel.selected) < sel.max_count:
+                for pos, idx in enumerate(sel.candidates):
+                    if idx not in sel.selected:
+                        out.append(Decision(id=actions.format_action(actions.SELECT_CARD, pos),
+                                            text=f"choose {self._generated_label(sel, idx)}"))
+            if ctx.can_confirm_selection():
+                out.append(Decision(id=actions.CONFIRM_SELECTION, text="confirm selection"))
+            return out
         if sel is not None:
             in_hand = sel.source == "hand"
             pile = player.hand if in_hand else player.discard_pile

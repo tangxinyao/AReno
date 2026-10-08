@@ -164,6 +164,14 @@ class AttackCardTest(unittest.TestCase):
         ctx.play_card("rampage", target_slot=0)
         self.assertEqual(m0(ctx).hp, 200 - 9 - 14)
 
+    def test_rampage_growth_is_per_copy(self) -> None:
+        ctx = make(["nibbit"], hand=["rampage", "rampage"])
+        ctx.player.energy = 2
+        ctx.play_card("rampage", target_slot=0)
+        ctx.play_card("rampage", target_slot=0)
+        self.assertEqual(m0(ctx).hp, 200 - 9 - 9)
+        self.assertEqual([c.bonus for c in ctx.player.discard_pile], [5, 5])
+
     def test_spite_hits_twice_after_losing_hp(self) -> None:
         ctx = make(["nibbit"], hand=["spite", "bloodletting", "spite+1"])
         ctx.play_card("spite", target_slot=0)
@@ -224,7 +232,8 @@ class AttackCardTest(unittest.TestCase):
         ctx = make(["nibbit"], hand=["thrash", "bludgeon"])
         ctx.play_card("thrash", target_slot=0)
         self.assertEqual(m0(ctx).hp, 192)
-        self.assertEqual(ctx.combat.bonus_damage["thrash"], 32)
+        thrash = next(c for c in ctx.player.discard_pile if c == "thrash")
+        self.assertEqual(thrash.bonus, 32)
         self.assertIn("bludgeon", ctx.player.exhaust_pile)
 
     def test_setup_strike_strength_is_temporary(self) -> None:

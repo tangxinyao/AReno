@@ -1,0 +1,3090 @@
+[
+ {
+  "monster_id": "bowlbug_egg",
+  "game_id": "BOWLBUG_EGG",
+  "name": "Bowlbug (Egg)",
+  "kind": "normal",
+  "hp": [
+   21,
+   22
+  ],
+  "hp_asc": [
+   23,
+   24
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "BITE": {
+    "name": "Bite",
+    "intents": [
+     "attack",
+     "defend"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        7,
+        8,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "block",
+      "args": {
+       "amount": [
+        7,
+        8,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "BITE",
+   "nodes": {
+    "BITE": {
+     "type": "move",
+     "move": "BITE",
+     "next": "BITE"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "bowlbug_nectar",
+  "game_id": "BOWLBUG_NECTAR",
+  "name": "Bowlbug (Nectar)",
+  "kind": "normal",
+  "hp": [
+   35,
+   38
+  ],
+  "hp_asc": [
+   36,
+   39
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "THRASH": {
+    "name": "Thrash",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": 3
+      }
+     }
+    ]
+   },
+   "BUFF": {
+    "name": "Buff",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": [
+        15,
+        16,
+        9
+       ],
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "THRASH2": {
+    "name": "Thrash",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": 3
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "THRASH",
+   "nodes": {
+    "THRASH": {
+     "type": "move",
+     "move": "THRASH",
+     "next": "BUFF"
+    },
+    "BUFF": {
+     "type": "move",
+     "move": "BUFF",
+     "next": "THRASH2"
+    },
+    "THRASH2": {
+     "type": "move",
+     "move": "THRASH2",
+     "next": "THRASH2"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "bowlbug_rock",
+  "game_id": "BOWLBUG_ROCK",
+  "name": "Bowlbug (Rock)",
+  "kind": "normal",
+  "hp": [
+   45,
+   48
+  ],
+  "hp_asc": [
+   46,
+   49
+  ],
+  "innate_powers": [
+   {
+    "power": "imbalanced",
+    "amount": 1
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "HEADBUTT": {
+    "name": "Headbutt",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        15,
+        16,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "DIZZY": {
+    "name": "Dizzy",
+    "intents": [
+     "stun"
+    ],
+    "effects": [
+     {
+      "verb": "special",
+      "args": {
+       "name": "dizzy"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "HEADBUTT",
+   "nodes": {
+    "HEADBUTT": {
+     "type": "move",
+     "move": "HEADBUTT",
+     "next": "POST_HEADBUTT"
+    },
+    "DIZZY": {
+     "type": "move",
+     "move": "DIZZY",
+     "next": "HEADBUTT"
+    },
+    "POST_HEADBUTT": {
+     "type": "conditional",
+     "branches": [
+      {
+       "to": "DIZZY",
+       "if": "flag",
+       "arg": "off_balance"
+      },
+      {
+       "to": "HEADBUTT"
+      }
+     ]
+    }
+   }
+  },
+  "notes": "Imbalanced: a Headbutt the player fully blocks leaves it Dizzy (stunned) for a turn."
+ },
+ {
+  "monster_id": "bowlbug_silk",
+  "game_id": "BOWLBUG_SILK",
+  "name": "Bowlbug (Silk)",
+  "kind": "normal",
+  "hp": [
+   40,
+   43
+  ],
+  "hp_asc": [
+   41,
+   44
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "THRASH": {
+    "name": "Thrash",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        4,
+        5,
+        9
+       ],
+       "hits": 2
+      }
+     }
+    ]
+   },
+   "TOXIC_SPIT": {
+    "name": "Toxic Spit",
+    "intents": [
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "weak",
+       "amount": 1,
+       "target": "player"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "TOXIC_SPIT",
+   "nodes": {
+    "TOXIC_SPIT": {
+     "type": "move",
+     "move": "TOXIC_SPIT",
+     "next": "THRASH"
+    },
+    "THRASH": {
+     "type": "move",
+     "move": "THRASH",
+     "next": "TOXIC_SPIT"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "chomper",
+  "game_id": "CHOMPER",
+  "name": "Chomper",
+  "kind": "normal",
+  "hp": [
+   60,
+   64
+  ],
+  "hp_asc": [
+   63,
+   67
+  ],
+  "innate_powers": [
+   {
+    "power": "artifact",
+    "amount": 2
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "CLAMP": {
+    "name": "Clamp",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ],
+       "hits": 2
+      }
+     }
+    ]
+   },
+   "SCREECH": {
+    "name": "Screech",
+    "intents": [
+     "status"
+    ],
+    "effects": [
+     {
+      "verb": "add_card",
+      "args": {
+       "card": "dazed",
+       "pile": "discard",
+       "count": 3
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "CLAMP",
+   "nodes": {
+    "CLAMP": {
+     "type": "move",
+     "move": "CLAMP",
+     "next": "SCREECH"
+    },
+    "SCREECH": {
+     "type": "move",
+     "move": "SCREECH",
+     "next": "CLAMP"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "exoskeleton",
+  "game_id": "EXOSKELETON",
+  "name": "Exoskeleton",
+  "kind": "normal",
+  "hp": [
+   24,
+   28
+  ],
+  "hp_asc": [
+   25,
+   29
+  ],
+  "innate_powers": [
+   {
+    "power": "hard_to_kill",
+    "amount": 9
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "SKITTER": {
+    "name": "Skitter",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": 1,
+       "hits": [
+        3,
+        4,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "MANDIBLES": {
+    "name": "Mandibles",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "ENRAGE": {
+    "name": "Enrage",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 2,
+       "target": "self"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "INIT_MOVE",
+   "nodes": {
+    "SKITTER": {
+     "type": "move",
+     "move": "SKITTER",
+     "next": "RAND"
+    },
+    "MANDIBLES": {
+     "type": "move",
+     "move": "MANDIBLES",
+     "next": "ENRAGE"
+    },
+    "ENRAGE": {
+     "type": "move",
+     "move": "ENRAGE",
+     "next": "RAND"
+    },
+    "RAND": {
+     "type": "random",
+     "branches": [
+      {
+       "to": "SKITTER",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      },
+      {
+       "to": "MANDIBLES",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      }
+     ]
+    },
+    "INIT_MOVE": {
+     "type": "conditional",
+     "branches": [
+      {
+       "to": "SKITTER",
+       "if": "kind_index",
+       "arg": 0
+      },
+      {
+       "to": "MANDIBLES",
+       "if": "kind_index",
+       "arg": 1
+      },
+      {
+       "to": "ENRAGE",
+       "if": "kind_index",
+       "arg": 2
+      },
+      {
+       "to": "RAND"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "thieving_hopper",
+  "game_id": "THIEVING_HOPPER",
+  "name": "Thieving Hopper",
+  "kind": "normal",
+  "hp": [
+   79,
+   79
+  ],
+  "hp_asc": [
+   84,
+   84
+  ],
+  "innate_powers": [
+   {
+    "power": "escape_artist",
+    "amount": 5
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "THIEVERY": {
+    "name": "Thievery",
+    "intents": [
+     "attack",
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        17,
+        19,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "special",
+      "args": {
+       "name": "steal_card"
+      }
+     }
+    ]
+   },
+   "FLUTTER": {
+    "name": "Flutter",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "flutter",
+       "amount": 5,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "HAT_TRICK": {
+    "name": "Hat Trick",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        21,
+        23,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "NAB": {
+    "name": "Nab",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        14,
+        16,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "ESCAPE": {
+    "name": "Escape",
+    "intents": [
+     "escape"
+    ],
+    "effects": [
+     {
+      "verb": "escape",
+      "args": {}
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "THIEVERY",
+   "nodes": {
+    "THIEVERY": {
+     "type": "move",
+     "move": "THIEVERY",
+     "next": "FLUTTER"
+    },
+    "FLUTTER": {
+     "type": "move",
+     "move": "FLUTTER",
+     "next": "HAT_TRICK"
+    },
+    "HAT_TRICK": {
+     "type": "move",
+     "move": "HAT_TRICK",
+     "next": "NAB"
+    },
+    "NAB": {
+     "type": "move",
+     "move": "NAB",
+     "next": "ESCAPE"
+    },
+    "ESCAPE": {
+     "type": "move",
+     "move": "ESCAPE",
+     "next": "ESCAPE"
+    }
+   }
+  },
+  "notes": "Thievery takes a card from the draw/discard pile; killing the Hopper returns it, letting it escape loses it for the run."
+ },
+ {
+  "monster_id": "tunneler",
+  "game_id": "TUNNELER",
+  "name": "Tunneler",
+  "kind": "normal",
+  "hp": [
+   87,
+   87
+  ],
+  "hp_asc": [
+   92,
+   92
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "BITE": {
+    "name": "Bite",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        13,
+        15,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "BURROW": {
+    "name": "Burrow",
+    "intents": [
+     "buff",
+     "defend"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "burrowed",
+       "amount": 1,
+       "target": "self"
+      }
+     },
+     {
+      "verb": "block",
+      "args": {
+       "amount": [
+        32,
+        37,
+        8
+       ]
+      }
+     }
+    ]
+   },
+   "BELOW": {
+    "name": "Attack from Below",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        23,
+        26,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "BITE",
+   "nodes": {
+    "BITE": {
+     "type": "move",
+     "move": "BITE",
+     "next": "BURROW"
+    },
+    "BURROW": {
+     "type": "move",
+     "move": "BURROW",
+     "next": "BELOW"
+    },
+    "BELOW": {
+     "type": "move",
+     "move": "BELOW",
+     "next": "BELOW"
+    }
+   }
+  },
+  "notes": "Burrowed keeps its Block between turns; breaking all of it stuns the Tunneler and sends it back to Bite."
+ },
+ {
+  "monster_id": "louse_progenitor",
+  "game_id": "LOUSE_PROGENITOR",
+  "name": "Louse Progenitor",
+  "kind": "normal",
+  "hp": [
+   134,
+   136
+  ],
+  "hp_asc": [
+   138,
+   141
+  ],
+  "innate_powers": [
+   {
+    "power": "curl_up",
+    "amount": [
+     14,
+     18,
+     8
+    ]
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "WEB_CANNON": {
+    "name": "Web Cannon",
+    "intents": [
+     "attack",
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        9,
+        10,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "frail",
+       "amount": 2,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "CURL_AND_GROW": {
+    "name": "Curl and Grow",
+    "intents": [
+     "defend",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "block",
+      "args": {
+       "amount": [
+        14,
+        18,
+        8
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 5,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "POUNCE": {
+    "name": "Pounce",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        14,
+        16,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "WEB_CANNON",
+   "nodes": {
+    "WEB_CANNON": {
+     "type": "move",
+     "move": "WEB_CANNON",
+     "next": "CURL_AND_GROW"
+    },
+    "CURL_AND_GROW": {
+     "type": "move",
+     "move": "CURL_AND_GROW",
+     "next": "POUNCE"
+    },
+    "POUNCE": {
+     "type": "move",
+     "move": "POUNCE",
+     "next": "WEB_CANNON"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "myte",
+  "game_id": "MYTE",
+  "name": "Myte",
+  "kind": "normal",
+  "hp": [
+   61,
+   67
+  ],
+  "hp_asc": [
+   64,
+   69
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "TOXIC": {
+    "name": "Toxic Cornucopia",
+    "intents": [
+     "status"
+    ],
+    "effects": [
+     {
+      "verb": "add_card",
+      "args": {
+       "card": "toxic",
+       "pile": "hand",
+       "count": 2
+      }
+     }
+    ]
+   },
+   "BITE": {
+    "name": "Bite",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        13,
+        15,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "SUCK": {
+    "name": "Suck",
+    "intents": [
+     "attack",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        4,
+        6,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": [
+        2,
+        3,
+        9
+       ],
+       "target": "self"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "INIT_MOVE",
+   "nodes": {
+    "TOXIC": {
+     "type": "move",
+     "move": "TOXIC",
+     "next": "BITE"
+    },
+    "BITE": {
+     "type": "move",
+     "move": "BITE",
+     "next": "SUCK"
+    },
+    "SUCK": {
+     "type": "move",
+     "move": "SUCK",
+     "next": "TOXIC"
+    },
+    "INIT_MOVE": {
+     "type": "conditional",
+     "branches": [
+      {
+       "to": "TOXIC",
+       "if": "kind_index",
+       "arg": 0
+      },
+      {
+       "to": "SUCK"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "ovicopter",
+  "game_id": "OVICOPTER",
+  "name": "Ovicopter",
+  "kind": "normal",
+  "hp": [
+   124,
+   130
+  ],
+  "hp_asc": [
+   126,
+   132
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "LAY_EGGS": {
+    "name": "Lay Eggs",
+    "intents": [
+     "summon"
+    ],
+    "effects": [
+     {
+      "verb": "special",
+      "args": {
+       "name": "lay_eggs"
+      }
+     }
+    ]
+   },
+   "SMASH": {
+    "name": "Smash",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        16,
+        17,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "TENDERIZER": {
+    "name": "Tenderizer",
+    "intents": [
+     "attack",
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        7,
+        8,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "vulnerable",
+       "amount": 2,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "NUTRITIONAL_PASTE": {
+    "name": "Nutritional Paste",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": [
+        3,
+        4,
+        9
+       ],
+       "target": "self"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "SUMMON_BRANCH",
+   "nodes": {
+    "LAY_EGGS": {
+     "type": "move",
+     "move": "LAY_EGGS",
+     "next": "SMASH"
+    },
+    "SMASH": {
+     "type": "move",
+     "move": "SMASH",
+     "next": "TENDERIZER"
+    },
+    "TENDERIZER": {
+     "type": "move",
+     "move": "TENDERIZER",
+     "next": "SUMMON_BRANCH"
+    },
+    "NUTRITIONAL_PASTE": {
+     "type": "move",
+     "move": "NUTRITIONAL_PASTE",
+     "next": "SMASH"
+    },
+    "SUMMON_BRANCH": {
+     "type": "conditional",
+     "branches": [
+      {
+       "to": "LAY_EGGS",
+       "if": "side_alive_lt",
+       "arg": 4
+      },
+      {
+       "to": "NUTRITIONAL_PASTE"
+      }
+     ]
+    }
+   }
+  },
+  "notes": "Lays up to three Tough Eggs while at most two other monsters live; otherwise eats Nutritional Paste."
+ },
+ {
+  "monster_id": "tough_egg",
+  "game_id": "TOUGH_EGG",
+  "name": "Tough Egg",
+  "kind": "normal",
+  "hp": [
+   14,
+   18
+  ],
+  "hp_asc": [
+   15,
+   19
+  ],
+  "innate_powers": [
+   {
+    "power": "hatch",
+    "amount": 1
+   },
+   {
+    "power": "minion",
+    "amount": 1
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "HATCH": {
+    "name": "Hatch",
+    "intents": [
+     "summon"
+    ],
+    "effects": [
+     {
+      "verb": "special",
+      "args": {
+       "name": "hatch",
+       "lo": [
+        19,
+        20,
+        8
+       ],
+       "hi": [
+        21,
+        22,
+        8
+       ]
+      }
+     }
+    ]
+   },
+   "NIBBLE": {
+    "name": "Nibble",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        4,
+        5,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "HATCH",
+   "nodes": {
+    "HATCH": {
+     "type": "move",
+     "move": "HATCH",
+     "next": "NIBBLE"
+    },
+    "NIBBLE": {
+     "type": "move",
+     "move": "NIBBLE",
+     "next": "NIBBLE"
+    }
+   }
+  },
+  "notes": "Hatching re-rolls its HP (19-21; 20-22 from Ascension 8)."
+ },
+ {
+  "monster_id": "slumbering_beetle",
+  "game_id": "SLUMBERING_BEETLE",
+  "name": "Slumbering Beetle",
+  "kind": "normal",
+  "hp": [
+   86,
+   86
+  ],
+  "hp_asc": [
+   89,
+   89
+  ],
+  "innate_powers": [
+   {
+    "power": "plating",
+    "amount": [
+     15,
+     18,
+     8
+    ]
+   },
+   {
+    "power": "slumber",
+    "amount": 3
+   }
+  ],
+  "starting_block": [
+   15,
+   18,
+   8
+  ],
+  "moves": {
+   "SNORE": {
+    "name": "Snore",
+    "intents": [
+     "sleep"
+    ],
+    "effects": []
+   },
+   "ROLL_OUT": {
+    "name": "Roll Out",
+    "intents": [
+     "attack",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        16,
+        18,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 2,
+       "target": "self"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "SNORE",
+   "nodes": {
+    "SNORE": {
+     "type": "move",
+     "move": "SNORE",
+     "next": "SNORE_NEXT"
+    },
+    "ROLL_OUT": {
+     "type": "move",
+     "move": "ROLL_OUT",
+     "next": "ROLL_OUT"
+    },
+    "SNORE_NEXT": {
+     "type": "conditional",
+     "branches": [
+      {
+       "to": "SNORE",
+       "if": "has_power",
+       "arg": "slumber"
+      },
+      {
+       "to": "ROLL_OUT"
+      }
+     ]
+    }
+   }
+  },
+  "notes": "Slumber ticks down each round and on each HP loss; losing it to damage stuns the beetle. Plating drops when it wakes."
+ },
+ {
+  "monster_id": "spiny_toad",
+  "game_id": "SPINY_TOAD",
+  "name": "Spiny Toad",
+  "kind": "normal",
+  "hp": [
+   116,
+   119
+  ],
+  "hp_asc": [
+   121,
+   124
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "PROTRUDING_SPIKES": {
+    "name": "Protruding Spikes",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "thorns",
+       "amount": 5,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "SPIKE_EXPLOSION": {
+    "name": "Spike Explosion",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        23,
+        25,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "thorns",
+       "amount": -5,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "TONGUE_LASH": {
+    "name": "Tongue Lash",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        17,
+        19,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "PROTRUDING_SPIKES",
+   "nodes": {
+    "PROTRUDING_SPIKES": {
+     "type": "move",
+     "move": "PROTRUDING_SPIKES",
+     "next": "SPIKE_EXPLOSION"
+    },
+    "SPIKE_EXPLOSION": {
+     "type": "move",
+     "move": "SPIKE_EXPLOSION",
+     "next": "TONGUE_LASH"
+    },
+    "TONGUE_LASH": {
+     "type": "move",
+     "move": "TONGUE_LASH",
+     "next": "PROTRUDING_SPIKES"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "the_obscura",
+  "game_id": "THE_OBSCURA",
+  "name": "The Obscura",
+  "kind": "normal",
+  "hp": [
+   123,
+   123
+  ],
+  "hp_asc": [
+   129,
+   129
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "ILLUSION": {
+    "name": "Illusion",
+    "intents": [
+     "summon"
+    ],
+    "effects": [
+     {
+      "verb": "summon",
+      "args": {
+       "monster": "parafright",
+       "where": "before"
+      }
+     }
+    ]
+   },
+   "PIERCING_GAZE": {
+    "name": "Piercing Gaze",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        10,
+        11,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "SAIL": {
+    "name": "Sail",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 3,
+       "target": "all"
+      }
+     }
+    ]
+   },
+   "HARDENING_STRIKE": {
+    "name": "Hardening Strike",
+    "intents": [
+     "attack",
+     "defend"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        6,
+        7,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "block",
+      "args": {
+       "amount": [
+        6,
+        7,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "ILLUSION",
+   "nodes": {
+    "ILLUSION": {
+     "type": "move",
+     "move": "ILLUSION",
+     "next": "RAND"
+    },
+    "PIERCING_GAZE": {
+     "type": "move",
+     "move": "PIERCING_GAZE",
+     "next": "RAND"
+    },
+    "SAIL": {
+     "type": "move",
+     "move": "SAIL",
+     "next": "RAND"
+    },
+    "HARDENING_STRIKE": {
+     "type": "move",
+     "move": "HARDENING_STRIKE",
+     "next": "RAND"
+    },
+    "RAND": {
+     "type": "random",
+     "branches": [
+      {
+       "to": "PIERCING_GAZE",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      },
+      {
+       "to": "SAIL",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      },
+      {
+       "to": "HARDENING_STRIKE",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "parafright",
+  "game_id": "PARAFRIGHT",
+  "name": "Parafright",
+  "kind": "normal",
+  "hp": [
+   21,
+   21
+  ],
+  "hp_asc": [
+   21,
+   21
+  ],
+  "innate_powers": [
+   {
+    "power": "illusion",
+    "amount": 1
+   },
+   {
+    "power": "minion",
+    "amount": 1
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "SLAM": {
+    "name": "Slam",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        16,
+        17,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "SLAM",
+   "nodes": {
+    "SLAM": {
+     "type": "move",
+     "move": "SLAM",
+     "next": "SLAM"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "hunter_killer",
+  "game_id": "HUNTER_KILLER",
+  "name": "Hunter Killer",
+  "kind": "normal",
+  "hp": [
+   121,
+   121
+  ],
+  "hp_asc": [
+   126,
+   126
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "TENDERIZING_GOOP": {
+    "name": "Tenderizing Goop",
+    "intents": [
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "tender",
+       "amount": 1,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "BITE": {
+    "name": "Bite",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        17,
+        19,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "PUNCTURE": {
+    "name": "Puncture",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        7,
+        8,
+        9
+       ],
+       "hits": 3
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "TENDERIZING_GOOP",
+   "nodes": {
+    "TENDERIZING_GOOP": {
+     "type": "move",
+     "move": "TENDERIZING_GOOP",
+     "next": "RAND"
+    },
+    "BITE": {
+     "type": "move",
+     "move": "BITE",
+     "next": "RAND"
+    },
+    "PUNCTURE": {
+     "type": "move",
+     "move": "PUNCTURE",
+     "next": "RAND"
+    },
+    "RAND": {
+     "type": "random",
+     "branches": [
+      {
+       "to": "BITE",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      },
+      {
+       "to": "PUNCTURE",
+       "weight": 1.0,
+       "repeat": "can_repeat_x",
+       "max_times": 2
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "decimillipede_segment_front",
+  "game_id": "DECIMILLIPEDE_SEGMENT_FRONT",
+  "name": "Decimillipede Segment (Front)",
+  "kind": "elite",
+  "hp": [
+   40,
+   46
+  ],
+  "hp_asc": [
+   46,
+   52
+  ],
+  "innate_powers": [
+   {
+    "power": "reattach",
+    "amount": 25
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "WRITHE": {
+    "name": "Writhe",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        5,
+        6,
+        9
+       ],
+       "hits": 2
+      }
+     }
+    ]
+   },
+   "CONSTRICT": {
+    "name": "Constrict",
+    "intents": [
+     "attack",
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "weak",
+       "amount": 1,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "BULK": {
+    "name": "Bulk",
+    "intents": [
+     "attack",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        6,
+        7,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 2,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "DEAD": {
+    "name": "Dead",
+    "intents": [
+     "unknown"
+    ],
+    "effects": []
+   },
+   "REATTACH": {
+    "name": "Reattach",
+    "intents": [
+     "heal"
+    ],
+    "effects": []
+   }
+  },
+  "ai": {
+   "initial": "START",
+   "nodes": {
+    "WRITHE": {
+     "type": "move",
+     "move": "WRITHE",
+     "next": "CONSTRICT"
+    },
+    "CONSTRICT": {
+     "type": "move",
+     "move": "CONSTRICT",
+     "next": "BULK"
+    },
+    "BULK": {
+     "type": "move",
+     "move": "BULK",
+     "next": "WRITHE"
+    },
+    "DEAD": {
+     "type": "move",
+     "move": "DEAD",
+     "next": "REATTACH"
+    },
+    "REATTACH": {
+     "type": "move",
+     "move": "REATTACH",
+     "next": "RAND"
+    },
+    "RAND": {
+     "type": "random",
+     "branches": [
+      {
+       "to": "WRITHE",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      },
+      {
+       "to": "BULK",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      },
+      {
+       "to": "CONSTRICT",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      }
+     ]
+    },
+    "START": {
+     "type": "conditional",
+     "branches": [
+      {
+       "to": "WRITHE",
+       "if": "starter",
+       "arg": 0
+      },
+      {
+       "to": "BULK",
+       "if": "starter",
+       "arg": 1
+      },
+      {
+       "to": "CONSTRICT"
+      }
+     ]
+    }
+   }
+  },
+  "notes": "A segment that dies while another lives reattaches two turns later (one if it fell on the enemy turn) at 25 HP."
+ },
+ {
+  "monster_id": "decimillipede_segment_middle",
+  "game_id": "DECIMILLIPEDE_SEGMENT_MIDDLE",
+  "name": "Decimillipede Segment (Middle)",
+  "kind": "elite",
+  "hp": [
+   40,
+   46
+  ],
+  "hp_asc": [
+   46,
+   52
+  ],
+  "innate_powers": [
+   {
+    "power": "reattach",
+    "amount": 25
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "WRITHE": {
+    "name": "Writhe",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        5,
+        6,
+        9
+       ],
+       "hits": 2
+      }
+     }
+    ]
+   },
+   "CONSTRICT": {
+    "name": "Constrict",
+    "intents": [
+     "attack",
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "weak",
+       "amount": 1,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "BULK": {
+    "name": "Bulk",
+    "intents": [
+     "attack",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        6,
+        7,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 2,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "DEAD": {
+    "name": "Dead",
+    "intents": [
+     "unknown"
+    ],
+    "effects": []
+   },
+   "REATTACH": {
+    "name": "Reattach",
+    "intents": [
+     "heal"
+    ],
+    "effects": []
+   }
+  },
+  "ai": {
+   "initial": "START",
+   "nodes": {
+    "WRITHE": {
+     "type": "move",
+     "move": "WRITHE",
+     "next": "CONSTRICT"
+    },
+    "CONSTRICT": {
+     "type": "move",
+     "move": "CONSTRICT",
+     "next": "BULK"
+    },
+    "BULK": {
+     "type": "move",
+     "move": "BULK",
+     "next": "WRITHE"
+    },
+    "DEAD": {
+     "type": "move",
+     "move": "DEAD",
+     "next": "REATTACH"
+    },
+    "REATTACH": {
+     "type": "move",
+     "move": "REATTACH",
+     "next": "RAND"
+    },
+    "RAND": {
+     "type": "random",
+     "branches": [
+      {
+       "to": "WRITHE",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      },
+      {
+       "to": "BULK",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      },
+      {
+       "to": "CONSTRICT",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      }
+     ]
+    },
+    "START": {
+     "type": "conditional",
+     "branches": [
+      {
+       "to": "WRITHE",
+       "if": "starter",
+       "arg": 0
+      },
+      {
+       "to": "BULK",
+       "if": "starter",
+       "arg": 1
+      },
+      {
+       "to": "CONSTRICT"
+      }
+     ]
+    }
+   }
+  },
+  "notes": "A segment that dies while another lives reattaches two turns later (one if it fell on the enemy turn) at 25 HP."
+ },
+ {
+  "monster_id": "decimillipede_segment_back",
+  "game_id": "DECIMILLIPEDE_SEGMENT_BACK",
+  "name": "Decimillipede Segment (Back)",
+  "kind": "elite",
+  "hp": [
+   40,
+   46
+  ],
+  "hp_asc": [
+   46,
+   52
+  ],
+  "innate_powers": [
+   {
+    "power": "reattach",
+    "amount": 25
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "WRITHE": {
+    "name": "Writhe",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        5,
+        6,
+        9
+       ],
+       "hits": 2
+      }
+     }
+    ]
+   },
+   "CONSTRICT": {
+    "name": "Constrict",
+    "intents": [
+     "attack",
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "weak",
+       "amount": 1,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "BULK": {
+    "name": "Bulk",
+    "intents": [
+     "attack",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        6,
+        7,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 2,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "DEAD": {
+    "name": "Dead",
+    "intents": [
+     "unknown"
+    ],
+    "effects": []
+   },
+   "REATTACH": {
+    "name": "Reattach",
+    "intents": [
+     "heal"
+    ],
+    "effects": []
+   }
+  },
+  "ai": {
+   "initial": "START",
+   "nodes": {
+    "WRITHE": {
+     "type": "move",
+     "move": "WRITHE",
+     "next": "CONSTRICT"
+    },
+    "CONSTRICT": {
+     "type": "move",
+     "move": "CONSTRICT",
+     "next": "BULK"
+    },
+    "BULK": {
+     "type": "move",
+     "move": "BULK",
+     "next": "WRITHE"
+    },
+    "DEAD": {
+     "type": "move",
+     "move": "DEAD",
+     "next": "REATTACH"
+    },
+    "REATTACH": {
+     "type": "move",
+     "move": "REATTACH",
+     "next": "RAND"
+    },
+    "RAND": {
+     "type": "random",
+     "branches": [
+      {
+       "to": "WRITHE",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      },
+      {
+       "to": "BULK",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      },
+      {
+       "to": "CONSTRICT",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      }
+     ]
+    },
+    "START": {
+     "type": "conditional",
+     "branches": [
+      {
+       "to": "WRITHE",
+       "if": "starter",
+       "arg": 0
+      },
+      {
+       "to": "BULK",
+       "if": "starter",
+       "arg": 1
+      },
+      {
+       "to": "CONSTRICT"
+      }
+     ]
+    }
+   }
+  },
+  "notes": "A segment that dies while another lives reattaches two turns later (one if it fell on the enemy turn) at 25 HP."
+ },
+ {
+  "monster_id": "entomancer",
+  "game_id": "ENTOMANCER",
+  "name": "Entomancer",
+  "kind": "elite",
+  "hp": [
+   145,
+   145
+  ],
+  "hp_asc": [
+   155,
+   155
+  ],
+  "innate_powers": [
+   {
+    "power": "personal_hive",
+    "amount": 1
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "PHEROMONE_SPIT": {
+    "name": "Pheromone Spit",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "special",
+      "args": {
+       "name": "pheromone_spit"
+      }
+     }
+    ]
+   },
+   "BEES": {
+    "name": "Beeeees!",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": 3,
+       "hits": [
+        7,
+        8,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "SPEAR": {
+    "name": "Spear!",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        18,
+        20,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "BEES",
+   "nodes": {
+    "BEES": {
+     "type": "move",
+     "move": "BEES",
+     "next": "SPEAR"
+    },
+    "SPEAR": {
+     "type": "move",
+     "move": "SPEAR",
+     "next": "PHEROMONE_SPIT"
+    },
+    "PHEROMONE_SPIT": {
+     "type": "move",
+     "move": "PHEROMONE_SPIT",
+     "next": "BEES"
+    }
+   }
+  },
+  "notes": "Pheromone Spit: +1 Personal Hive and +1 Strength while Personal Hive < 3, else +2 Strength."
+ },
+ {
+  "monster_id": "infested_prism",
+  "game_id": "INFESTED_PRISM",
+  "name": "Infested Prism",
+  "kind": "elite",
+  "hp": [
+   161,
+   161
+  ],
+  "hp_asc": [
+   171,
+   171
+  ],
+  "innate_powers": [
+   {
+    "power": "vital_spark",
+    "amount": [
+     2,
+     3,
+     9
+    ]
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "JAB": {
+    "name": "Jab",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        15,
+        17,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "RADIATE": {
+    "name": "Radiate",
+    "intents": [
+     "attack",
+     "defend"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        11,
+        13,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "block",
+      "args": {
+       "amount": [
+        11,
+        13,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "WHIRLWIND": {
+    "name": "Whirlwind",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        5,
+        6,
+        9
+       ],
+       "hits": 3
+      }
+     }
+    ]
+   },
+   "PULSATE": {
+    "name": "Pulsate",
+    "intents": [
+     "attack",
+     "buff",
+     "defend"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        10,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "block",
+      "args": {
+       "amount": [
+        20,
+        22,
+        8
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "vital_spark",
+       "amount": [
+        2,
+        3,
+        9
+       ],
+       "target": "self"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "JAB",
+   "nodes": {
+    "JAB": {
+     "type": "move",
+     "move": "JAB",
+     "next": "RADIATE"
+    },
+    "RADIATE": {
+     "type": "move",
+     "move": "RADIATE",
+     "next": "WHIRLWIND"
+    },
+    "WHIRLWIND": {
+     "type": "move",
+     "move": "WHIRLWIND",
+     "next": "PULSATE"
+    },
+    "PULSATE": {
+     "type": "move",
+     "move": "PULSATE",
+     "next": "JAB"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "crusher",
+  "game_id": "CRUSHER",
+  "name": "Crusher",
+  "kind": "boss",
+  "hp": [
+   209,
+   209
+  ],
+  "hp_asc": [
+   219,
+   219
+  ],
+  "innate_powers": [
+   {
+    "power": "back_attack_left",
+    "amount": 1
+   },
+   {
+    "power": "crab_rage",
+    "amount": 1
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "THRASH": {
+    "name": "Thrash",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        12,
+        14,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "ENLARGING_STRIKE": {
+    "name": "Enlarging Strike",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": 4
+      }
+     }
+    ]
+   },
+   "BUG_STING": {
+    "name": "Bug Sting",
+    "intents": [
+     "attack",
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        6,
+        7,
+        9
+       ],
+       "hits": 2
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "weak",
+       "amount": 2,
+       "target": "player"
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "frail",
+       "amount": 2,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "ADAPT": {
+    "name": "Adapt",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": [
+        2,
+        3,
+        9
+       ],
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "GUARDED_STRIKE": {
+    "name": "Guarded Strike",
+    "intents": [
+     "attack",
+     "defend"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        12,
+        14,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "block",
+      "args": {
+       "amount": 18
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "THRASH",
+   "nodes": {
+    "THRASH": {
+     "type": "move",
+     "move": "THRASH",
+     "next": "ENLARGING_STRIKE"
+    },
+    "ENLARGING_STRIKE": {
+     "type": "move",
+     "move": "ENLARGING_STRIKE",
+     "next": "BUG_STING"
+    },
+    "BUG_STING": {
+     "type": "move",
+     "move": "BUG_STING",
+     "next": "ADAPT"
+    },
+    "ADAPT": {
+     "type": "move",
+     "move": "ADAPT",
+     "next": "GUARDED_STRIKE"
+    },
+    "GUARDED_STRIKE": {
+     "type": "move",
+     "move": "GUARDED_STRIKE",
+     "next": "THRASH"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "rocket",
+  "game_id": "ROCKET",
+  "name": "Rocket",
+  "kind": "boss",
+  "hp": [
+   199,
+   199
+  ],
+  "hp_asc": [
+   209,
+   209
+  ],
+  "innate_powers": [
+   {
+    "power": "back_attack_right",
+    "amount": 1
+   },
+   {
+    "power": "crab_rage",
+    "amount": 1
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "TARGETING_RETICLE": {
+    "name": "Targeting Reticle",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        3,
+        4,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "PRECISION_BEAM": {
+    "name": "Precision Beam",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        18,
+        20,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "CHARGE_UP": {
+    "name": "Charge Up",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": [
+        2,
+        3,
+        9
+       ],
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "LASER": {
+    "name": "Laser",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        31,
+        35,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "RECHARGE": {
+    "name": "Recharge",
+    "intents": [
+     "sleep"
+    ],
+    "effects": []
+   }
+  },
+  "ai": {
+   "initial": "TARGETING_RETICLE",
+   "nodes": {
+    "TARGETING_RETICLE": {
+     "type": "move",
+     "move": "TARGETING_RETICLE",
+     "next": "PRECISION_BEAM"
+    },
+    "PRECISION_BEAM": {
+     "type": "move",
+     "move": "PRECISION_BEAM",
+     "next": "CHARGE_UP"
+    },
+    "CHARGE_UP": {
+     "type": "move",
+     "move": "CHARGE_UP",
+     "next": "LASER"
+    },
+    "LASER": {
+     "type": "move",
+     "move": "LASER",
+     "next": "RECHARGE"
+    },
+    "RECHARGE": {
+     "type": "move",
+     "move": "RECHARGE",
+     "next": "TARGETING_RETICLE"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "knowledge_demon",
+  "game_id": "KNOWLEDGE_DEMON",
+  "name": "Knowledge Demon",
+  "kind": "boss",
+  "hp": [
+   379,
+   379
+  ],
+  "hp_asc": [
+   399,
+   399
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "CURSE_OF_KNOWLEDGE": {
+    "name": "Curse of Knowledge",
+    "intents": [
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "special",
+      "args": {
+       "name": "curse_of_knowledge"
+      }
+     }
+    ]
+   },
+   "SLAP": {
+    "name": "Slap",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        17,
+        18,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "KNOWLEDGE_OVERWHELMING": {
+    "name": "Knowledge Overwhelming",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ],
+       "hits": 3
+      }
+     }
+    ]
+   },
+   "PONDER": {
+    "name": "Ponder",
+    "intents": [
+     "attack",
+     "heal",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        11,
+        13,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "heal",
+      "args": {
+       "amount": 30
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": [
+        2,
+        3,
+        9
+       ],
+       "target": "self"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "CURSE_OF_KNOWLEDGE",
+   "nodes": {
+    "CURSE_OF_KNOWLEDGE": {
+     "type": "move",
+     "move": "CURSE_OF_KNOWLEDGE",
+     "next": "SLAP"
+    },
+    "SLAP": {
+     "type": "move",
+     "move": "SLAP",
+     "next": "KNOWLEDGE_OVERWHELMING"
+    },
+    "KNOWLEDGE_OVERWHELMING": {
+     "type": "move",
+     "move": "KNOWLEDGE_OVERWHELMING",
+     "next": "PONDER"
+    },
+    "PONDER": {
+     "type": "move",
+     "move": "PONDER",
+     "next": "CURSE_BRANCH"
+    },
+    "CURSE_BRANCH": {
+     "type": "conditional",
+     "branches": [
+      {
+       "to": "CURSE_OF_KNOWLEDGE",
+       "if": "move_count_lt",
+       "arg": "CURSE_OF_KNOWLEDGE:3"
+      },
+      {
+       "to": "SLAP"
+      }
+     ]
+    }
+   }
+  },
+  "notes": "Curse of Knowledge makes the player choose Disintegration (6/7/8 damage each turn end) or a curse (Mind Rot, then Sloth, then Waste Away)."
+ },
+ {
+  "monster_id": "the_insatiable",
+  "game_id": "THE_INSATIABLE",
+  "name": "The Insatiable",
+  "kind": "boss",
+  "hp": [
+   321,
+   321
+  ],
+  "hp_asc": [
+   341,
+   341
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "LIQUIFY_GROUND": {
+    "name": "Liquify Ground",
+    "intents": [
+     "buff",
+     "status"
+    ],
+    "effects": [
+     {
+      "verb": "special",
+      "args": {
+       "name": "liquify_ground"
+      }
+     }
+    ]
+   },
+   "THRASH": {
+    "name": "Thrash",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ],
+       "hits": 2
+      }
+     }
+    ]
+   },
+   "THRASH_MOVE_2": {
+    "name": "Thrash",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ],
+       "hits": 2
+      }
+     }
+    ]
+   },
+   "LUNGING_BITE": {
+    "name": "Lunging Bite",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        28,
+        31,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "SALIVATE": {
+    "name": "Salivate",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": [
+        2,
+        3,
+        9
+       ],
+       "target": "self"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "LIQUIFY_GROUND",
+   "nodes": {
+    "LIQUIFY_GROUND": {
+     "type": "move",
+     "move": "LIQUIFY_GROUND",
+     "next": "THRASH"
+    },
+    "THRASH": {
+     "type": "move",
+     "move": "THRASH",
+     "next": "LUNGING_BITE"
+    },
+    "LUNGING_BITE": {
+     "type": "move",
+     "move": "LUNGING_BITE",
+     "next": "SALIVATE"
+    },
+    "SALIVATE": {
+     "type": "move",
+     "move": "SALIVATE",
+     "next": "THRASH_MOVE_2"
+    },
+    "THRASH_MOVE_2": {
+     "type": "move",
+     "move": "THRASH_MOVE_2",
+     "next": "THRASH"
+    }
+   }
+  },
+  "notes": "Liquify Ground: Sandpit 4 and six Frantic Escapes (three into the draw pile, three into the discard). Sandpit counts down each enemy turn; at 0 the player dies."
+ }
+]

@@ -174,11 +174,24 @@ class PowerCatalogTest(_Data):
 
 
 class MonsterCatalogTest(_Data):
-    def test_act1_roster(self) -> None:
-        self.assertEqual(len(self.monsters), 51)
+    def test_roster(self) -> None:
+        # 51 Act 1 monsters (Overgrowth + Underdocks), 26 Hive, 25 Glory.
+        self.assertEqual(len(self.monsters), 102)
         for mid in ("nibbit", "vantom", "ceremonial_beast", "kin_priest", "lagavulin_matriarch",
-                    "soul_fysh", "waterfall_giant", "terror_eel"):
+                    "soul_fysh", "waterfall_giant", "terror_eel", "knowledge_demon", "the_insatiable",
+                    "crusher", "rocket", "queen", "test_subject", "aeonglass", "decimillipede_segment_front"):
             self.assertIn(mid, self.monsters)
+
+    def test_act23_spot_values(self) -> None:
+        m = self.monsters
+        self.assertEqual((m["exoskeleton"].hp, m["exoskeleton"].hp_asc), ((24, 28), (25, 29)))
+        self.assertEqual(m["exoskeleton"].innate_powers, (("hard_to_kill", 9, 9, 0),))
+        self.assertEqual(m["test_subject"].hp, (100, 100))
+        self.assertEqual(m["queen"].hp_asc, (419, 419))
+        self.assertEqual(m["frog_knight"].starting_block, (15, 19, 8))
+        bees = m["entomancer"].moves["BEES"].effects[0].args
+        self.assertEqual((bees["damage"], bees["hits"]), (3, [7, 8, 9]))
+        self.assertEqual(m["owl_magistrate"].moves["VERDICT"].effects[0].args["damage"], [33, 36, 9])
 
     def test_spot_values(self) -> None:
         m = self.monsters
@@ -194,7 +207,9 @@ class MonsterCatalogTest(_Data):
 
     def test_every_move_reachable(self) -> None:
         stun_targets = {"ceremonial_beast": {"BEAST_CRY"}, "terror_eel": {"TERROR"},
-                        "waterfall_giant": {"ABOUT_TO_BLOW"}}
+                        "waterfall_giant": {"ABOUT_TO_BLOW"}, "axebot": {"BOOT_UP"},
+                        "test_subject": {"RESPAWN"},
+                        **{f"decimillipede_segment_{p}": {"DEAD"} for p in ("front", "middle", "back")}}
         for mid, m in self.monsters.items():
             seen: set[str] = set()
             todo = [m.ai_initial, *stun_targets.get(mid, ())]
@@ -221,6 +236,8 @@ class EncounterCatalogTest(_Data):
             ("overgrowth", "elite"): 3, ("overgrowth", "boss"): 3,
             ("underdocks", "weak"): 4, ("underdocks", "normal"): 10,
             ("underdocks", "elite"): 3, ("underdocks", "boss"): 3,
+            ("hive", "weak"): 4, ("hive", "normal"): 10, ("hive", "elite"): 3, ("hive", "boss"): 3,
+            ("glory", "weak"): 3, ("glory", "normal"): 9, ("glory", "elite"): 3, ("glory", "boss"): 3,
         })
 
     def test_generated_rosters_use_known_monsters(self) -> None:

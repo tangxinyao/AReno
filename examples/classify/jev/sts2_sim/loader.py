@@ -41,13 +41,18 @@ from .schemas import (
 
 DATA_ROOT = Path(__file__).resolve().parent / "data"
 CARD_FILES = ("ironclad", "status", "curse", "token")
-MONSTER_FILES = ("overgrowth", "underdocks")
+MONSTER_FILES = ("overgrowth", "underdocks", "hive", "glory")
 ENCOUNTER_POOLS = frozenset({"weak", "normal", "elite", "boss"})
-ACTS = frozenset({"overgrowth", "underdocks"})
-_SPECIALS = frozenset({"explode", "spike_spit", "soul_siphon", "pressure_gun", "rat_backup", "beckon"})
+ACTS = frozenset({"overgrowth", "underdocks", "hive", "glory"})
+_SPECIALS = frozenset({
+    "explode", "spike_spit", "soul_siphon", "pressure_gun", "rat_backup", "beckon", "dizzy", "steal_card",
+    "pheromone_spit", "lay_eggs", "hatch", "fabricate", "guard", "boot_up", "possess", "increasing_intensity",
+    "liquify_ground", "curse_of_knowledge",
+})
 _GENERATORS = frozenset({
     "slimes_weak", "slimes_normal", "flyconid_normal", "slithering_strangler", "ruby_raiders",
-    "corpse_slugs_2", "corpse_slugs_3", "two_tailed_rats",
+    "corpse_slugs_2", "corpse_slugs_3", "two_tailed_rats", "bowlbugs_weak", "bowlbugs_normal",
+    "scrolls_3", "scrolls_4", "decimillipede", "chompers",
 })
 
 
@@ -263,7 +268,7 @@ def _parse_monster(entry: dict, *, where: str, power_ids: set[str] | None,
         ai_nodes=MappingProxyType(nodes),
         ai_initial=initial,
         innate_powers=tuple(innate),
-        starting_block=int(entry.get("starting_block", 0)),
+        starting_block=_scaled_raw(entry.get("starting_block", 0), f"{where}.starting_block"),
         notes=str(entry.get("notes", "")),
     )
 
@@ -316,9 +321,9 @@ def _parse_step(step: Any, where: str, power_ids: set[str] | None, card_ids: set
     if missing:
         raise SimDataError(f"{where}.args missing {sorted(missing)} for verb {verb!r}")
     extra = set(args) - spec["required"] - spec["optional"]
-    if extra:
+    if extra and verb != "special":
         raise SimDataError(f"{where}.args unexpected {sorted(extra)} for verb {verb!r}")
-    for k in ("damage", "hits", "amount", "count"):
+    for k in ("damage", "hits", "amount", "count", "block", "strength", "lo", "hi", "withers"):
         if k in args:
             _scaled(args[k], f"{where}.args.{k}")
     if verb == "apply_power":
@@ -369,6 +374,11 @@ def _scaled(v: Any, where: str) -> tuple[int, int, int]:
     if isinstance(v, list) and len(v) == 3 and all(isinstance(x, int) for x in v) and v[2] in (8, 9):
         return (v[0], v[1], v[2])
     raise SimDataError(f"{where} must be an int or [base, ascension_value, 8|9], got {v!r}")
+
+
+def _scaled_raw(v: Any, where: str) -> int | tuple[int, int, int]:
+    base, asc, lvl = _scaled(v, where)
+    return base if base == asc else (base, asc, lvl)
 
 
 def _read_json(path: Path) -> Any:
