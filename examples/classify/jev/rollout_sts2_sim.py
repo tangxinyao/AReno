@@ -36,29 +36,14 @@ import logging
 import math
 import random
 import sys
-import urllib.error
-import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # dataset_loader
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))  # AReno root
 
-from dataset_loader import ANSWER_MARK, question_prefix, render_candidate  # noqa: E402
+from decision_prompt import DecisionClient, build_question, render  # noqa: E402
 from examples.classify.jev.operators.sts2_sim import Sts2SimBackend  # noqa: E402
-
-
-INSTRUCTION_BY_POINT = {
-    "neow_bonus":   "Pick a Neow bonus to accept.",
-    "map_select":   "Choose which map room to enter next.",
-    "combat_play":  "Pick an action in combat (play a card or end the turn).",
-    "card_reward":  "Pick a card reward (or skip).",
-    "rest_site":    "Decide what to do at the rest site.",
-    "shop":         "Decide what to buy at the shop (or skip).",
-    "event_choice": "Pick an event option.",
-    "boss_relic":   "Pick a boss relic.",
-    "game_over":    "Game over.",
-}
 
 
 @dataclass(slots=True)
@@ -71,23 +56,6 @@ class _DecisionRecord:
     old_logp: float
     terminal_reward: float = 0.0
     steps_until_terminal: int = 0
-
-
-def _build_question(decision_point: str, candidates: list[dict]) -> dict:
-    return {
-        "type": "choice",
-        "instructions": INSTRUCTION_BY_POINT.get(decision_point, f"Pick an action at {decision_point}."),
-        "criteria": {c["id"]: c["text"] for c in candidates},
-    }
-
-
-def _render(state_text: str, question: dict) -> tuple[str, list[str]]:
-    prompt = question_prefix(state_text, question)
-    rendered = [
-        render_candidate(question, i) + "\n" + ANSWER_MARK
-        for i in range(len(question["criteria"]))
-    ]
-    return prompt, rendered
 
 
 # ---------------------------------------------------------------------------
@@ -104,44 +72,20 @@ def _policy_greedy(k: int) -> tuple[int, float]:
 
 
 class _ServerPolicy:
-    """HTTP client against serve_decisions.py's /api/alpha/decisions."""
+    """Samples from serve_decisions.py logits at `temperature`."""
 
     def __init__(self, server_url: str, temperature: float, model_name: str, timeout: float):
-        self._url = server_url.rstrip("/") + "/api/alpha/decisions"
+        self._client = DecisionClient(server_url, model_name, timeout)
         self._temperature = max(temperature, 1e-6)
-        self._model = model_name
-        self._timeout = timeout
 
-    def pick(self, state_text: str, candidates: list[dict], rng: random.Random) -> tuple[int, float]:
-        question = _build_question("", candidates)  # decision_point ignored for server call
-        # The server does its own prompt rendering via question_prefix, so we
-        # only need to pass raw state + the question block. The resulting
-        # logits are keyed by the candidate ids we provided in criteria.
-        body = {
-            "model": self._model,
-            "state": state_text if state_text else "<empty>",
-            "questions": {"q": question},
-        }
-        try:
-            payload = json.dumps(body).encode("utf-8")
-            req = urllib.request.Request(
-                self._url, data=payload, method="POST",
-                headers={"Content-Type": "application/json"},
-            )
-            with urllib.request.urlopen(req, timeout=self._timeout) as resp:
-                reply = json.loads(resp.read().decode("utf-8"))
-        except (urllib.error.URLError, OSError, json.JSONDecodeError) as exc:
-            raise RuntimeError(f"server decision call failed: {exc}") from exc
-
-        answer = reply["answers"]["q"]
-        logits = answer["logits"]  # dict: candidate_id -> raw score
-        ids_in_order = [c["id"] for c in candidates]
-        scaled = [logits[c] / self._temperature for c in ids_in_order]
+    def pick(self, state_text: str, question: dict, rng: random.Random) -> tuple[int, float]:
+        # Must be the same `question` rendered into the training prompt, or
+        # old_logp would be scored under different instructions.
+        scaled = [v / self._temperature for v in self._client.logits(state_text, question)]
         m = max(scaled)
         exps = [math.exp(v - m) for v in scaled]
         total = sum(exps)
         probs = [v / total for v in exps]
-        # Sample from the empirical distribution.
         r = rng.random()
         acc = 0.0
         chosen = len(probs) - 1
@@ -183,8 +127,8 @@ def run_episode(
         if not candidates:
             break
         k = len(candidates)
-        question = _build_question(packet["decision_point"], candidates)
-        prompt_text, rendered = _render(packet["state_text"], question)
+        question = build_question(packet["decision_point"], candidates)
+        prompt_text, rendered = render(packet["state_text"], question)
 
         if policy == "random":
             chosen_idx, old_logp = _policy_random(k, rng)
@@ -192,7 +136,7 @@ def run_episode(
             chosen_idx, old_logp = _policy_greedy(k)
         elif policy == "server":
             assert server_policy is not None
-            chosen_idx, old_logp = server_policy.pick(packet["state_text"], candidates, rng)
+            chosen_idx, old_logp = server_policy.pick(packet["state_text"], question, rng)
         else:
             raise ValueError(f"unknown policy {policy!r}")
 
