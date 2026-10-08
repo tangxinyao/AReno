@@ -262,6 +262,8 @@ class EncounterSchema:
     room_type: str
     monsters: tuple[str, ...] = ()
     generator: str | None = None
+    # EncounterTags: two encounters sharing a tag are never rolled back to back.
+    tags: tuple[str, ...] = ()
 
 
 __all__ = [

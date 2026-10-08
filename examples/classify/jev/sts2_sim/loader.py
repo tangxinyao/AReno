@@ -150,6 +150,7 @@ def load_encounters(
             room_type=_get_str(e, "room_type", where),
             monsters=monsters,
             generator=gen,
+            tags=tuple(e.get("tags", ())),
         )
         _require_unique(out, eid, where="encounters")
         out[eid] = enc

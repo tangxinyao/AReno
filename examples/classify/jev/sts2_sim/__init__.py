@@ -1,15 +1,15 @@
 """Pure-Python Slay the Spire 2 simulator for the Jev scoring policy.
 
 Content targets STS2 v0.107.1: all 87 Ironclad cards (plus statuses, curses
-and Giant Rock) and every Act 1 monster and encounter (Overgrowth and
-Underdocks). `RunLoop.reset()` yields a Neow screen and
-`step(actions.NEOW_SKIP)` starts an Act 1 weak-pool combat. See `NOTICE.md`
-for sources and attribution.
+and Giant Rock), every monster and encounter of the three acts (Overgrowth
+or Underdocks, Hive, Glory), act maps, combat rewards, rest sites, shops and
+treasure rooms. `RunLoop.reset()` yields a Neow screen and a run goes on to
+the last boss or the player's death. See `NOTICE.md` for sources.
 """
 
 from __future__ import annotations
 
-from . import actions
+from . import actions, mapgen, rewards
 from .combat import CombatContext, CombatError
 from .effects import Effect, EffectQueue
 from .enums import ALL_CHARACTERS, Character, CombatPhase, DecisionPoint, Outcome, Screen
@@ -30,6 +30,8 @@ from .state import CardRef, CombatState, MonsterState, PlayerState, RunState
 
 __all__ = [
     "actions",
+    "mapgen",
+    "rewards",
     "ALL_CHARACTERS",
     "Character",
     "CardRef",

@@ -33,8 +33,12 @@ EXPECTED_DEFS = {
 
 EXPECTED_DECISION_POINTS = {
     "combat_play",
+    "hand_select",
+    "card_select",
     "map_select",
+    "rewards",
     "card_reward",
+    "treasure",
     "rest_site",
     "event_choice",
     "shop",

@@ -101,7 +101,8 @@ class ResetShapeTest(unittest.TestCase):
         self.assertIsNone(info["outcome"])
 
     def test_state_text_mentions_neow(self) -> None:
-        self.assertIn("neow", self.packet["state_text"])
+        self.assertIn("event=Neow", self.packet["state_text"])
+        self.assertIn("relics=Burning Blood", self.packet["state_text"])
 
 
 class SeedDeterminismTest(unittest.TestCase):
@@ -149,16 +150,21 @@ class EndToEndFlowTest(unittest.TestCase):
         })
         self.episode_id = self.reset_packet["episode_id"]
 
-    def test_skip_transitions_to_combat_play(self) -> None:
+    def test_skip_opens_the_map_then_a_fight(self) -> None:
         packet = self.backend.step({"episode_id": self.episode_id, "action_id": "choose_event_option:0"})
+        self.assertEqual(packet["decision_point"], "map_select")
+        self.assertTrue(all(c["id"].startswith("choose_map_node:") for c in packet["candidates"]))
+        self.assertIn("screen=map", packet["state_text"])
+        packet = self.backend.step({"episode_id": self.episode_id, "action_id": "choose_map_node:0"})
         self.assertEqual(packet["decision_point"], "combat_play")
         self.assertFalse(packet["done"])
         ids = {c["id"] for c in packet["candidates"]}
         self.assertIn("end_turn", ids)
+        self.assertIn("screen=monster", packet["state_text"])
 
     def test_greedy_policy_reaches_terminal(self) -> None:
         packet = self.backend.step({"episode_id": self.episode_id, "action_id": "choose_event_option:0"})
-        for _ in range(50):
+        for _ in range(20000):
             if packet["done"]:
                 break
             chosen = packet["candidates"][0]["id"]
@@ -169,7 +175,7 @@ class EndToEndFlowTest(unittest.TestCase):
 
     def test_terminal_reward_sign_matches_outcome(self) -> None:
         packet = self.backend.step({"episode_id": self.episode_id, "action_id": "choose_event_option:0"})
-        for _ in range(50):
+        for _ in range(20000):
             if packet["done"]:
                 break
             chosen = packet["candidates"][0]["id"]

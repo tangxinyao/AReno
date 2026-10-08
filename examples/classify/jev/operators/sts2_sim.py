@@ -11,10 +11,9 @@ is importable from any CWD and does not require `examples` to be a
 Python package. Keep the public StatePacket shape 1:1 with
 `examples/classify/jev/operator.schema.json`.
 
-Scope: Ironclad, ascension 0-10, one Act 1 combat (Overgrowth or
-Underdocks weak pool) per episode. full_run scope is reported in
-StatePacket.info for schema compatibility; map / rewards / shops / events
-are not simulated yet.
+Scope: Ironclad, ascension 0-10, a whole run: Neow, three acts of map
+(Overgrowth or Underdocks, Hive, Glory), combats, rewards, rest sites,
+shops and treasure rooms, ending at the last boss or on death.
 """
 
 from __future__ import annotations
@@ -114,6 +113,13 @@ def _powers_text(powers: dict[str, int], defs: dict[str, Any]) -> str:
     return ", ".join(out)
 
 
+_LIVE_STATE_TYPE = {
+    "neow": "event", "ancient": "event", "map": "map", "rewards": "rewards", "card_reward": "card_reward",
+    "card_select": "card_select", "rest": "rest_site", "shop": "shop", "treasure": "treasure",
+    "event": "event", "game_over": "game_over",
+}
+
+
 def _render_state_text(loop: Any) -> str:
     """Compact digest for Jev's score head, shaped like the live adapter's.
 
@@ -125,13 +131,20 @@ def _render_state_text(loop: Any) -> str:
     player = state.player
     combat = state.combat
     screen = state.screen
-    if screen == "combat" and state.encounter_id is not None:
-        screen = loop._encounters[state.encounter_id].room_type
+    in_combat = screen == "combat"
+    if in_combat:
+        screen = state.room or "monster"
+    else:
+        screen = _LIVE_STATE_TYPE.get(screen, screen)
     lines: list[str] = [
         f"screen={screen} act={state.act} floor={state.floor}",
         f"hp={player.hp}/{player.max_hp} gold={player.gold}" if player is not None else "hp=?",
     ]
-    if combat is not None and player is not None and combat.outcome is None:
+    if player is not None and player.relics:
+        lines.append("relics=" + ", ".join(_relic_name(loop, r) for r in player.relics))
+    if player is not None and any(player.potions):
+        lines.append("potions=" + ", ".join(_potion_name(loop, x) for x in player.potions if x))
+    if in_combat and combat is not None and player is not None and combat.outcome is None:
         lines.append(f"round={combat.turn} energy={player.energy}/{player.max_energy} block={player.block}")
         status = _powers_text(player.powers, loop.powers)
         if status:
@@ -157,8 +170,33 @@ def _render_state_text(loop: Any) -> str:
         sel = combat.pending_selection
         if sel is not None:
             verb = {"exhaust": "Exhaust", "upgrade": "Upgrade", "to_draw_top": "Put on top of your Draw Pile"}
-            lines.append(f"prompt=Choose {sel.max_count} card(s) to {verb.get(sel.purpose, sel.purpose)}.")
+            if sel.source == "generated":
+                lines.append("prompt=Make your choice.")
+            else:
+                lines.append(f"prompt=Choose {sel.max_count} card(s) to {verb.get(sel.purpose, sel.purpose)}.")
+    elif screen == "card_select" and state.deck_select is not None:
+        verb = {"upgrade": "Upgrade", "remove": "Remove"}.get(state.deck_select.purpose, state.deck_select.purpose)
+        lines.append(f"prompt=Choose a card to {verb}.")
+    if not in_combat and player is not None and screen in ("map", "rewards", "card_reward", "rest_site", "shop",
+                                                            "card_select", "treasure"):
+        lines.append(f"deck={len(player.deck)} cards")
+    if screen == "event" and state.screen in ("neow", "ancient"):
+        lines.append("event=Neow" if state.screen == "neow" else "event=Ancient")
     return "\n".join(lines)
+
+
+def _relic_name(loop: Any, relic_id: str) -> str:
+    relics = getattr(loop, "relics", None)
+    if relics and relic_id in relics:
+        return relics[relic_id].name
+    return relic_id.replace("_", " ").title()
+
+
+def _potion_name(loop: Any, potion_id: str) -> str:
+    potions = getattr(loop, "potion_defs", None)
+    if potions and potion_id in potions:
+        return potions[potion_id].name
+    return potion_id.replace("_", " ").title()
 
 
 class Sts2SimBackend:
@@ -170,7 +208,7 @@ class Sts2SimBackend:
     """
 
     BACKEND_ID = "sts2-sim"
-    BACKEND_VERSION = "act1-v0.107.1"
+    BACKEND_VERSION = "run-v0.107.1"
     GAME_VERSION = "sts2-sim@v0.107.1"
 
     def __init__(self) -> None:
@@ -193,9 +231,9 @@ class Sts2SimBackend:
             "approx_step_latency_ms": None,
             "max_parallel_episodes": None,
             "notes": (
-                "In-house Python simulator of STS2 v0.107.1 combat: all Ironclad "
-                "cards and every Act 1 monster/encounter; one weak-pool fight per "
-                "episode (no map, rewards, shops or events yet)."
+                "In-house Python simulator of STS2 v0.107.1: every Ironclad card, every "
+                "Act 1-3 monster and encounter, act maps, combat rewards, rest sites, "
+                "shops and treasure rooms over a full three-act run."
             ),
         }
 

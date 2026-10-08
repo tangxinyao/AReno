@@ -10,8 +10,12 @@
       "description": "What kind of choice the agent is making. Targeted combat actions (e.g. 'Strike enemy 0' vs 'Strike enemy 1') are expanded into separate Candidates under combat_play, not a separate decision point. Potions appear as additional candidates in whichever decision point they are legal.",
       "enum": [
         "combat_play",
+        "hand_select",
+        "card_select",
         "map_select",
+        "rewards",
         "card_reward",
+        "treasure",
         "rest_site",
         "event_choice",
         "shop",

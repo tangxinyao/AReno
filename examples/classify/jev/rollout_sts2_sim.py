@@ -189,7 +189,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--episodes", type=int, default=256)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--seed-start", type=int, default=0)
-    parser.add_argument("--max-steps", type=int, default=400)
+    parser.add_argument("--max-steps", type=int, default=6000,
+                        help="step cap per episode; a full three-act run takes ~1-5k steps")
     parser.add_argument("--policy", choices=["random", "greedy", "server"], default="random")
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--log-every", type=int, default=25)

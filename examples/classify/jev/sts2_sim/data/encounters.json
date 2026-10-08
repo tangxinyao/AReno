@@ -8,6 +8,9 @@
   "room_type": "monster",
   "monsters": [
    "fuzzy_wurm_crawler"
+  ],
+  "tags": [
+   "Crawler"
   ]
  },
  {
@@ -19,6 +22,9 @@
   "room_type": "monster",
   "monsters": [
    "nibbit"
+  ],
+  "tags": [
+   "Nibbit"
   ]
  },
  {
@@ -30,6 +36,9 @@
   "room_type": "monster",
   "monsters": [
    "shrinker_beetle"
+  ],
+  "tags": [
+   "Shrinker"
   ]
  },
  {
@@ -39,7 +48,10 @@
   "act": "overgrowth",
   "pool": "weak",
   "room_type": "monster",
-  "generator": "slimes_weak"
+  "generator": "slimes_weak",
+  "tags": [
+   "Slimes"
+  ]
  },
  {
   "encounter_id": "cubex_construct_normal",
@@ -59,7 +71,11 @@
   "act": "overgrowth",
   "pool": "normal",
   "room_type": "monster",
-  "generator": "flyconid_normal"
+  "generator": "flyconid_normal",
+  "tags": [
+   "Mushroom",
+   "Slimes"
+  ]
  },
  {
   "encounter_id": "fogmog_normal",
@@ -118,6 +134,10 @@
   "monsters": [
    "shrinker_beetle",
    "fuzzy_wurm_crawler"
+  ],
+  "tags": [
+   "Shrinker",
+   "Crawler"
   ]
  },
  {
@@ -136,7 +156,10 @@
   "act": "overgrowth",
   "pool": "normal",
   "room_type": "monster",
-  "generator": "slimes_normal"
+  "generator": "slimes_normal",
+  "tags": [
+   "Slimes"
+  ]
  },
  {
   "encounter_id": "slithering_strangler_normal",
@@ -157,6 +180,9 @@
   "monsters": [
    "snapping_jaxfruit",
    "flyconid"
+  ],
+  "tags": [
+   "Mushroom"
   ]
  },
  {
@@ -245,7 +271,10 @@
   "act": "underdocks",
   "pool": "weak",
   "room_type": "monster",
-  "generator": "corpse_slugs_2"
+  "generator": "corpse_slugs_2",
+  "tags": [
+   "Slugs"
+  ]
  },
  {
   "encounter_id": "seapunk_weak",
@@ -256,6 +285,9 @@
   "room_type": "monster",
   "monsters": [
    "seapunk"
+  ],
+  "tags": [
+   "Seapunk"
   ]
  },
  {
@@ -288,7 +320,10 @@
   "act": "underdocks",
   "pool": "normal",
   "room_type": "monster",
-  "generator": "corpse_slugs_3"
+  "generator": "corpse_slugs_3",
+  "tags": [
+   "Slugs"
+  ]
  },
  {
   "encounter_id": "cultists_normal",
@@ -367,6 +402,9 @@
   "monsters": [
    "calcified_cultist",
    "seapunk"
+  ],
+  "tags": [
+   "Seapunk"
   ]
  },
  {
@@ -465,7 +503,10 @@
   "act": "hive",
   "pool": "weak",
   "room_type": "monster",
-  "generator": "bowlbugs_weak"
+  "generator": "bowlbugs_weak",
+  "tags": [
+   "Workers"
+  ]
  },
  {
   "encounter_id": "exoskeletons_weak",
@@ -478,6 +519,9 @@
    "exoskeleton",
    "exoskeleton",
    "exoskeleton"
+  ],
+  "tags": [
+   "Exoskeletons"
   ]
  },
  {
@@ -489,6 +533,9 @@
   "room_type": "monster",
   "monsters": [
    "thieving_hopper"
+  ],
+  "tags": [
+   "Thieves"
   ]
  },
  {
@@ -500,6 +547,9 @@
   "room_type": "monster",
   "monsters": [
    "tunneler"
+  ],
+  "tags": [
+   "Burrower"
   ]
  },
  {
@@ -509,7 +559,10 @@
   "act": "hive",
   "pool": "normal",
   "room_type": "monster",
-  "generator": "bowlbugs_normal"
+  "generator": "bowlbugs_normal",
+  "tags": [
+   "Workers"
+  ]
  },
  {
   "encounter_id": "chompers_normal",
@@ -518,7 +571,10 @@
   "act": "hive",
   "pool": "normal",
   "room_type": "monster",
-  "generator": "chompers"
+  "generator": "chompers",
+  "tags": [
+   "Chomper"
+  ]
  },
  {
   "encounter_id": "exoskeletons_normal",
@@ -532,6 +588,9 @@
    "exoskeleton",
    "exoskeleton",
    "exoskeleton"
+  ],
+  "tags": [
+   "Exoskeletons"
   ]
  },
  {
@@ -590,6 +649,9 @@
    "bowlbug_rock",
    "bowlbug_silk",
    "slumbering_beetle"
+  ],
+  "tags": [
+   "Workers"
   ]
  },
  {
@@ -697,7 +759,10 @@
   "act": "glory",
   "pool": "weak",
   "room_type": "monster",
-  "generator": "scrolls_3"
+  "generator": "scrolls_3",
+  "tags": [
+   "Scrolls"
+  ]
  },
  {
   "encounter_id": "turret_operator_weak",
@@ -786,7 +851,10 @@
   "act": "glory",
   "pool": "normal",
   "room_type": "monster",
-  "generator": "scrolls_4"
+  "generator": "scrolls_4",
+  "tags": [
+   "Scrolls"
+  ]
  },
  {
   "encounter_id": "slimed_berserker_normal",
@@ -822,6 +890,9 @@
    "flail_knight",
    "spectral_knight",
    "magi_knight"
+  ],
+  "tags": [
+   "Knights"
   ]
  },
  {

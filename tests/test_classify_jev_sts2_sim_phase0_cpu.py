@@ -179,11 +179,13 @@ class RunLoopTest(unittest.TestCase):
         self.assertEqual([c["id"] for c in packet["candidates"]], ["choose_event_option:0"])
 
     def test_skip_transitions_to_combat(self) -> None:
-        """Skipping Neow enters an Act 1 weak-pool combat."""
+        """Skipping Neow opens the map; row 1 is all Monster rooms (weak pool)."""
 
         loop = self._loop()
         loop.reset()
         packet = loop.step("choose_event_option:0")
+        self.assertEqual(packet["screen"], self.sim.Screen.MAP)
+        packet = loop.step("choose_map_node:0")
         self.assertFalse(packet["done"])
         self.assertEqual(packet["screen"], self.sim.Screen.COMBAT)
         self.assertEqual(packet["decision_point"], self.sim.DecisionPoint.COMBAT_PLAY)

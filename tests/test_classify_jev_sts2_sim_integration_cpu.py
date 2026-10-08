@@ -1,9 +1,9 @@
 """RunLoop + CombatContext integration tests.
 
 Drives the whole stack via `RunLoop.reset()` + `RunLoop.step(action_id)`
-to prove the Jev-side operator contract works end-to-end: Neow -> an Act 1
-weak-pool combat -> play / select / end_turn -> victory or death ->
-game_over.
+to prove the Jev-side operator contract works end-to-end: Neow -> map -> an
+Act 1 weak-pool combat -> play / select / end_turn -> victory or death.
+Pinned-encounter loops (`encounter=`) are single-combat episodes.
 """
 
 from __future__ import annotations
@@ -45,6 +45,9 @@ class NeowToCombatTest(unittest.TestCase):
 
     def test_skip_enters_an_act1_weak_pool_combat(self) -> None:
         packet = self.loop.step("choose_event_option:0")
+        self.assertEqual(packet["screen"], self.sim.Screen.MAP)
+        self.assertTrue(all(c["text"].startswith("go to Monster (row 1") for c in packet["candidates"]))
+        packet = self.loop.step("choose_map_node:0")
         self.assertEqual(packet["screen"], self.sim.Screen.COMBAT)
         self.assertEqual(packet["decision_point"], self.sim.DecisionPoint.COMBAT_PLAY)
         enc = self.loop._encounters[self.loop.state.encounter_id]
@@ -58,11 +61,13 @@ class NeowToCombatTest(unittest.TestCase):
             loop = self.sim.RunLoop(seed=seed)
             loop.reset()
             loop.step("choose_event_option:0")
+            loop.step("choose_map_node:0")
             acts.add(loop._encounters[loop.state.encounter_id].act)
         self.assertEqual(acts, {"overgrowth", "underdocks"})
 
     def test_initial_combat_candidates_include_strikes_defends_bash_and_end_turn(self) -> None:
-        packet = self.loop.step("choose_event_option:0")
+        self.loop.step("choose_event_option:0")
+        packet = self.loop.step("choose_map_node:0")
         ids = {c["id"] for c in packet["candidates"]}
         # Hand is drawn from the standard Ironclad deck; expect at least one
         # of each affordable base card type after shuffle. Strike + Defend

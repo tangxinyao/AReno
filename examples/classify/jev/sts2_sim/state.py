@@ -88,6 +88,10 @@ class PlayerState:
     discard_pile: list[str] = field(default_factory=list)
     exhaust_pile: list[str] = field(default_factory=list)
     relics: list[str] = field(default_factory=list)
+    # Per-relic counters / flags (Pen Nib count, Lizard Tail used ...).
+    relic_state: dict[str, Any] = field(default_factory=dict)
+    # Potion belt: one entry per slot, None when empty.
+    potions: list[str | None] = field(default_factory=list)
 
     @property
     def alive(self) -> bool:
@@ -174,6 +178,48 @@ class CombatState:
 
 
 @dataclass
+class ActRooms:
+    """One act's rolled encounters (ActModel.GenerateRooms)."""
+
+    act: str
+    normal: list[str]  # weak encounters first, then normal ones
+    elite: list[str]
+    boss: str
+    second_boss: str | None = None
+
+
+@dataclass
+class RewardItem:
+    kind: str  # "gold" | "potion" | "relic" | "card"
+    gold: int = 0
+    potion: str | None = None
+    relic: str | None = None
+    cards: list[str] = field(default_factory=list)
+
+
+@dataclass
+class DeckSelection:
+    """A choice of cards from the master deck (Smith, card removal ...)."""
+
+    purpose: str  # "upgrade" | "remove"
+    candidates: list[int]  # deck indices
+    count: int
+    source: str  # screen to return to
+    selected: list[int] = field(default_factory=list)
+    cancelable: bool = True
+    price: int = 0
+
+
+@dataclass
+class ShopItem:
+    category: str  # "card" | "relic" | "potion" | "card_removal"
+    item: str | None
+    price: int
+    stocked: bool = True
+    on_sale: bool = False
+
+
+@dataclass
 class RunState:
     character: str
     ascension: int
@@ -186,6 +232,26 @@ class RunState:
     combat: CombatState | None = None
     encounter_id: str | None = None
     steps: int = 0
+    # --- run structure ------------------------------------------------------
+    act_index: int = 0
+    acts: list[ActRooms] = field(default_factory=list)
+    map: Any = None  # mapgen.ActMap for the current act
+    map_coord: tuple[int, int] | None = None
+    normal_visited: int = 0
+    elite_visited: int = 0
+    unknown_odds: dict[str, float] = field(default_factory=dict)
+    card_rarity_offset: float = -0.05
+    potion_odds: float = 0.4
+    room: str | None = None  # monster / elite / boss / rest / shop / treasure / event / ancient
+    last_room: str | None = None
+    rewards: list[RewardItem] = field(default_factory=list)
+    card_reward: list[str] | None = None
+    card_reward_item: int | None = None
+    deck_select: DeckSelection | None = None
+    rest_used: bool = False
+    shop: list[ShopItem] = field(default_factory=list)
+    removals_used: int = 0
+    treasure_relics: list[str] = field(default_factory=list)
 
     def is_terminal(self) -> bool:
         return self.outcome != Outcome.UNDECIDED or self.screen == Screen.GAME_OVER
