@@ -1051,6 +1051,89 @@ class AncientRunHookTest(unittest.TestCase):
         loop._step_deck_select("confirm_selection", ())
         self.assertIn("COOK", p.relic_state["rest_taken"])
 
+    def test_fur_coat_drops_next_combat_monsters_to_one_hp(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        loop._obtain_relic("fur_coat", return_to=SIM.Screen.MAP)
+        self.assertEqual(p.relic_state["fur_coat"], 7)
+        encounter = next(iter(SIM.load_encounters().values()))
+        loop._start_combat(encounter.monsters, [{} for _ in encounter.monsters], room="monster")
+        self.assertEqual(p.relic_state["fur_coat"], 6)
+        for monster in loop.state.combat.monsters:
+            self.assertEqual(monster.hp, 1)
+            self.assertEqual(monster.max_hp, 1)
+
+    def test_fur_coat_skips_boss_rooms(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        loop._obtain_relic("fur_coat", return_to=SIM.Screen.MAP)
+        encounter = next(iter(SIM.load_encounters().values()))
+        loop._start_combat(encounter.monsters, [{} for _ in encounter.monsters], room="boss")
+        self.assertEqual(p.relic_state["fur_coat"], 7)  # not consumed on boss
+        self.assertTrue(any(m.hp > 1 for m in loop.state.combat.monsters))
+
+    def test_toy_box_grants_four_wax_relics(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        before = set(p.relics)
+        loop._obtain_relic("toy_box", return_to=SIM.Screen.MAP)
+        wax = p.relic_state.get("toy_box_wax_relics")
+        self.assertIsInstance(wax, list)
+        self.assertEqual(len(wax), 4)
+        for rid in wax:
+            self.assertIn(rid, p.relics)
+            self.assertNotIn(rid, before)
+
+    def test_toy_box_melts_leftmost_every_three_combats(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        loop._obtain_relic("toy_box", return_to=SIM.Screen.MAP)
+        wax0 = list(p.relic_state["toy_box_wax_relics"])
+        # Simulate 3 combat victories.
+        for _ in range(3):
+            loop.state.combat = SIM.combat.CombatState()
+            loop.state.combat.outcome = "victory"
+            loop._maybe_finalize_combat()
+        self.assertEqual(p.relic_state["toy_box_combats"], 3)
+        self.assertEqual(len(p.relic_state["toy_box_wax_relics"]), 3)
+        self.assertNotIn(wax0[0], p.relics)
+
+    def test_golden_compass_builds_linear_act2_map(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        loop._obtain_relic("golden_compass", return_to=SIM.Screen.MAP)
+        loop._enter_act_map(1)
+        from examples.classify.jev.sts2_sim import mapgen
+        act_map = loop.state.map
+        boss_row = act_map.boss_row
+        # Exactly one node per row (plus the start Ancient and the Boss).
+        self.assertEqual(len(act_map.nodes), boss_row + 1)
+        for row in range(boss_row + 1):
+            self.assertIn((mapgen.START_COL, row), act_map.nodes)
+        self.assertEqual(act_map.nodes[(mapgen.START_COL, 0)].kind, mapgen.ANCIENT)
+        self.assertEqual(act_map.nodes[(mapgen.START_COL, boss_row)].kind, mapgen.BOSS)
+        self.assertEqual(act_map.nodes[(mapgen.START_COL, boss_row - 1)].kind, mapgen.REST)
+
+    def test_paels_eye_grants_extra_turn(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        loop._obtain_relic("paels_eye", return_to=SIM.Screen.MAP)
+        encounter = next(iter(SIM.load_encounters().values()))
+        loop._start_combat(encounter.monsters, [{} for _ in encounter.monsters], room="monster")
+        combat = loop.state.combat
+        start_turn = combat.turn
+        start_hp = p.hp
+        # End the turn without playing any card.
+        loop.combat_ctx.end_turn()
+        # paels_eye_done flag is set and extra_turn_pending is consumed.
+        self.assertEqual(loop.combat_ctx.relics.n.get("paels_eye_done"), 1)
+        self.assertFalse(combat.extra_turn_pending)
+        # The player did NOT take 6 flat damage (old buggy behavior).
+        self.assertGreaterEqual(p.hp, start_hp - 5)
+        # Turn counter advanced by exactly one extra player turn
+        # (begin_player_turn ran twice: one normal end + the extra-turn loop).
+        self.assertGreater(combat.turn, start_turn)
+
     def test_driftwood_offers_reroll_decision(self) -> None:
         loop = self._run()
         p = loop.state.player

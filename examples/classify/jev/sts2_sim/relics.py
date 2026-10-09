@@ -551,14 +551,14 @@ class RelicEngine(RelicHooks):
         # Ancient: paels_tears banks unspent energy for the next turn.
         if self.has("paels_tears") and self.p.energy > 0:
             self.n["paels_tears_banked"] = self.p.energy
-        # Ancient: paels_eye punishes an empty turn (first time per combat).
+        # Ancient: paels_eye grants an extra turn (first time per combat) when
+        # the player ends a turn without playing a card. Hand exhausts first.
         if (self.has("paels_eye") and c.combat.cards_played_this_turn == 0
                 and not self.n.get("paels_eye_done")):
             self.n["paels_eye_done"] = 1
-            # Exhaust the hand, take damage. Hand flush happens right after.
             for cid in list(self.p.hand):
                 c.exhaust_card(cid)
-            c.damage_player(6)
+            c.combat.extra_turn_pending = True
         # Reset per-turn flags for the next turn.
         self.n.pop("music_box", None)
         # Ancient: paels_legion wakes 2 turns after it fires.

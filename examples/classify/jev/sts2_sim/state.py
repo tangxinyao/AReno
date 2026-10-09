@@ -184,6 +184,8 @@ class CombatState:
     stolen: list[tuple[MonsterState, str]] = field(default_factory=list)
     # Knowledge Demon's pending choice: (generated card ids, disintegration amount).
     curse_choice: tuple[list[str], int] | None = None
+    # Pael's Eye: a relic grants one extra player turn (skip the enemy turn once).
+    extra_turn_pending: bool = False
 
 
 @dataclass

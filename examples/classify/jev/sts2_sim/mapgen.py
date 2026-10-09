@@ -456,7 +456,38 @@ def generate_act_map(act: str, ascension: int, rng: random.Random, *, second_bos
     return m
 
 
+def simple_linear_act_map(act: str, *, second_boss: bool = False) -> ActMap:
+    """Golden Compass: a single straight path from Ancient to Boss.
+
+    Row 1..boss_row-1 are filled with a fixed mix (one Treasure, one Shop,
+    one Elite, Rest just before the Boss, the rest Monster) so the player
+    still sees every room type on the way up.
+    """
+
+    boss_row = boss_row_for(act)
+    nodes: dict[Coord, MapNode] = {}
+    for row in range(0, boss_row + 1):
+        nodes[(START_COL, row)] = MapNode(START_COL, row)
+    for row in range(0, boss_row):
+        nodes[(START_COL, row)].children.append((START_COL, row + 1))
+        nodes[(START_COL, row + 1)].parents.append((START_COL, row))
+    nodes[(START_COL, 0)].kind = ANCIENT
+    nodes[(START_COL, boss_row)].kind = BOSS
+    special = {boss_row - 1: REST, boss_row - 3: ELITE, boss_row - 5: SHOP, boss_row - 7: TREASURE}
+    for row in range(1, boss_row):
+        nodes[(START_COL, row)].kind = special.get(row, MONSTER)
+    m = ActMap(act=act, boss_row=boss_row, nodes=nodes)
+    if second_boss:
+        boss = nodes[(START_COL, boss_row)]
+        second = MapNode(START_COL, boss_row + 1, kind=BOSS, can_be_modified=False)
+        nodes[second.coord] = second
+        boss.children.append(second.coord)
+        second.parents.append(boss.coord)
+        m.second_boss = True
+    return m
+
+
 __all__ = [
     "ACT_ROOMS", "ANCIENT", "ActMap", "BOSS", "ELITE", "MONSTER", "MapNode", "REST", "SHOP", "TREASURE",
-    "UNKNOWN", "WIDTH", "boss_row_for", "elite_count", "generate_act_map",
+    "UNKNOWN", "WIDTH", "boss_row_for", "elite_count", "generate_act_map", "simple_linear_act_map",
 ]

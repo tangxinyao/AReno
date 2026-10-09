@@ -448,8 +448,12 @@ class RunLoop:
         state.act = act_index + 1
         rooms = state.acts[act_index]
         second = rooms.second_boss is not None
-        state.map = mapgen.generate_act_map(rooms.act, state.ascension,
-                                            self.rng.stream(f"act_{act_index + 1}_map"), second_boss=second)
+        if act_index == 1 and "golden_compass" in state.player.relics:
+            # Ancient: Golden Compass collapses Act 2 into a single linear path.
+            state.map = mapgen.simple_linear_act_map(rooms.act, second_boss=second)
+        else:
+            state.map = mapgen.generate_act_map(rooms.act, state.ascension,
+                                                self.rng.stream(f"act_{act_index + 1}_map"), second_boss=second)
         state.map_coord = None
         state.normal_visited = 0
         state.elite_visited = 0
@@ -663,9 +667,9 @@ class RunLoop:
             for _ in range(2):
                 self._add_card_if_exists(p, "relax")
         elif relic_id == "fur_coat":
-            # 7 random combats are flagged as "weak enemies". We approximate
-            # by marking a run-level counter the encounter builder can read
-            # later; currently a stub (data-only).
+            # Ancient: 7 random combats are "weak" (enemies have 1 HP). We
+            # approximate "random" as "the next 7 non-boss combats" so the
+            # effect is observable in-sim.
             p.relic_state["fur_coat"] = 7
         elif relic_id == "pandoras_box":
             targets = [i for i, c in enumerate(p.deck)
@@ -697,9 +701,25 @@ class RunLoop:
                 stream = self.rng.stream("relic_pickup")
                 self._transform_cards([stream.choice(cands)])
         elif relic_id == "toy_box":
-            # 4 Wax Relics; the "every 3 combats transform leftmost" mechanic
-            # is a stub -- just mark the counter.
-            p.relic_state["toy_box_wax"] = 4
+            # Ancient: 4 "wax" relics drawn from the ancient pool. Each wax
+            # relic is a real relic (its passive hooks still fire), but its
+            # pickup side effects are skipped and the left-most melts away
+            # every 3 combats (handled in _maybe_finalize_combat).
+            stream = self.rng.stream("relic_pickup")
+            wax_pool = sorted(r.relic_id for r in self._relics.values()
+                              if r.pool == "ancient"
+                              and r.relic_id != "toy_box"
+                              and r.relic_id not in p.relics
+                              and not r.stops_after_act3_chest)
+            stream.shuffle(wax_pool)
+            wax: list[str] = []
+            for rid in wax_pool[:4]:
+                if rid not in p.relics:
+                    p.relics.append(rid)
+                    self._drop_from_bags(rid)
+                    wax.append(rid)
+            p.relic_state["toy_box_wax_relics"] = wax
+            p.relic_state["toy_box_combats"] = 0
         elif relic_id == "paels_wing":
             # Sacrifice card rewards -> relic every 2 sacrifices. Tracked in
             # relic_state and consumed on SKIP_CARD_REWARD.
@@ -1085,6 +1105,14 @@ class RunLoop:
         ctx = self.combat_ctx
         ctx.relics = RelicEngine(ctx)
         ctx.start_combat(monster_ids, list(p.deck), monster_flags=flags, room=room)
+        # Ancient: Fur Coat drops every enemy to 1 HP for the next 7 non-boss
+        # combats after pickup.
+        fur_left = p.relic_state.get("fur_coat", 0)
+        if fur_left > 0 and room in ("monster", "elite"):
+            for monster in ctx.combat.monsters:
+                monster.hp = 1
+                monster.max_hp = 1
+            p.relic_state["fur_coat"] = fur_left - 1
         self._maybe_finalize_combat()
 
     def _handle_combat_action(self, name: str, args: tuple[str, ...]) -> None:
@@ -1133,6 +1161,16 @@ class RunLoop:
         if self.single_combat:
             self._game_over(Outcome.VICTORY)
             return
+        # Ancient: Toy Box melts the left-most wax relic every 3 combats.
+        if "toy_box" in p.relics:
+            n = p.relic_state.get("toy_box_combats", 0) + 1
+            p.relic_state["toy_box_combats"] = n
+            wax = p.relic_state.get("toy_box_wax_relics") or []
+            if n % 3 == 0 and wax:
+                removed = wax.pop(0)
+                if removed in p.relics:
+                    p.relics.remove(removed)
+                p.relic_state["toy_box_wax_relics"] = wax
         # Ancient: Pael's Tooth randomly restores one banked card, upgraded.
         if "paels_tooth" in p.relics:
             bank = p.relic_state.get("paels_tooth_bank") or []

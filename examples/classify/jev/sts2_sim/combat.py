@@ -1779,6 +1779,12 @@ class CombatContext:
         self._hooks.dispatch("on_player_turn_end", {"ctx": self})
         if self._check_end():
             return
+        # Ancient: Pael's Eye may grant an extra player turn — skip the enemy
+        # turn and loop straight back into _begin_player_turn.
+        if combat.extra_turn_pending:
+            combat.extra_turn_pending = False
+            self._begin_player_turn(initial=False)
+            return
         combat.phase = CombatPhase.ENEMY
         monster_ai.run_enemy_turn(self)
         if combat.outcome is not None:
