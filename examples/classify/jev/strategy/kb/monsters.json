@@ -1,0 +1,181 @@
+{
+  "version": "STS2 v0.107.1 (sim data); wiki transcription, not version-pinned",
+  "sources": [
+    "sts2.huijiwiki.com monster page (pasted into session), mechanics and notes only"
+  ],
+  "note": "Structured for later use in combat decisions. The card-reward/ancient labeler does not read this file yet.",
+  "entries": [
+    {
+      "guide_name": "缩小甲虫",
+      "sim_name": "Shrinker Beetle",
+      "act": 1,
+      "kind": "normal",
+      "mechanic": "缩小: 玩家攻击伤害减少30%; 第1回合施加",
+      "source": "sts2.huijiwiki monster page (mechanics text)",
+      "confidence": "medium"
+    },
+    {
+      "guide_name": "藤蔓蹒跚者",
+      "sim_name": "Vine Shambler",
+      "act": 1,
+      "kind": "normal",
+      "mechanic": "缠结X: 攻击牌费用+1, 持续X回合; 紧绕藤蔓施加1层",
+      "source": "sts2.huijiwiki monster page (mechanics text)",
+      "confidence": "medium"
+    },
+    {
+      "guide_name": "雾菇",
+      "sim_name": "Fogmog",
+      "act": 1,
+      "kind": "normal",
+      "mechanic": "幻象: 死亡后下回合满血复活; 第1回合召唤利齿之眼",
+      "source": "sts2.huijiwiki monster page (mechanics text)",
+      "confidence": "medium"
+    },
+    {
+      "guide_name": "利齿之眼",
+      "sim_name": "Eye with Teeth",
+      "act": 1,
+      "kind": "normal",
+      "mechanic": "幻象: 死亡后下回合满血复活; 牵制: 向弃牌堆洗入3张晕眩",
+      "source": "sts2.huijiwiki monster page (mechanics text)",
+      "confidence": "medium"
+    },
+    {
+      "guide_name": "立柱构造体",
+      "sim_name": "Cubex Construct",
+      "act": 1,
+      "kind": "normal",
+      "mechanic": "开场13点格挡与1层人工制品",
+      "source": "sts2.huijiwiki monster page (mechanics text)",
+      "confidence": "medium"
+    },
+    {
+      "guide_name": "蛇行扼杀者",
+      "sim_name": "Slithering Strangler",
+      "act": 1,
+      "kind": "normal",
+      "mechanic": "紧缠X: 每回合结束受到X点伤害, 存活期间持续",
+      "source": "sts2.huijiwiki monster page (mechanics text)",
+      "confidence": "medium"
+    },
+    {
+      "guide_name": "小啃兽",
+      "sim_name": "Nibbit",
+      "act": 1,
+      "kind": "normal",
+      "mechanic": "两只时前排固定切割起手, 后排固定哈气起手",
+      "notes": "wiki text for 顶撞/切割/哈气 pairing is incomplete; treat pairing as unverified",
+      "source": "sts2.huijiwiki monster page (mechanics text)",
+      "confidence": "medium"
+    },
+    {
+      "guide_name": "拳击构装体",
+      "sim_name": null,
+      "act": 2,
+      "kind": "normal",
+      "mechanic": "开场1层人工制品; 重拳出击事件中生命值降低2~10",
+      "source": "sts2.huijiwiki monster page (mechanics text)",
+      "confidence": "medium"
+    },
+    {
+      "guide_name": "啃咬机",
+      "sim_name": null,
+      "act": 2,
+      "kind": "normal",
+      "mechanic": "开场2层人工制品; 成群出现, 第1只固定钳击, 第2只固定尖锐鸣叫",
+      "source": "sts2.huijiwiki monster page (mechanics text)",
+      "confidence": "medium"
+    },
+    {
+      "guide_name": "猎人杀手",
+      "sim_name": null,
+      "act": 2,
+      "kind": "normal",
+      "mechanic": "柔嫩: 每打出一张牌失去1点力量和敏捷(本回合)",
+      "source": "sts2.huijiwiki monster page (mechanics text)",
+      "confidence": "medium"
+    },
+    {
+      "guide_name": "外骨骼虫",
+      "sim_name": null,
+      "act": 2,
+      "kind": "normal",
+      "mechanic": "难以杀灭9: 受到的伤害和生命减少效果不超过9点",
+      "source": "sts2.huijiwiki monster page (mechanics text)",
+      "confidence": "medium"
+    },
+    {
+      "guide_name": "熟睡甲虫",
+      "sim_name": null,
+      "act": 2,
+      "kind": "normal",
+      "mechanic": "覆甲15(18); 熟睡3层, 层数归零后苏醒",
+      "source": "sts2.huijiwiki monster page (mechanics text)",
+      "confidence": "medium"
+    },
+    {
+      "guide_name": "偷窃草蜢",
+      "sim_name": null,
+      "act": 2,
+      "kind": "normal",
+      "mechanic": "偷窃: 从抽牌堆或弃牌堆偷牌; 被击杀后偷来的牌回到手中",
+      "source": "sts2.huijiwiki monster page (mechanics text)",
+      "confidence": "medium"
+    },
+    {
+      "guide_name": "残杀千足虫",
+      "sim_name": null,
+      "act": 2,
+      "kind": "elite",
+      "mechanic": "3个体节; 体节死亡2回合后以25点血复活",
+      "source": "sts2.huijiwiki monster page (mechanics text)",
+      "confidence": "medium"
+    },
+    {
+      "guide_name": "多尼斯异鸟",
+      "sim_name": "Byrdonis",
+      "act": 1,
+      "kind": "elite",
+      "mechanic": "领地X: 回合结束获得X点力量",
+      "source": "sts2.huijiwiki monster page (mechanics text)",
+      "confidence": "medium"
+    },
+    {
+      "guide_name": "旧日雕像",
+      "sim_name": "Bygone Effigy",
+      "act": 1,
+      "kind": "elite",
+      "mechanic": "缓慢: 玩家本回合每打出一张牌, 受到攻击伤害+10%; 前两回合沉睡/唤醒",
+      "source": "sts2.huijiwiki monster page (mechanics text)",
+      "confidence": "medium"
+    },
+    {
+      "guide_name": "异蛙寄生虫",
+      "sim_name": "Phrog Parasite",
+      "act": 1,
+      "kind": "elite",
+      "mechanic": "寄生物X: 死亡召唤X只扭动虫, 扭动虫第1回合被击晕",
+      "source": "sts2.huijiwiki monster page (mechanics text)",
+      "confidence": "medium"
+    },
+    {
+      "guide_name": "仪式兽",
+      "sim_name": "Ceremonial Beast",
+      "act": 1,
+      "kind": "boss",
+      "mechanic": "横冲直撞: 血量<=层数且本回合受过伤害时击晕并重置力量, 进入阶段二",
+      "source": "sts2.huijiwiki monster page (mechanics text)",
+      "confidence": "medium"
+    },
+    {
+      "guide_name": "门扉缔造者",
+      "sim_name": null,
+      "act": 3,
+      "kind": "boss",
+      "mechanic": "开场为门扉(无限生命); 饥饿/细看/紧握使玩家牌附加负面词条",
+      "source": "sts2.huijiwiki monster page (mechanics text)",
+      "confidence": "medium"
+    }
+  ]
+}
