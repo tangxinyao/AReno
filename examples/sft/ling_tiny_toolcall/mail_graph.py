@@ -49,13 +49,17 @@ MAX_STEPS = 6  # cap a runaway think-act-observe loop before it breaks the budge
 class MailState:
     """Mutable workflow state shared across nodes.
 
+    Only plain, JSON-serializable values live here: the LangGraph ``MemorySaver``
+    checkpointer serializes state to msgpack, so the per-task ``MailEnv`` (with
+    Python objects and the HTTP client it is not part of) must NOT be a field. It
+    is threaded in as a build-time closure value instead (see ``build_graph``).
+
     ``messages`` is the OpenAI-style transcript the collector exports verbatim.
     ``done`` is the Verifier's verdict -- a trajectory is kept for training only
     when ``done`` is True and every assistant tool-call turn parsed cleanly.
     """
 
     user_query: str
-    env: MailEnv
     messages: list[dict[str, Any]] = field(default_factory=list)
     step: int = 0
     done: bool = False
@@ -164,11 +168,12 @@ def router_node(state: MailState, *, client: OpenAIClient) -> MailState:
     return state
 
 
-def tool_execution_node(state: MailState, *, client: OpenAIClient) -> MailState:
+def tool_execution_node(state: MailState, *, client: OpenAIClient, env: MailEnv) -> MailState:
     """Execute any tool call in the latest assistant message; append tool results.
 
     If the latest assistant turn has no tool call, this is a no-op -- the Verifier
-    then decides whether the prose answer completes the task.
+    then decides whether the prose answer completes the task. ``env`` is the
+    per-task mailbox bound in at graph build time, not a state field.
     """
 
     last = state.messages[-1] if state.messages else None
@@ -184,7 +189,7 @@ def tool_execution_node(state: MailState, *, client: OpenAIClient) -> MailState:
                 except json.JSONDecodeError:
                     arguments = {}
             try:
-                result = execute_tool(function["name"], arguments, state.env)
+                result = execute_tool(function["name"], arguments, env)
             except (ToolCallError, TypeError) as exc:
                 result = {"error": str(exc)}
             state.messages.append(
@@ -241,8 +246,12 @@ def summarizer_node(state: MailState, *, client: OpenAIClient) -> MailState:
 # ---------------------------------------------------------------------------
 
 
-def build_graph(client: OpenAIClient) -> Any:
+def build_graph(client: OpenAIClient, env: MailEnv) -> Any:
     """Compile the Planner->Router->ToolExecution->Verifier->Summarizer graph.
+
+    ``env`` is the per-task mailbox; it is a build-time closure value, NOT a state
+    field, because the ``MemorySaver`` checkpointer serializes state and ``MailEnv``
+    is not msgpack-serializable. Build a fresh graph per task to swap env.
 
     ``langgraph`` is imported here so the module imports without it installed. The
     topology matches the report's section 2.1: each Router turn drives one think
@@ -293,7 +302,7 @@ def build_graph(client: OpenAIClient) -> Any:
     graph = StateGraph(MailState)
     graph.add_node("planner", lambda s: planner_node(s, client=client))
     graph.add_node("router", lambda s: router_node(s, client=client))
-    graph.add_node("tool_execution", lambda s: tool_execution_node(s, client=client))
+    graph.add_node("tool_execution", lambda s: tool_execution_node(s, client=client, env=env))
     graph.add_node("verifier", lambda s: verifier_node(s, client=client))
     graph.add_node("summarizer", lambda s: summarizer_node(s, client=client))
 

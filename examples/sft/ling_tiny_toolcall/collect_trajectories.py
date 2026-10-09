@@ -51,12 +51,17 @@ def _env_for_task(task: dict[str, Any]) -> MailEnv:
 
 
 def run_task(
-    task: dict[str, Any], *, client: OpenAIClient, graph: Any, **_: Any
+    task: dict[str, Any], *, client: OpenAIClient, build_graph: Any, **_: Any
 ) -> dict[str, Any]:
-    """Run one task through the graph and return a raw trajectory record."""
+    """Run one task through the graph and return a raw trajectory record.
+
+    The graph is rebuilt per task so the per-task ``MailEnv`` is bound as a build-
+    time closure value (``MailEnv`` is not LangGraph-checkpoint-serializable).
+    """
 
     env = _env_for_task(task)
-    initial = MailState(user_query=task["prompt"], env=env)
+    graph = build_graph(client, env)
+    initial = MailState(user_query=task["prompt"])
     # LangGraph invoke with a per-task thread id so the MemorySaver keeps tasks
     # isolated. The graph mutates the state in place; the returned value holds
     # the final messages and done flag.
@@ -117,13 +122,12 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     client = OpenAIClient(args.base_url, args.model)
-    graph = build_graph(client)
     tasks = _load_jsonl(args.tasks)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("w", encoding="utf-8") as handle:
         for task in tasks:
             try:
-                record = run_task(task, client=client, graph=graph)
+                record = run_task(task, client=client, build_graph=build_graph)
             except Exception as exc:  # keep collecting on a single bad task
                 record = {
                     "task_id": task["task_id"],
