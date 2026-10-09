@@ -1011,6 +1011,69 @@ class AncientRunHookTest(unittest.TestCase):
         # After the 2nd sacrifice, a relic reward should have been pushed.
         self.assertTrue(any(r.kind == "relic" for r in loop.state.rewards))
 
+    def test_sea_glass_adds_five_cards(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        before = len(p.deck)
+        loop._obtain_relic("sea_glass", return_to=SIM.Screen.MAP)
+        self.assertEqual(len(p.deck), before + 5)
+
+    def test_nutritious_soup_enchants_strikes_with_ember(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        loop._obtain_relic("nutritious_soup", return_to=SIM.Screen.MAP)
+        strikes = [c for c in p.deck if "strike" in loop.cards[c].tags]
+        self.assertTrue(strikes)
+        for c in strikes:
+            self.assertEqual(c.enchant, "ember")
+            self.assertEqual(c.enchant_amount, 1)
+
+    def test_touch_of_orobas_sets_flag(self) -> None:
+        loop = self._run()
+        loop._obtain_relic("touch_of_orobas", return_to=SIM.Screen.MAP)
+        self.assertTrue(loop.state.player.relic_state.get("touch_of_orobas"))
+
+    def test_meat_cleaver_exposes_cook_rest_option(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        loop._obtain_relic("meat_cleaver", return_to=SIM.Screen.MAP)
+        loop.state.screen = SIM.Screen.REST
+        loop.state.rest_used = False
+        option_ids = [opt[0] for opt in loop._rest_options()]
+        self.assertIn("COOK", option_ids)
+        # Pick COOK: opens deck_select, cook purpose.
+        cook_index = option_ids.index("COOK")
+        loop._step_rest("choose_rest_option", (str(cook_index),))
+        self.assertIsNotNone(loop.state.deck_select)
+        self.assertEqual(loop.state.deck_select.purpose, "cook")
+        # Confirm with the first card selected: transforms it + closes the option.
+        loop._step_deck_select("select_card", ("0",))
+        loop._step_deck_select("confirm_selection", ())
+        self.assertIn("COOK", p.relic_state["rest_taken"])
+
+    def test_driftwood_offers_reroll_decision(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        loop._obtain_relic("driftwood", return_to=SIM.Screen.MAP)
+        # Set up a card_reward screen manually.
+        reward = loop._card_reward_item("monster")
+        loop.state.rewards = [reward]
+        loop.state.card_reward = list(reward.cards)
+        loop.state.card_reward_item = 0
+        loop.state.card_reward_rerolled = False
+        loop.state.room = "monster"
+        loop.state.screen = SIM.Screen.CARD_REWARD
+        decisions = loop._decisions()
+        reroll_ids = [d.id for d in decisions if d.id.endswith(":reroll")]
+        self.assertEqual(len(reroll_ids), 1)
+        # Execute the reroll: cards may change, rerolled flag flips, screen stays.
+        loop._step_card_reward("skip_card_reward", ("reroll",))
+        self.assertTrue(loop.state.card_reward_rerolled)
+        self.assertEqual(loop.state.screen, SIM.Screen.CARD_REWARD)
+        # No more reroll decision after one use.
+        reroll_ids_after = [d.id for d in loop._decisions() if d.id.endswith(":reroll")]
+        self.assertEqual(reroll_ids_after, [])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -259,6 +259,7 @@ class RunState:
     rewards: list[RewardItem] = field(default_factory=list)
     card_reward: list[str] | None = None
     card_reward_item: int | None = None
+    card_reward_rerolled: bool = False  # Driftwood: at most one reroll per reward.
     deck_select: DeckSelection | None = None
     rest_used: bool = False
     shop: list[ShopItem] = field(default_factory=list)

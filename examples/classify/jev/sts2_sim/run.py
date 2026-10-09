@@ -114,6 +114,7 @@ _REST_TEXT = {
     "SMITH": ("Smith", "Upgrade a card in your Deck."),
     "LIFT": ("Train", "Start battles with +1 Strength. ({left} Left)"),
     "DIG": ("Dig", "Dig for a Relic."),
+    "COOK": ("Cook", "Transform 1 card in your Deck."),
 }
 # Enchantments relics hand out on pickup: (enchant, amount, count, may pick fewer, card types).
 _PICKUP_ENCHANTS = {
@@ -799,6 +800,32 @@ class RunLoop:
             self._add_card_if_exists(p, "pride")
             for _ in range(3):
                 self._offer_random_shared_relic(stream, return_to)
+        elif relic_id == "driftwood":
+            # Flag only; each card reward may be rerolled once (handled on screen).
+            p.relic_state["driftwood"] = True
+        elif relic_id == "meat_cleaver":
+            # Flag only; adds a Cook option at Rest Sites.
+            p.relic_state["meat_cleaver"] = True
+        elif relic_id == "nutritious_soup":
+            # Enchant every Strike in the deck with Tezcatara's Ember (inert tag).
+            for i, cref in enumerate(p.deck):
+                card = self.cards.get(cref)
+                if card is not None and "strike" in card.tags:
+                    ref = CardRef(cref, like=cref)
+                    ref.enchant, ref.enchant_amount = "ember", 1
+                    p.deck[i] = ref
+        elif relic_id == "sea_glass":
+            # Simplified: this sim has only one character, so grab 5 random
+            # reward-pool cards to stand in for "see 15 cards from another
+            # character, choose any".
+            stream = self.rng.stream("relic_pickup")
+            for _ in range(5):
+                if self._reward_pool:
+                    p.deck.append(CardRef(stream.choice(self._reward_pool)))
+        elif relic_id == "touch_of_orobas":
+            # No distinct "ancient starter relic" in this sim; mark it so adapters
+            # can present the ancient variant.
+            p.relic_state["touch_of_orobas"] = True
         elif relic_id == "lees_waffle":
             pass  # already handled above
 
@@ -1231,6 +1258,7 @@ class RunLoop:
         elif item.kind == "card":
             state.card_reward = list(item.cards)
             state.card_reward_item = index
+            state.card_reward_rerolled = False
             state.screen = Screen.CARD_REWARD
             return
         state.rewards.pop(index)
@@ -1239,6 +1267,15 @@ class RunLoop:
         state = self.state
         p = state.player
         assert state.card_reward is not None and state.card_reward_item is not None
+        if (name == actions.SKIP_CARD_REWARD and args and args[0] == "reroll"
+                and "driftwood" in p.relics and not state.card_reward_rerolled):
+            # Ancient: Driftwood lets each card reward be rerolled once.
+            room = state.room or "monster"
+            new_item = self._card_reward_item(room)
+            state.rewards[state.card_reward_item] = new_item
+            state.card_reward = list(new_item.cards)
+            state.card_reward_rerolled = True
+            return
         if name == actions.SELECT_CARD_REWARD:
             self._add_card_to_deck(state.card_reward[int(args[0])])
         elif name == actions.SKIP_CARD_REWARD and "paels_wing" in p.relics:
@@ -1302,6 +1339,8 @@ class RunLoop:
             out.append(("LIFT", _REST_TEXT["LIFT"][0], _REST_TEXT["LIFT"][1].format(left=GIRYA_LIFTS - lifts)))
         if "shovel" in p.relics and "DIG" not in taken:
             out.append(("DIG",) + _REST_TEXT["DIG"])
+        if "meat_cleaver" in p.relics and "COOK" not in taken and p.deck:
+            out.append(("COOK",) + _REST_TEXT["COOK"])
         return out
 
     def _finish_rest_option(self, option: str) -> None:
@@ -1337,6 +1376,12 @@ class RunLoop:
         elif option == "DIG":
             self._finish_rest_option(option)
             self._obtain_relic(self._next_relic(self.rng.stream("rewards")), return_to=Screen.REST)
+        elif option == "COOK":
+            cands = list(range(len(p.deck)))
+            if cands:
+                self._open_deck_select("cook", cands, 1, Screen.REST, cancelable=True)
+            else:
+                self._finish_rest_option(option)
 
     # ------------------------------------------------------------------
     # Deck card selection (Smith, card removal, relic pickups)
@@ -1379,6 +1424,10 @@ class RunLoop:
                 deck[idx] = ref
         elif sel.purpose == "transform":
             self._transform_cards(sel.selected, upgrade=sel.enchant == "upgrade")
+        elif sel.purpose == "cook":
+            # Meat Cleaver: transform the chosen card then close the rest option.
+            self._transform_cards(sel.selected, upgrade=False)
+            self._finish_rest_option("COOK")
         elif sel.purpose == "transform_into":
             target = sel.enchant  # repurposed field holds the target card id
             if target in self.cards:
@@ -1584,6 +1633,9 @@ class RunLoop:
             out = [Decision(id=actions.format_action(actions.SELECT_CARD_REWARD, i), text=f"take {self.deck_card_label(c)}")
                    for i, c in enumerate(state.card_reward or [])]
             out.append(Decision(id=actions.SKIP_CARD_REWARD, text="skip card reward"))
+            if "driftwood" in state.player.relics and not state.card_reward_rerolled:
+                out.append(Decision(id=actions.format_action(actions.SKIP_CARD_REWARD, "reroll"),
+                                    text="reroll card reward"))
             return out
         if screen == Screen.CARD_SELECT:
             return self._deck_select_decisions()
