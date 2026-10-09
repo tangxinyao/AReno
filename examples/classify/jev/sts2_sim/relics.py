@@ -84,6 +84,9 @@ class RelicEngine(RelicHooks):
     def skips_first_flush(self) -> bool:
         return self.has("ringing_triangle")
 
+    def retains_hand(self) -> bool:
+        return self.has("runic_pyramid")
+
     def makes_ethereal(self, card: CardSchema) -> bool:
         return self.has("ghost_seed") and card.rarity == "basic" and bool({"strike", "defend"} & card.tags)
 
@@ -142,6 +145,11 @@ class RelicEngine(RelicHooks):
     def modify_card_block(self, amount: int) -> int:
         if self.has("vambrace") and not self.n.get("vambrace") and amount > 0:
             self.vambrace_card = True
+            return amount * 2
+        if (self.has("paels_legion") and amount > 0
+                and not self.n.get("paels_legion_sleep")
+                and not self.n.get("paels_legion_card")):
+            self.n["paels_legion_card"] = 1
             return amount * 2
         return amount
 
@@ -413,6 +421,9 @@ class RelicEngine(RelicHooks):
         # Ancient: iron_club draws 1 every 4 cards played.
         if self._count("iron_club", 4):
             c.draw(1)
+        # Ancient: paels_legion sleeps for 2 turns after doubling a card's block.
+        if self.n.pop("paels_legion_card", 0):
+            self.n["paels_legion_sleep"] = 2
         if self.has("rainbow_ring") and not self.n.get("rainbow_ring_paid"):
             self.rainbow.add(card.card_type)
             if {"attack", "skill", "power"} <= self.rainbow:
@@ -550,6 +561,10 @@ class RelicEngine(RelicHooks):
             c.damage_player(6)
         # Reset per-turn flags for the next turn.
         self.n.pop("music_box", None)
+        # Ancient: paels_legion wakes 2 turns after it fires.
+        sleep = self.n.get("paels_legion_sleep", 0)
+        if sleep > 0:
+            self.n["paels_legion_sleep"] = sleep - 1
 
     def after_flush(self) -> None:
         if self.ethereal_exhausts and self.has("joss_paper"):

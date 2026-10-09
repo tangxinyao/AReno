@@ -771,6 +771,27 @@ class AncientRelicCombatTest(unittest.TestCase):
         ctx.draw(1)
         self.assertGreaterEqual(ctx.player.block, before + 5)
 
+    def test_runic_pyramid_retains_hand_at_end_of_turn(self) -> None:
+        ctx = make(relics=["runic_pyramid"], hand=["defend_ironclad"] * 3,
+                   deck=["strike_ironclad"] * 20)
+        kept = list(ctx.player.hand)
+        ctx.end_turn()
+        # Hand retained across the flush; the next turn draw tops it up.
+        self.assertTrue(all(c in ctx.player.hand for c in kept))
+
+    def test_paels_legion_doubles_block_once(self) -> None:
+        # Baseline Defend block, then Pael's Legion doubles it.
+        ctx_no = make(relics=[], hand=["defend_ironclad"])
+        ctx_no.play_card("defend_ironclad")
+        base = ctx_no.player.block
+        ctx = make(relics=["paels_legion"], hand=["defend_ironclad"] * 2, energy=5)
+        ctx.play_card("defend_ironclad")
+        boosted = ctx.player.block
+        self.assertEqual(boosted, base * 2)
+        # Second card in the same turn: Legion asleep, back to base.
+        ctx.play_card("defend_ironclad")
+        self.assertEqual(ctx.player.block - boosted, base)
+
 
 class AncientRunHookTest(unittest.TestCase):
     def _run(self, seed=3):
@@ -870,6 +891,43 @@ class AncientRunHookTest(unittest.TestCase):
         self.assertEqual(loop.state.screen, SIM.Screen.CARD_SELECT)
         self.assertIn(loop.state.deck_select.purpose, ("transform", "transform_into"))
         self.assertEqual(loop.state.deck_select.min_count, 0)
+
+    def test_paels_tooth_removes_five_cards_and_banks(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        before = len(p.deck)
+        loop._obtain_relic("paels_tooth", return_to=SIM.Screen.MAP)
+        self.assertEqual(len(p.deck), before - 5)
+        self.assertEqual(len(p.relic_state["paels_tooth_bank"]), 5)
+
+    def test_paels_tooth_returns_card_upgraded_after_combat(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        # Seed a bank with a single known upgradable card.
+        p.relic_state["paels_tooth_bank"] = ["strike_ironclad"]
+        p.relics.append("paels_tooth")
+        deck_before = list(p.deck)
+        # Fake a finished-victory combat to run the after-combat hook.
+        loop.state.combat = SIM.CombatState(monsters=[], outcome="victory", took_unblocked=False)
+        loop.state.room = "monster"
+        loop._maybe_finalize_combat()
+        self.assertEqual(p.relic_state["paels_tooth_bank"], [])
+        new_cards = [c for c in p.deck if c not in deck_before]
+        self.assertEqual(len(new_cards), 1)
+        self.assertEqual(str(new_cards[0]), "strike_ironclad+1")
+
+    def test_leafy_poultice_loses_max_hp_and_transforms(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        max_before = p.max_hp
+        strikes_before = sum(1 for c in p.deck if c == "strike_ironclad")
+        defends_before = sum(1 for c in p.deck if c == "defend_ironclad")
+        loop._obtain_relic("leafy_poultice", return_to=SIM.Screen.MAP)
+        self.assertEqual(p.max_hp, max_before - 10)
+        strikes_after = sum(1 for c in p.deck if c == "strike_ironclad")
+        defends_after = sum(1 for c in p.deck if c == "defend_ironclad")
+        self.assertEqual(strikes_after, max(0, strikes_before - 1))
+        self.assertEqual(defends_after, max(0, defends_before - 1))
 
     def test_paels_wing_grants_relic_every_two_skips(self) -> None:
         loop = self._run()

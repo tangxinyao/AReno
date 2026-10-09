@@ -169,6 +169,7 @@ class RelicHooks:
     def conserves_energy(self) -> bool: return False
     def keeps_block(self) -> bool: return False
     def skips_first_flush(self) -> bool: return False
+    def retains_hand(self) -> bool: return False
     def makes_ethereal(self, card: CardSchema) -> bool: return False
     def upgrades_played(self, card: CardSchema) -> bool: return False
     def prevent_death(self) -> bool: return False
@@ -1735,7 +1736,9 @@ class CombatContext:
         for pid in ("rage", "one_two_punch", "duplication", "tangled", "ringing", "no_draw", "smoggy_used"):
             p.powers.pop(pid, None)
         # Hand flush: in-hand statuses fire, ethereal exhausts, retain stays.
-        retain_all = p.powers.get("retain_hand", 0) > 0 or (combat.turn == 1 and self.relics.skips_first_flush())
+        retain_all = (p.powers.get("retain_hand", 0) > 0
+                      or (combat.turn == 1 and self.relics.skips_first_flush())
+                      or self.relics.retains_hand())
         hand_size = len(p.hand)
         keep: list[str] = []
         for cid in list(p.hand):

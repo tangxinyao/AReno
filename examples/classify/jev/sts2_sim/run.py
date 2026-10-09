@@ -713,6 +713,28 @@ class RunLoop:
                 stream.shuffle(pool)
                 for cid in pool[:5]:
                     p.deck.append(CardRef(cid))
+        elif relic_id == "paels_tooth":
+            cands = [i for i, c in enumerate(p.deck) if c not in _UNREMOVABLE]
+            if cands:
+                stream = self.rng.stream("relic_pickup")
+                stream.shuffle(cands)
+                bank: list[str] = []
+                for idx in sorted(cands[:5], reverse=True):
+                    bank.append(str(p.deck[idx]))
+                    p.deck.pop(idx)
+                p.relic_state["paels_tooth_bank"] = bank
+        elif relic_id == "leafy_poultice":
+            self._lose_max_hp(10)
+            stream = self.rng.stream("relic_pickup")
+            strikes = [i for i, c in enumerate(p.deck) if c == "strike_ironclad"]
+            defends = [i for i, c in enumerate(p.deck) if c == "defend_ironclad"]
+            picks: list[int] = []
+            if strikes:
+                picks.append(stream.choice(strikes))
+            if defends:
+                picks.append(stream.choice(defends))
+            if picks:
+                self._transform_cards(picks)
         elif relic_id == "lees_waffle":
             pass  # already handled above
 
@@ -1020,6 +1042,18 @@ class RunLoop:
         if self.single_combat:
             self._game_over(Outcome.VICTORY)
             return
+        # Ancient: Pael's Tooth randomly restores one banked card, upgraded.
+        if "paels_tooth" in p.relics:
+            bank = p.relic_state.get("paels_tooth_bank") or []
+            if bank:
+                stream = self.rng.stream("relic_pickup")
+                cid = stream.choice(bank)
+                bank.remove(cid)
+                card = self.cards.get(cid)
+                if card is not None and card.upgrade_of is not None:
+                    cid = card.upgrade_of
+                self._add_card_if_exists(p, cid)
+                p.relic_state["paels_tooth_bank"] = bank
         # GenerateCombatRewards: the healing relics act first.
         if "burning_blood" in p.relics:
             self._heal(6)
