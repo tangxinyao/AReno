@@ -1234,11 +1234,24 @@ class EventFrameworkTest(unittest.TestCase):
 
     def test_unknown_event_defaults_to_leave(self) -> None:
         loop = self._run()
-        self._open_event(loop, "SELF_HELP_BOOK")  # not implemented
+        self._open_event(loop, "NOT_A_REAL_EVENT")  # no handler registered
         decisions = loop._decisions()
         self.assertEqual(len(decisions), 1)
         loop._step_event("choose_event_option", ("0",))
         self.assertEqual(loop.state.screen, SIM.Screen.MAP)
+
+    def test_every_pooled_event_has_a_handler(self) -> None:
+        # The event framework finishes "normal events": every id in the pools
+        # should resolve to real options (never fall back to the "leave" stub).
+        from examples.classify.jev.sts2_sim import events as EVT
+        loop = self._run()
+        for act, pool in EVT.EVENT_POOLS.items():
+            for event_id in pool:
+                self.assertIn(event_id, EVT.EVENT_HANDLERS,
+                              f"{event_id} ({act}) has no handler")
+                opts = EVT.EVENT_HANDLERS[event_id](loop)
+                self.assertGreaterEqual(len(opts), 2,
+                                        f"{event_id} should offer >= 2 options")
 
 
 class ShuffleEntryRankTest(unittest.TestCase):
