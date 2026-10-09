@@ -735,6 +735,70 @@ class RunLoop:
                 picks.append(stream.choice(defends))
             if picks:
                 self._transform_cards(picks)
+        elif relic_id == "alchemical_coffer":
+            p.potions.extend([None, None, None, None])
+            stream = self.rng.stream("relic_pickup")
+            for i, pot in enumerate(p.potions):
+                if pot is None:
+                    p.potions[i] = random_potion(self._potions, stream)
+        elif relic_id == "arcane_scroll":
+            stream = self.rng.stream("relic_pickup")
+            rares = [cid for cid in self._reward_pool if self.cards[cid].rarity == "rare"]
+            if rares:
+                p.deck.append(CardRef(stream.choice(rares)))
+        elif relic_id == "lost_coffer":
+            self._push_reward(self._card_reward_item("monster"), return_to)
+            stream = self.rng.stream("relic_pickup")
+            self._push_reward(RewardItem(kind="potion",
+                                         potion=random_potion(self._potions, stream)), return_to)
+        elif relic_id == "lead_paperweight":
+            if self._colorless_pool:
+                stream = self.rng.stream("relic_pickup")
+                options = list(self._colorless_pool)
+                stream.shuffle(options)
+                choices = options[:2]
+                refs = [CardRef(cid) for cid in choices]
+                self._push_reward(RewardItem(kind="card", cards=refs), return_to)
+        elif relic_id == "massive_scroll":
+            if self._colorless_pool:
+                stream = self.rng.stream("relic_pickup")
+                options = list(self._colorless_pool)
+                stream.shuffle(options)
+                choices = options[:3]
+                refs = [CardRef(cid) for cid in choices]
+                self._push_reward(RewardItem(kind="card", cards=refs), return_to)
+        elif relic_id == "glass_eye":
+            stream = self.rng.stream("relic_pickup")
+            pool = self._reward_pool
+            commons = [cid for cid in pool if self.cards[cid].rarity == "common"]
+            uncommons = [cid for cid in pool if self.cards[cid].rarity == "uncommon"]
+            rares = [cid for cid in pool if self.cards[cid].rarity == "rare"]
+            for group, n in ((commons, 2), (uncommons, 2), (rares, 1)):
+                if group:
+                    stream.shuffle(group)
+                    for cid in group[:n]:
+                        p.deck.append(CardRef(cid))
+        elif relic_id == "silver_crucible":
+            p.relic_state["silver_crucible_rewards_left"] = 3
+            p.relic_state["silver_crucible_treasure_pending"] = True
+        elif relic_id == "lords_parasol":
+            p.relic_state["lords_parasol"] = True
+        elif relic_id == "golden_compass":
+            p.relic_state["golden_compass"] = True
+        elif relic_id == "glitter":
+            p.relic_state["glitter"] = True
+        elif relic_id == "dusty_tome":
+            # No ancient-rarity cards in this sim; add one random rare as a stub.
+            stream = self.rng.stream("relic_pickup")
+            rares = [cid for cid in self._reward_pool if self.cards[cid].rarity == "rare"]
+            if rares:
+                p.deck.append(CardRef(stream.choice(rares)))
+        elif relic_id == "calling_bell":
+            # Curse + 3 relics (simplified: use shared pool for the relics).
+            stream = self.rng.stream("relic_pickup")
+            self._add_card_if_exists(p, "pride")
+            for _ in range(3):
+                self._offer_random_shared_relic(stream, return_to)
         elif relic_id == "lees_waffle":
             pass  # already handled above
 
@@ -1102,6 +1166,15 @@ class RunLoop:
         if "wing_charm" in p.relics:
             target = stream.choice(refs)
             target.enchant, target.enchant_amount = "swift", 1
+        left = p.relic_state.get("silver_crucible_rewards_left", 0)
+        if left > 0:
+            refs = [CardRef(self.cards[c].upgrade_of, like=c) if self.cards[c].upgrade_of else c
+                    for c in refs]
+            p.relic_state["silver_crucible_rewards_left"] = left - 1
+        if "glitter" in p.relics:
+            for ref in refs:
+                if getattr(ref, "enchant", None) is None and not self.cards[ref].unplayable:
+                    ref.enchant, ref.enchant_amount = "glam", 1
         return RewardItem(kind="card", cards=refs)
 
     def _open_combat_rewards(self, room: str, *, took_damage: bool) -> None:
@@ -1383,6 +1456,24 @@ class RunLoop:
             item.price = self._price(item.price)
         state.shop = items
         state.screen = Screen.SHOP
+        if "lords_parasol" in p.relics:
+            self._lords_parasol_buyout()
+
+    def _lords_parasol_buyout(self) -> None:
+        """Ancient: Lord's Parasol auto-takes every item in the merchant."""
+
+        state = self.state
+        p = state.player
+        for item in state.shop:
+            if not item.stocked or item.category == "card_removal":
+                continue
+            item.stocked = False
+            if item.category == "card":
+                self._add_card_to_deck(item.item)
+            elif item.category == "potion" and None in p.potions:
+                p.potions[p.potions.index(None)] = item.item
+            elif item.category == "relic":
+                self._obtain_relic(item.item, return_to=Screen.SHOP)
 
     def _step_shop(self, name: str, args: tuple[str, ...]) -> None:
         state = self.state
@@ -1444,7 +1535,13 @@ class RunLoop:
         """EnterTreasureRoom: the chest's gold, paid as it opens, and a relic from the shared bag."""
 
         state = self.state
+        p = state.player
         stream = self.rng.stream("treasure")
+        if p is not None and p.relic_state.pop("silver_crucible_treasure_pending", False):
+            # Ancient: Silver Crucible empties the first treasure chest.
+            state.treasure_relics = []
+            state.screen = Screen.TREASURE
+            return
         self._gain_gold(rewards.poverty_gold(state.ascension, stream.randint(42, 52)))
         relic = self._pull_relic(state.shared_relic_bag, self._roll_relic_rarity(stream))
         state.treasure_relics = [relic or "circlet"]

@@ -916,6 +916,68 @@ class AncientRunHookTest(unittest.TestCase):
         self.assertEqual(len(new_cards), 1)
         self.assertEqual(str(new_cards[0]), "strike_ironclad+1")
 
+    def test_silver_crucible_upgrades_first_three_rewards(self) -> None:
+        loop = self._run()
+        loop._obtain_relic("silver_crucible", return_to=SIM.Screen.MAP)
+        loop.state.act_index = 0
+        upgraded_counts = []
+        for _ in range(4):
+            item = loop._card_reward_item("monster")
+            upgraded_counts.append(sum(1 for c in item.cards if "+1" in str(c)))
+        # First 3 rewards had every card upgraded; the 4th did not.
+        self.assertTrue(all(n == len(upgraded_counts) and n > 0 for n in upgraded_counts[:3]) or
+                        all(upgraded_counts[i] > upgraded_counts[3] for i in range(3)))
+        self.assertEqual(loop.state.player.relic_state.get("silver_crucible_rewards_left", 0), 0)
+
+    def test_silver_crucible_empties_first_treasure(self) -> None:
+        loop = self._run()
+        loop._obtain_relic("silver_crucible", return_to=SIM.Screen.MAP)
+        gold_before = loop.state.player.gold
+        loop._enter_treasure()
+        self.assertEqual(loop.state.treasure_relics, [])
+        self.assertEqual(loop.state.player.gold, gold_before)  # no gold paid either
+
+    def test_glass_eye_adds_five_cards(self) -> None:
+        loop = self._run()
+        before = len(loop.state.player.deck)
+        loop._obtain_relic("glass_eye", return_to=SIM.Screen.MAP)
+        self.assertEqual(len(loop.state.player.deck), before + 5)
+
+    def test_arcane_scroll_adds_rare_card(self) -> None:
+        loop = self._run()
+        before = len(loop.state.player.deck)
+        loop._obtain_relic("arcane_scroll", return_to=SIM.Screen.MAP)
+        self.assertEqual(len(loop.state.player.deck), before + 1)
+        added = str(loop.state.player.deck[-1])
+        self.assertEqual(loop.cards[added].rarity, "rare")
+
+    def test_alchemical_coffer_adds_four_filled_slots(self) -> None:
+        loop = self._run()
+        before_slots = len(loop.state.player.potions)
+        loop._obtain_relic("alchemical_coffer", return_to=SIM.Screen.MAP)
+        self.assertEqual(len(loop.state.player.potions), before_slots + 4)
+        # All slots are filled with real potion ids (not None).
+        self.assertTrue(all(p is not None for p in loop.state.player.potions))
+
+    def test_lost_coffer_pushes_card_and_potion_rewards(self) -> None:
+        loop = self._run()
+        loop.state.rewards = []
+        loop._obtain_relic("lost_coffer", return_to=SIM.Screen.MAP)
+        kinds = [r.kind for r in loop.state.rewards]
+        self.assertIn("card", kinds)
+        self.assertIn("potion", kinds)
+
+    def test_lords_parasol_auto_takes_shop(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        p.gold = 99999
+        loop._obtain_relic("lords_parasol", return_to=SIM.Screen.MAP)
+        loop._enter_shop()
+        # Every non-removal shop item is marked out of stock.
+        for item in loop.state.shop:
+            if item.category != "card_removal":
+                self.assertFalse(item.stocked, item.category)
+
     def test_leafy_poultice_loses_max_hp_and_transforms(self) -> None:
         loop = self._run()
         p = loop.state.player
