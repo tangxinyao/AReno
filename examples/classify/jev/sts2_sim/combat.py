@@ -666,6 +666,11 @@ class CombatContext:
         elif ref.enchant == "swift" and not ref.enchant_spent:
             ref.enchant_spent = True
             self.draw(ref.enchant_amount)
+        elif ref.enchant == "imbued":
+            # Pael's Claw: an Imbued skill grants +N Block on top of its effect.
+            # The full STS2 Imbued text is unavailable; this stands in for the
+            # bonus so an Imbued Defend is observably stronger than a plain one.
+            self.gain_block(ref.enchant_amount, powered=False)
 
     def _run_effect(self, fn, arg: Any, finish: Callable[[], None], *, label: str, auto: bool = False) -> None:
         """Run a non-card effect (potion, follow-up) that may ask for selections."""
@@ -1363,6 +1368,11 @@ class CombatContext:
         p = self._player
         p.draw_pile = list(p.discard_pile) + p.draw_pile
         p.discard_pile.clear()
+        # Canonical ordering before Fisher-Yates (CardEffects.ShuffleDiscardIntoDraw
+        # in r33hab/sts2): sort by (game_id ordinal, upgraded flag). Position is
+        # the stable tiebreaker so cards that match on key keep insertion order.
+        defs = self._card_defs
+        p.draw_pile.sort(key=lambda ref, d=defs: (d[ref].game_id, 1 if str(ref).endswith("+1") else 0))
         self._rng.stream("combat_shuffle").shuffle(p.draw_pile)
         self.relics.after_shuffle()
         for _ in range(p.powers.get("stratagem", 0)):

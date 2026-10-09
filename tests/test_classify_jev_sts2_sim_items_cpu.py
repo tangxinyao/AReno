@@ -1011,12 +1011,20 @@ class AncientRunHookTest(unittest.TestCase):
         # After the 2nd sacrifice, a relic reward should have been pushed.
         self.assertTrue(any(r.kind == "relic" for r in loop.state.rewards))
 
-    def test_sea_glass_adds_five_cards(self) -> None:
+    def test_sea_glass_offers_fifteen_cards_to_pick(self) -> None:
         loop = self._run()
-        p = loop.state.player
-        before = len(p.deck)
+        before = len(loop.state.player.deck)
         loop._obtain_relic("sea_glass", return_to=SIM.Screen.MAP)
-        self.assertEqual(len(p.deck), before + 5)
+        sel = loop.state.deck_select
+        self.assertIsNotNone(sel)
+        self.assertEqual(sel.purpose, "pick_add")
+        self.assertEqual(len(sel.generated_cards), 15)
+        self.assertEqual(sel.min_count, 0)
+        # Take only the first 3 offered.
+        for i in range(3):
+            loop._step_deck_select("select_card", (str(i),))
+        loop._step_deck_select("confirm_selection", ())
+        self.assertEqual(len(loop.state.player.deck), before + 3)
 
     def test_nutritious_soup_enchants_strikes_with_ember(self) -> None:
         loop = self._run()
@@ -1156,6 +1164,169 @@ class AncientRunHookTest(unittest.TestCase):
         # No more reroll decision after one use.
         reroll_ids_after = [d.id for d in loop._decisions() if d.id.endswith(":reroll")]
         self.assertEqual(reroll_ids_after, [])
+
+
+class EventFrameworkTest(unittest.TestCase):
+    """Normal (non-ancient) event system."""
+
+    def _run(self, seed=3):
+        loop = SIM.RunLoop(seed=seed)
+        loop.reset()
+        loop.step("choose_event_option:0")
+        return loop
+
+    def test_event_room_opens_an_event(self) -> None:
+        loop = self._run()
+        state = loop.state
+        state.screen = SIM.Screen.MAP
+        loop._enter_event()
+        self.assertEqual(state.screen, SIM.Screen.EVENT)
+        self.assertIsNotNone(state.event_id)
+        self.assertTrue(loop._decisions())
+
+    def _open_event(self, loop, event_id):
+        loop.state.event_id = event_id
+        loop.state.screen = SIM.Screen.EVENT
+
+    def test_wellspring_option_heals(self) -> None:
+        loop = self._run()
+        loop.state.player.hp = 50
+        self._open_event(loop, "WELLSPRING")
+        loop._step_event("choose_event_option", ("0",))
+        self.assertEqual(loop.state.player.hp, 70)
+        self.assertEqual(loop.state.screen, SIM.Screen.MAP)
+        self.assertIsNone(loop.state.event_id)
+
+    def test_trash_heap_dig_gives_gold_and_curse(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        before_gold = p.gold
+        before_deck = len(p.deck)
+        self._open_event(loop, "TRASH_HEAP")
+        loop._step_event("choose_event_option", ("0",))
+        self.assertEqual(p.gold, before_gold + 30)
+        self.assertEqual(len(p.deck), before_deck + 1)
+        self.assertIn("regret", [str(c) for c in p.deck])
+
+    def test_abyssal_baths_immerse_adjusts_hp(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        p.hp = p.max_hp = 80
+        self._open_event(loop, "ABYSSAL_BATHS")
+        loop._step_event("choose_event_option", ("0",))
+        self.assertEqual(p.max_hp, 82)
+        self.assertEqual(p.hp, 82 - 3)
+
+    def test_sunken_treasury_locked_when_broke(self) -> None:
+        loop = self._run()
+        loop.state.player.gold = 10
+        self._open_event(loop, "SUNKEN_TREASURY")
+        decisions = [d.id for d in loop._decisions()]
+        # Pay option is at index 0 but locked (gold < 75) -> omitted from decisions.
+        self.assertNotIn("choose_event_option:0", decisions)
+        self.assertIn("choose_event_option:1", decisions)
+
+    def test_zen_weaver_has_three_options(self) -> None:
+        loop = self._run()
+        self._open_event(loop, "ZEN_WEAVER")
+        decisions = loop._decisions()
+        self.assertEqual(len(decisions), 3)
+
+    def test_unknown_event_defaults_to_leave(self) -> None:
+        loop = self._run()
+        self._open_event(loop, "SELF_HELP_BOOK")  # not implemented
+        decisions = loop._decisions()
+        self.assertEqual(len(decisions), 1)
+        loop._step_event("choose_event_option", ("0",))
+        self.assertEqual(loop.state.screen, SIM.Screen.MAP)
+
+
+class ShuffleEntryRankTest(unittest.TestCase):
+    def test_shuffle_canonicalises_by_entry(self) -> None:
+        # Two piles with the same cards in reversed order should shuffle to the
+        # same draw sequence (EntryRank canonicalisation before Fisher-Yates).
+        from tests.test_classify_jev_sts2_sim_combat_cpu import DATA, SIM, m0
+        powers, cards, mdefs = DATA
+        deck_a = ["strike_ironclad", "defend_ironclad", "bash",
+                  "strike_ironclad", "defend_ironclad"]
+        deck_b = list(reversed(deck_a))
+
+        def shuffle_from(deck):
+            player = SIM.PlayerState(hp=80, max_hp=80, gold=99, max_energy=3)
+            run = SIM.RunState(character="ironclad", ascension=0, seed=11, player=player)
+            ctx = SIM.CombatContext(run=run, cards=cards, monsters=mdefs, powers=powers,
+                                    rng=SIM.Rng(11), hooks=SIM.HookBus(),
+                                    effects=SIM.EffectQueue(), potions=POTIONS)
+            ctx.relics = SIM.relics.RelicEngine(ctx)
+            ctx.start_combat(["nibbit"], list(deck))
+            player.hand = []
+            player.draw_pile = []
+            player.discard_pile = [SIM.CardRef(c) for c in deck]
+            ctx.shuffle_discard_into_draw()
+            return list(player.draw_pile)
+
+        self.assertEqual([str(c) for c in shuffle_from(deck_a)],
+                         [str(c) for c in shuffle_from(deck_b)])
+
+
+class RelicDepthTest(unittest.TestCase):
+    def _run(self, seed=3):
+        loop = SIM.RunLoop(seed=seed)
+        loop.reset()
+        loop.step("choose_event_option:0")
+        return loop
+
+    def test_archaic_tooth_opens_choice_screen(self) -> None:
+        loop = self._run()
+        loop._obtain_relic("archaic_tooth", return_to=SIM.Screen.MAP)
+        sel = loop.state.deck_select
+        self.assertIsNotNone(sel)
+        self.assertEqual(sel.purpose, "transform_to_ancient")
+        # Pick one starter and confirm.
+        loop._step_deck_select("select_card", ("0",))
+        loop._step_deck_select("confirm_selection", ())
+        # The chosen slot is now an ancient-rarity card.
+        ancient_ids = {cid for cid, c in loop.cards.items() if c.rarity == "ancient"}
+        self.assertTrue(any(str(c) in ancient_ids for c in loop.state.player.deck))
+
+    def test_dusty_tome_adds_ancient_card(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        before = len(p.deck)
+        loop._obtain_relic("dusty_tome", return_to=SIM.Screen.MAP)
+        self.assertEqual(len(p.deck), before + 1)
+        added = p.deck[-1]
+        self.assertEqual(loop.cards[added].rarity, "ancient")
+
+    def test_calling_bell_adds_unique_curse(self) -> None:
+        loop = self._run()
+        p = loop.state.player
+        curse_before = {str(c) for c in p.deck if loop.cards[c].card_type == "curse"}
+        loop._obtain_relic("calling_bell", return_to=SIM.Screen.MAP)
+        curse_after = {str(c) for c in p.deck if loop.cards[c].card_type == "curse"}
+        new = curse_after - curse_before
+        self.assertEqual(len(new), 1)
+        self.assertNotIn("pride", new)  # unique pool, not hard-coded pride
+
+    def test_paels_claw_imbued_defends_grant_extra_block(self) -> None:
+        # Imbued Defend plays like Defend but adds enchant_amount block.
+        from tests.test_classify_jev_sts2_sim_combat_cpu import DATA, SIM, m0
+        powers, cards, mdefs = DATA
+        player = SIM.PlayerState(hp=80, max_hp=80, gold=99, max_energy=3)
+        run = SIM.RunState(character="ironclad", ascension=0, seed=11, player=player)
+        ctx = SIM.CombatContext(run=run, cards=cards, monsters=mdefs, powers=powers,
+                                rng=SIM.Rng(11), hooks=SIM.HookBus(),
+                                effects=SIM.EffectQueue(), potions=POTIONS)
+        ctx.relics = SIM.relics.RelicEngine(ctx)
+        ctx.start_combat(["nibbit"], ["defend_ironclad"])
+        imbued = SIM.CardRef("defend_ironclad")
+        imbued.enchant = "imbued"
+        imbued.enchant_amount = 2
+        player.hand = [imbued]
+        player.energy = 3
+        ctx.play_card(imbued)
+        # Normal Defend grants 5; Imbued adds 2 -> 7 (unpowered helper may vary).
+        self.assertGreaterEqual(player.block, 7)
 
 
 if __name__ == "__main__":

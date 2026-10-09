@@ -46,7 +46,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from . import actions, mapgen, rewards
+from . import actions, events, mapgen, rewards
 from .combat import CombatContext, CombatError
 from .effects import EffectQueue
 from .encounters import build_roster
@@ -352,7 +352,7 @@ class RunLoop:
         elif screen == Screen.TREASURE:
             self._step_treasure(name, args)
         elif screen == Screen.EVENT:
-            self._enter_map_screen()
+            self._step_event(name, args)
         else:  # pragma: no cover - gated by the legal set
             raise RunLoopError(f"unhandled action {action_id!r} at screen {screen!r}")
 
@@ -692,14 +692,14 @@ class RunLoop:
                 self._open_deck_select(purpose, cands, min(6, len(cands)), return_to,
                                        min_count=0, enchant=target)
         elif relic_id == "archaic_tooth":
-            # "Transform a starter card into an ancient version". No ancient
-            # cards in sim yet -- just transform one Strike or Defend into a
-            # random reward-pool card as a stub.
+            # "Transform a starter card into an ancient version." Player picks
+            # which starter (Strike or Defend) to replace, and the sim swaps it
+            # for a random Ancient-rarity card from the reward pool.
             cands = [i for i, c in enumerate(p.deck)
                      if c == "strike_ironclad" or c == "defend_ironclad"]
             if cands:
-                stream = self.rng.stream("relic_pickup")
-                self._transform_cards([stream.choice(cands)])
+                self._open_deck_select("transform_to_ancient", cands, 1, return_to,
+                                       cancelable=False)
         elif relic_id == "toy_box":
             # Ancient: 4 "wax" relics drawn from the ancient pool. Each wax
             # relic is a real relic (its passive hooks still fire), but its
@@ -809,15 +809,28 @@ class RunLoop:
         elif relic_id == "glitter":
             p.relic_state["glitter"] = True
         elif relic_id == "dusty_tome":
-            # No ancient-rarity cards in this sim; add one random rare as a stub.
+            # "Obtain an Ancient Card." Pick a random Ancient-rarity Ironclad
+            # card; fall back to a rare if the data has no ancient entries.
             stream = self.rng.stream("relic_pickup")
-            rares = [cid for cid in self._reward_pool if self.cards[cid].rarity == "rare"]
-            if rares:
-                p.deck.append(CardRef(stream.choice(rares)))
+            ancients = sorted(cid for cid, c in self.cards.items()
+                              if c.rarity == "ancient" and c.color == "ironclad"
+                              and not c.upgraded and not c.multiplayer_only)
+            pool = ancients or [cid for cid in self._reward_pool if self.cards[cid].rarity == "rare"]
+            if pool:
+                p.deck.append(CardRef(stream.choice(pool)))
         elif relic_id == "calling_bell":
-            # Curse + 3 relics (simplified: use shared pool for the relics).
+            # Ancient: unique Curse (one not already in the deck) and 3 relics.
             stream = self.rng.stream("relic_pickup")
-            self._add_card_if_exists(p, "pride")
+            owned_curses = {str(c) for c in p.deck if c in self.cards
+                            and self.cards[c].card_type == "curse"}
+            curse_pool = sorted(cid for cid, card in self.cards.items()
+                                if card.card_type == "curse"
+                                and cid not in owned_curses
+                                and cid not in _UNREMOVABLE)
+            if curse_pool:
+                p.deck.append(CardRef(stream.choice(curse_pool)))
+            else:
+                self._add_card_if_exists(p, "pride")
             for _ in range(3):
                 self._offer_random_shared_relic(stream, return_to)
         elif relic_id == "driftwood":
@@ -835,13 +848,18 @@ class RunLoop:
                     ref.enchant, ref.enchant_amount = "ember", 1
                     p.deck[i] = ref
         elif relic_id == "sea_glass":
-            # Simplified: this sim has only one character, so grab 5 random
-            # reward-pool cards to stand in for "see 15 cards from another
-            # character, choose any".
-            stream = self.rng.stream("relic_pickup")
-            for _ in range(5):
-                if self._reward_pool:
-                    p.deck.append(CardRef(stream.choice(self._reward_pool)))
+            # Ancient: see 15 cards from another character, add any number.
+            # This sim only has Ironclad, so roll 15 from the Ironclad reward
+            # pool and let the policy pick which (0..15) to add.
+            if self._reward_pool:
+                stream = self.rng.stream("relic_pickup")
+                offered: list[str] = []
+                for _ in range(15):
+                    offered.append(stream.choice(self._reward_pool))
+                self._open_deck_select("pick_add", list(range(len(offered))),
+                                       count=len(offered), return_to=return_to,
+                                       min_count=0, cancelable=False,
+                                       generated_cards=offered)
         elif relic_id == "touch_of_orobas":
             # No distinct "ancient starter relic" in this sim; mark it so adapters
             # can present the ancient variant.
@@ -920,11 +938,13 @@ class RunLoop:
 
     def _open_deck_select(self, purpose: str, cands: list[int], count: int, return_to: str, *,
                           min_count: int | None = None, enchant: str | None = None, enchant_amount: int = 0,
-                          price: int = 0, cancelable: bool = False) -> None:
+                          price: int = 0, cancelable: bool = False,
+                          generated_cards: list[str] | None = None) -> None:
         state = self.state
         state.deck_select = DeckSelection(purpose=purpose, candidates=cands, count=min(count, len(cands)),
                                           source=return_to, min_count=min_count, enchant=enchant,
-                                          enchant_amount=enchant_amount, price=price, cancelable=cancelable)
+                                          enchant_amount=enchant_amount, price=price, cancelable=cancelable,
+                                          generated_cards=list(generated_cards or []))
         state.screen = Screen.CARD_SELECT
 
     # ------------------------------------------------------------------
@@ -1002,7 +1022,7 @@ class RunLoop:
         elif room == "treasure":
             self._enter_treasure()
         else:
-            state.screen = Screen.EVENT
+            self._enter_event()
         state.last_room = room
 
     def _next_encounter(self, room: str, node: mapgen.MapNode) -> str:
@@ -1471,6 +1491,21 @@ class RunLoop:
             if target in self.cards:
                 for idx in sel.selected:
                     deck[idx] = CardRef(target)
+        elif sel.purpose == "pick_add":
+            # candidates index into sel.generated_cards; chosen cards get added to deck.
+            for idx in sel.selected:
+                cid = sel.generated_cards[idx]
+                self._add_card_to_deck(CardRef(cid))
+        elif sel.purpose == "transform_to_ancient":
+            # Archaic Tooth: transform each chosen starter into a random Ancient card.
+            if sel.selected:
+                stream = self.rng.stream("relic_pickup")
+                ancient_pool = sorted(cid for cid, c in self.cards.items()
+                                      if c.rarity == "ancient" and c.color == "ironclad"
+                                      and not c.upgraded and not c.multiplayer_only)
+                for idx in sel.selected:
+                    if ancient_pool:
+                        deck[idx] = CardRef(stream.choice(ancient_pool))
         if state.rewards and state.screen != Screen.REWARDS and state.rewards_return is None:
             state.rewards_return = state.screen
             state.screen = Screen.REWARDS
@@ -1644,6 +1679,53 @@ class RunLoop:
         self._enter_map_screen()
 
     # ------------------------------------------------------------------
+    # Normal events
+
+    def _current_act_name(self) -> str:
+        state = self.state
+        if 0 <= state.act_index < len(state.acts):
+            return state.acts[state.act_index].act
+        return "overgrowth"
+
+    def _enter_event(self) -> None:
+        state = self.state
+        pool = events.act_pool(self._current_act_name())
+        # Deterministic: drop events the player has already seen this run.
+        seen = set(state.player.relic_state.get("events_seen", []))
+        remaining = [eid for eid in pool if eid not in seen]
+        chosen_pool = remaining or pool
+        stream = self.rng.stream("encounter")
+        event_id = stream.choice(sorted(chosen_pool))
+        state.event_id = event_id
+        state.event_option_labels = [opt.label for opt in events.options_for(self, event_id)]
+        state.screen = Screen.EVENT
+        state.player.relic_state.setdefault("events_seen", []).append(event_id)
+
+    def _step_event(self, name: str, args: tuple[str, ...]) -> None:
+        state = self.state
+        if name != actions.CHOOSE_EVENT_OPTION:
+            state.event_id = None
+            state.event_option_labels = []
+            self._enter_map_screen()
+            return
+        event_id = state.event_id
+        if event_id is None:
+            self._enter_map_screen()
+            return
+        options = events.options_for(self, event_id)
+        idx = int(args[0])
+        if 0 <= idx < len(options) and not options[idx].locked:
+            options[idx].apply(self)
+        state.event_id = None
+        state.event_option_labels = []
+        if state.rewards and state.screen != Screen.REWARDS:
+            state.rewards_return = Screen.MAP
+            state.screen = Screen.REWARDS
+            return
+        if state.screen == Screen.EVENT:
+            self._enter_map_screen()
+
+    # ------------------------------------------------------------------
     # Decisions
 
     def _decisions(self) -> list[Decision]:
@@ -1695,8 +1777,21 @@ class RunLoop:
             out.append(Decision(id=actions.PROCEED, text="leave treasure room"))
             return out
         if screen == Screen.EVENT:
-            return [Decision(id=actions.format_action(actions.CHOOSE_EVENT_OPTION, 0),
-                             text="proceed (events are not simulated yet)")]
+            event_id = state.event_id
+            if event_id is None:
+                return [Decision(id=actions.format_action(actions.CHOOSE_EVENT_OPTION, 0),
+                                 text="leave")]
+            options = events.options_for(self, event_id)
+            out: list[Decision] = []
+            for i, opt in enumerate(options):
+                if opt.locked:
+                    continue
+                out.append(Decision(id=actions.format_action(actions.CHOOSE_EVENT_OPTION, i),
+                                    text=f"{event_id}: {opt.label}"))
+            if not out:
+                out.append(Decision(id=actions.format_action(actions.CHOOSE_EVENT_OPTION, 0),
+                                    text=f"{event_id}: leave"))
+            return out
         if screen == Screen.GAME_OVER:
             return [Decision(id=actions.GAME_OVER_MAIN_MENU, text="<game_over>")]
         raise RunLoopError(f"no decision table for screen {screen!r}")

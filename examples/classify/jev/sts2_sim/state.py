@@ -210,10 +210,10 @@ class RewardItem:
 
 @dataclass
 class DeckSelection:
-    """A choice of cards from the master deck (Smith, card removal ...)."""
+    """A choice of cards (deck indices, or ids in `generated_cards`)."""
 
-    purpose: str  # "upgrade" | "remove" | "duplicate" | "enchant"
-    candidates: list[int]  # deck indices
+    purpose: str  # "upgrade" | "remove" | "duplicate" | "enchant" | "pick_add" ...
+    candidates: list[int]  # indices into deck, or into `generated_cards`
     count: int
     source: str  # screen to return to
     selected: list[int] = field(default_factory=list)
@@ -222,6 +222,8 @@ class DeckSelection:
     min_count: int | None = None  # None: exactly `count`
     enchant: str | None = None
     enchant_amount: int = 0
+    # pick_add: candidates index into this list; chosen cards are added to deck.
+    generated_cards: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -275,6 +277,10 @@ class RunState:
     # Ancient event state: which event (NEOW/OROBAS/...) and the 3 relic choices.
     ancient_event: str | None = None
     ancient_choices: list[str] = field(default_factory=list)
+    # Normal event state: which event is being shown and the labels for its options.
+    # Options are resolved by the event handler at step time, not stored on state.
+    event_id: str | None = None
+    event_option_labels: list[str] = field(default_factory=list)
 
     def is_terminal(self) -> bool:
         return self.outcome != Outcome.UNDECIDED or self.screen == Screen.GAME_OVER
