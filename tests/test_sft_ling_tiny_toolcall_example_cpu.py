@@ -138,6 +138,39 @@ def test_loader_reads_only_train_jsonl_from_data_dir():
     assert all(set(record) == {"prompt", "response"} for record in records)
 
 
+def test_assistant_message_prefers_content_and_falls_back_to_reasoning():
+    """A thinking-only prose turn must not lose its answer (areno --disable-thinking).
+
+    ``reasoning_content`` is only a fallback: tool-call turns keep an empty content
+    (their payload is the call), and a non-empty ``content`` always wins.
+    """
+
+    graph = _load_module("mail_graph", "mail_graph.py")
+
+    def response(message: dict) -> dict:
+        return {"choices": [{"message": message}]}
+
+    # prose turn: content empty, answer only in reasoning_content -> fallback
+    prose = graph._assistant_message_from_response(
+        response({"role": "assistant", "content": "", "reasoning_content": "Sure!"})
+    )
+    assert prose == {"role": "assistant", "content": "Sure!"}
+
+    # non-empty content wins even when reasoning_content is present
+    both = graph._assistant_message_from_response(
+        response({"role": "assistant", "content": "answer", "reasoning_content": "thinking"})
+    )
+    assert both["content"] == "answer"
+
+    # tool-call turn: content stays empty, reasoning_content must NOT pollute it
+    calls = [{"id": "c1", "function": {"name": "list_emails", "arguments": "{}"}}]
+    tool_turn = graph._assistant_message_from_response(
+        response({"role": "assistant", "content": "", "reasoning_content": "thinking", "tool_calls": calls})
+    )
+    assert tool_turn["content"] == ""
+    assert tool_turn["tool_calls"] == calls
+
+
 def test_seed_build_is_deterministic_and_byte_identical():
     """Re-running build_dataset.py from the embedded seeds must leave data/ unchanged."""
 

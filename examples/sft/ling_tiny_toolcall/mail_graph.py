@@ -134,12 +134,23 @@ def _assistant_message_from_response(response: dict[str, Any]) -> dict[str, Any]
     If the endpoint parsed tool calls (``message.tool_calls``), keep them; otherwise
     treat the assistant content as prose. The collector stores ``content`` too so
     the converter can render either form back into on-wire Hermes blocks.
+
+    ``areno serve`` models launched with ``--disable-thinking`` may still emit the
+    visible answer in ``reasoning_content`` while leaving ``content`` empty. On a
+    pure prose turn (no tool calls) that would drop the final answer, so fall back
+    to ``reasoning_content`` for the content. Tool-call turns are left alone: their
+    payload is the tool call itself, and splicing thinking text into the content
+    would pollute the training sample.
     """
 
     message = response["choices"][0]["message"]
-    normalized = {"role": "assistant", "content": message.get("content") or ""}
-    if message.get("tool_calls"):
-        normalized["tool_calls"] = message["tool_calls"]
+    content = message.get("content") or ""
+    tool_calls = message.get("tool_calls")
+    if not tool_calls and not content.strip():
+        content = message.get("reasoning_content") or ""
+    normalized = {"role": "assistant", "content": content}
+    if tool_calls:
+        normalized["tool_calls"] = tool_calls
     return normalized
 
 
