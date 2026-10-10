@@ -42,6 +42,7 @@ def _rows(name: str) -> list[dict]:
 
 _TRAJECTORY_KEYS = {"prompt", "response", "lang", "trajectory_id", "step"}
 _EVAL_KEYS = {"prompt", "reference", "lang", "task_id"}
+_HERMES_TOOLS = {"skills_list", "skill_view", "clarify", "terminal"}
 
 
 def test_train_rows_match_sft_prompt_response_schema():
@@ -56,6 +57,17 @@ def test_train_rows_match_sft_prompt_response_schema():
     assert all(row["trajectory_id"] for row in rows)
 
 
+def test_action_space_is_the_real_hermes_toolset():
+    """The tools the student learns must be the real Hermes tools, not a toy set."""
+
+    tools = _load_module("tools", "tools.py")
+
+    assert {t["function"]["name"] for t in tools.TOOLS} == _HERMES_TOOLS
+    # skill_view / clarify descriptions are ported from Hermes, not invented
+    assert "linked_files" in tools.SKILL_VIEW_SCHEMA["function"]["description"]
+    assert "skill_view(name)" in tools.SKILLS_LIST_SCHEMA["function"]["description"]
+
+
 def test_train_tool_call_responses_are_valid_hermes():
     """Every response that contains a tool-call block is legal Hermes for a known tool."""
 
@@ -68,9 +80,7 @@ def test_train_tool_call_responses_are_valid_hermes():
         calls = build.assert_valid_tool_call(row["response"])
         assert calls, "format guard accepted a block with no valid calls"
         for call in calls:
-            assert call["name"] in {
-                t["function"]["name"] for t in build.TOOLS
-            }, f"unknown tool {call['name']}"
+            assert call["name"] in _HERMES_TOOLS, f"unknown tool {call['name']}"
             assert isinstance(call["arguments"], dict)
 
 
@@ -105,7 +115,7 @@ def test_format_guard_accepts_and_rejects():
     tools = _load_module("tools", "tools.py")
 
     # well-formed block parses cleanly
-    good = tools.render_hermes_tool_call("list_emails", {"folder": "inbox", "limit": 10})
+    good = tools.render_hermes_tool_call("skill_view", {"name": "google-workspace"})
     assert build.TOOL_CALL_RE.search(good)
     # unknown tool name -> guard raises
     bad_tool = (
@@ -163,12 +173,87 @@ def test_assistant_message_prefers_content_and_falls_back_to_reasoning():
     assert both["content"] == "answer"
 
     # tool-call turn: content stays empty, reasoning_content must NOT pollute it
-    calls = [{"id": "c1", "function": {"name": "list_emails", "arguments": "{}"}}]
+    calls = [{"id": "c1", "function": {"name": "skill_view", "arguments": "{}"}}]
     tool_turn = graph._assistant_message_from_response(
         response({"role": "assistant", "content": "", "reasoning_content": "thinking", "tool_calls": calls})
     )
     assert tool_turn["content"] == ""
     assert tool_turn["tool_calls"] == calls
+
+
+def test_skills_are_vendored_and_indexed_for_ambiguity():
+    """Both email skills are vendored and indexed so the model must disambiguate."""
+
+    tools = _load_module("tools", "tools.py")
+    graph = _load_module("mail_graph", "mail_graph.py")
+
+    env = tools.AgentEnv.default()
+    names = {r.name for r in env.skills}
+    # the two overlapping email skills that create the clarify decision
+    assert {"google-workspace", "himalaya"} <= names
+
+    index = graph.build_skills_system_prompt(env)
+    assert "<available_skills>" in index
+    assert "google-workspace" in index and "himalaya" in index
+
+
+def test_skill_view_reports_setup_needed_for_google_workspace():
+    """The login workflow is triggered by the skill reporting missing credentials."""
+
+    tools = _load_module("tools", "tools.py")
+    env = tools.AgentEnv.default()
+
+    gws = env.skill_view(name="google-workspace")
+    assert gws["success"] is True
+    assert gws["setup_needed"] is True
+    assert gws["readiness_status"] == "setup_needed"
+    assert "gmail-search-syntax.md" in gws["linked_files"]["references"]
+    # the linked reference is loadable
+    ref = env.skill_view(name="google-workspace", file_path="references/gmail-search-syntax.md")
+    assert ref["success"] is True and "is:unread" in ref["content"]
+
+    # himalaya has no missing credentials, so it is not flagged setup_needed
+    assert env.skill_view(name="himalaya")["setup_needed"] is False
+
+
+def test_terminal_backend_replays_the_documented_commands():
+    """The fake shell answers the exact Google Workspace commands the skill documents."""
+
+    tools = _load_module("tools", "tools.py")
+
+    # setup.py --check before auth -> not authenticated
+    check = tools.run_terminal_command("python setup.py --check")
+    assert check["exit_code"] == 1 and "NOT_AUTHENTICATED" in check["output"]
+    # --client-secret saves the credential
+    saved = tools.run_terminal_command("python setup.py --client-secret ~/x.json")
+    assert saved["exit_code"] == 0 and "Client secret saved" in saved["output"]
+    # --auth-url returns a real-shaped URL
+    url = tools.run_terminal_command("python setup.py --auth-url")
+    assert "accounts.google.com/o/oauth2/auth" in url["output"]
+    # --auth-code authenticates
+    code = tools.run_terminal_command(
+        "python setup.py --auth-code 'http://localhost:1/?code=4/0AXexample'"
+    )
+    assert code["exit_code"] == 0 and "AUTHENTICATED" in code["output"]
+    # gmail search returns the JSON listing
+    search = tools.run_terminal_command('python google_api.py gmail search "is:unread" --max 3')
+    assert search["exit_code"] == 0 and "UNREAD" in search["output"]
+    # an unrecognized command is reported, not silently faked
+    unknown = tools.run_terminal_command("rm -rf /")
+    assert unknown["exit_code"] != 0
+
+
+def test_clarify_returns_scripted_user_decisions():
+    """clarify replays the harness's canned answers in order (the scripted user)."""
+
+    tools = _load_module("tools", "tools.py")
+    env = tools.AgentEnv.default()
+
+    first = env.clarify(question="which route?", choices=["himalaya", "gws"])
+    assert first["user_response"].startswith("邮箱")
+    second = env.clarify(question="client secret path?")
+    assert "文件路径是" in second["user_response"]
+    assert len(env.clarify_log) == 2
 
 
 def test_seed_build_is_deterministic_and_byte_identical():
@@ -186,3 +271,28 @@ def test_seed_build_is_deterministic_and_byte_identical():
     disk_eval = [json.dumps(r, ensure_ascii=False) for r in _rows("eval.jsonl")]
     assert re_train == disk_train, "seed build drifted from committed train.jsonl"
     assert re_eval == disk_eval, "seed build drifted from committed eval.jsonl"
+
+
+def test_gmail_login_episode_walks_the_full_workflow():
+    """The canonical episode: skill_view -> clarify -> terminal OAuth -> prose answer."""
+
+    build = _load_module("build_dataset", "build_dataset.py")
+
+    episode = build._seed_gmail_login()
+    assert episode["done"] is True
+    calls = [
+        call["function"]["name"]
+        for m in episode["messages"]
+        if m.get("role") == "assistant"
+        for call in (m.get("tool_calls") or [])
+    ]
+    # the workflow order is what the model must learn
+    assert calls == [
+        "skill_view", "skill_view",          # load both email skills
+        "clarify", "clarify",                # route + client-secret path
+        "terminal", "terminal",              # --client-secret, --auth-url
+        "terminal",                          # --auth-code
+    ]
+    # and the final assistant turn is prose (no tool call) -- the summary
+    assert not episode["messages"][-1].get("tool_calls")
+    assert episode["messages"][-1]["content"].strip()

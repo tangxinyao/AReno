@@ -1,6 +1,4 @@
-{"task_id": "t1", "lang": "en", "prompt": "Read the email about the Q3 financial review meeting."}
-{"task_id": "t2", "lang": "en", "prompt": "What is the latest email in my inbox?"}
-{"task_id": "t3", "lang": "en", "prompt": "Find anything about budget approval and tell me the decision."}
-{"task_id": "t4", "lang": "zh", "prompt": "帮我看一下收件箱里关于假期办公室关闭的邮件。"}
-{"task_id": "t5", "lang": "en", "prompt": "Search my inbox for the benefits enrollment deadline."}
-{"task_id": "t6", "lang": "zh", "prompt": "帮我读一下 Alice 发的关于复盘会议的邮件。"}
+{"task_id": "t1", "lang": "zh", "prompt": "帮我登录我的谷歌邮箱"}
+{"task_id": "t2", "lang": "zh", "prompt": "看看我的谷歌邮箱里有哪些未读邮件。"}
+{"task_id": "t3", "lang": "zh", "prompt": "我想在终端里收邮件，用 himalaya 怎么配置？"}
+{"task_id": "t4", "lang": "zh", "prompt": "帮我看下谷歌邮箱里最近的未读邮件标题就行，不用登录那么麻烦。"}

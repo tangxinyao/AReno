@@ -31,22 +31,25 @@ from pathlib import Path
 from typing import Any
 
 from mail_graph import MailState, OpenAIClient, build_graph
-from tools import Email, MailEnv, parse_hermes_tool_calls
+from tools import AgentEnv, parse_hermes_tool_calls
 
 
 def _load_jsonl(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
-def _env_for_task(task: dict[str, Any]) -> MailEnv:
-    """Build a fresh mailbox per task; tasks may carry their own fixture emails."""
+def _env_for_task(task: dict[str, Any]) -> AgentEnv:
+    """Build a fresh harness per episode.
 
-    env = MailEnv()
-    emails = task.get("emails")
-    if emails:
-        env.emails = [Email(**email) for email in emails]
-    else:
-        env = MailEnv.default()
+    The Gmail-login episodes are a fixed script: the simulated user's answers to
+    ``clarify`` come from the task's ``decisions`` list (defaulting to the standard
+    "pick google-workspace, then give the client-secret path" route). The vendored
+    skills are discovered from ``skills/`` on construction.
+    """
+
+    env = AgentEnv.default()
+    if task.get("decisions"):
+        env.decisions = list(task["decisions"])
     return env
 
 
@@ -55,8 +58,8 @@ def run_task(
 ) -> dict[str, Any]:
     """Run one task through the graph and return a raw trajectory record.
 
-    The graph is rebuilt per task so the per-task ``MailEnv`` is bound as a build-
-    time closure value (``MailEnv`` is not LangGraph-checkpoint-serializable).
+    The graph is rebuilt per task so the per-episode ``AgentEnv`` is bound as a
+    build-time closure value (``AgentEnv`` is not LangGraph-checkpoint-serializable).
     """
 
     env = _env_for_task(task)

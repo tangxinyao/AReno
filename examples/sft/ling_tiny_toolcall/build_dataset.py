@@ -1,11 +1,9 @@
 """Build data/{train,eval}.jsonl for the Ling-3.0-tiny Hermes tool-call SFT example.
 
-This is the trajectory->SFT converter + filter from the report's section 4
-(data conversion) and section 5.2/5.3 (quality filtering and the over-calling
-risk). Pipeline:
+This is the trajectory->SFT converter + filter. Pipeline:
 
 1. A LangGraph workflow (mail_graph.py) runs Ling-3.0-tiny as the student over a
-   set of mail tasks and records a full messages transcript per task
+   set of Hermes tasks and records a full messages transcript per task
    (collect_trajectories.py emits this, one task per JSONL row).
 2. This script filters those transcripts -- keep only Verifier-marked-done runs in
    which every assistant tool-call turn is well-formed Hermes (valid JSON, known
@@ -13,7 +11,7 @@ risk). Pipeline:
    assistant step. Tool-result spans are context, not labels, so they live in the
    prompt prefix; only the assistant's own turns are trained.
 3. Negative (no-tool) chit-chat rows are added so the model does not learn "always
-   call a tool" (the Llama-3.2-1B irrelevance-collapse failure mode from the report).
+   call a tool" (the irrelevance-collapse failure mode).
 
 The default mode runs offline with NO collected raw_trajectories.jsonl: the small
 set of hand-authored trajectories embedded as SEED_TRAJECTORIES + SEED_NO_TOOL_TASKS
@@ -21,9 +19,14 @@ below produces the committed data/{train,eval}.jsonl deterministically. Re-runni
 with optional collector output (--trajectories) replaces those seed trajectories;
 the conversion code path is unchanged.
 
+The action space is the real Hermes toolset -- ``skills_list``, ``skill_view``,
+``clarify``, ``terminal`` (see tools.py). The canonical episode is the Gmail-login
+workflow: the user asks to log in to Gmail, the model loads both email skills
+(``google-workspace`` and ``himalaya``), asks the user which route to take, then
+drives the Google Workspace OAuth setup through ``terminal``.
+
 The on-wire Hermes tool-call tokens are assembled from code points (not written as
-source literals) so this file does not embed the raw angle-bracket markers, which
-keeps the source free of literal tool-call delimiters.
+source literals) so this file does not embed the raw angle-bracket markers.
 """
 
 from __future__ import annotations
@@ -34,7 +37,9 @@ from pathlib import Path
 from typing import Any
 
 from tools import (
-    MailEnv,
+    AgentEnv,
+    FIXTURE_ACCOUNT,
+    FIXTURE_CLIENT_SECRET,
     TOOLS,
     TOOL_CALL_RE,
     ToolCallError,
@@ -46,21 +51,49 @@ from tools import (
 
 OUT = Path(__file__).resolve().parent / "data"
 
-SYSTEM_PROMPT = (
-    "You are a mail assistant. Use the provided tools to read the user's mail and "
-    "answer questions about it. Emit one tool call per turn in the Hermes tool-call "
-    "format. When you already have the answer, reply in plain text with no tool call."
-)
+
+def _prompt_fragments() -> tuple[str, str, str]:
+    """Import the system-prompt fragments from mail_graph regardless of sys.path.
+
+    ``build_dataset`` runs both as a script (``python build_dataset.py``, where
+    ``mail_graph`` is importable because the file's directory is on ``sys.path``)
+    and via the CPU test loader (which imports this module by absolute path and
+    then restores ``sys.path``). The absolute-path fallback keeps both paths
+    working without duplicating the persona strings.
+    """
+
+    try:
+        from mail_graph import _SKILLS_PREAMBLE, HERMES_AGENT_HELP_GUIDANCE, SOUL_IDENTITY
+
+        return SOUL_IDENTITY, HERMES_AGENT_HELP_GUIDANCE, _SKILLS_PREAMBLE
+    except ModuleNotFoundError:
+        import importlib.util
+        import sys
+
+        module_path = Path(__file__).resolve().parent / "mail_graph.py"
+        spec = importlib.util.spec_from_file_location("ling_tiny_toolcall_mail_graph", module_path)
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return module.SOUL_IDENTITY, module.HERMES_AGENT_HELP_GUIDANCE, module._SKILLS_PREAMBLE
+
+
+def _system_prompt_text() -> str:
+    """The identity + help-guidance + skills preamble block used as the prompt prefix."""
+
+    soul, help_guidance, skills_preamble = _prompt_fragments()
+    return "\n\n".join([soul, help_guidance, skills_preamble])
 
 
 def assert_valid_tool_call(text: str) -> list[dict[str, Any]]:
     """Raise if ``text`` contains any tool-call block that is not valid Hermes.
 
-    Used as the training-data format guard (report section 5.2: every tool-call
-    block must be fully legal JSON). A well-formed block returns its parsed call;
-    a malformed block (bad JSON, unknown tool name, missing args) raises so the
-    caller can drop the turn. The regex and delimiters are shared with the
-    collector so collect-time and convert-time agree on what counts as valid.
+    Used as the training-data format guard: every tool-call block must be fully
+    legal JSON. A well-formed block returns its parsed call; a malformed block
+    (bad JSON, unknown tool name, missing args) raises so the caller can drop the
+    turn. The regex and delimiters are shared with the collector so collect-time
+    and convert-time agree on what counts as valid.
     """
 
     known = {tool["function"]["name"] for tool in TOOLS}
@@ -114,7 +147,11 @@ def _messages_to_prompt_text(messages: list[dict[str, Any]], *, tools: list[dict
     tool_specs = json.dumps(
         [tool["function"] for tool in tools], ensure_ascii=False, separators=(",", ":")
     )
-    lines = [f"system: {SYSTEM_PROMPT}", f"system_tools: {tool_specs}"]
+    # The system text is assembled here without the live env (the prompt prefix
+    # stores the identity + tool schemas; the per-episode skills index is injected
+    # by the served template at train time).
+    system = _system_prompt_text()
+    lines = [f"system: {system}", f"system_tools: {tool_specs}"]
     for message in messages:
         role = message["role"]
         if role == "assistant":
@@ -127,13 +164,13 @@ def _messages_to_prompt_text(messages: list[dict[str, Any]], *, tools: list[dict
     return "\n".join(lines)
 
 
-def clean_trajectory(trajectory: dict[str, Any], *, env: MailEnv) -> bool:
+def clean_trajectory(trajectory: dict[str, Any], *, env: AgentEnv) -> bool:
     """True if the trajectory is a Verifier-done run with all-valid tool calls.
 
-    This is the report's section 5.3 positive selection: keep only completed,
-    format-clean runs. Invalid JSON, unknown tool names, or a Verifier
-    not-done flag drop the whole trajectory. Tool-result values are replayed
-    through ``MailEnv`` so the recorded results must match the action space.
+    Positive selection: keep only completed, format-clean runs. Invalid JSON,
+    unknown tool names, or a Verifier not-done flag drop the whole trajectory.
+    Tool results are replayed through ``AgentEnv`` so the recorded results must
+    match the action space.
     """
 
     if not trajectory.get("done"):
@@ -169,9 +206,9 @@ def trajectory_to_rows(
 ) -> list[dict[str, Any]]:
     """Expand one trajectory into one SFT row per assistant step (step-wise).
 
-    Each row's prompt is the conversation rendered up through the latest tool result;
-    the response is the next assistant turn -- either a tool-call block or the
-    final natural-language answer. Tool-result messages stay in the prompt as
+    Each row's prompt is the conversation rendered up through the latest tool
+    result; the response is the next assistant turn -- either a tool-call block or
+    the final natural-language answer. Tool-result messages stay in the prompt as
     context; they are never the supervised target.
     """
 
@@ -205,21 +242,20 @@ def trajectory_to_rows(
 def no_tool_rows(tasks: list[dict[str, Any]], *, tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Rows teaching the model to answer directly when no tool is needed.
 
-    The report cites a Llama-3.2-1B study where SFT over an all-tool-call dataset
-    collapsed irrelevance accuracy because the model learned "tool available ->
-    call it." These rows supply the missing negative: plain prompts whose expected
-    response contains no tool-call block. Same system+tools prefix so the action
-    space is present, but the target is a short direct answer.
+    The action space is present (system + tools prefix), but the target is a short
+    direct answer with no tool-call block -- the missing negative that guards
+    against "tool available -> call it" collapse.
     """
 
     tool_specs = json.dumps(
         [tool["function"] for tool in tools], ensure_ascii=False, separators=(",", ":")
     )
+    system = _system_prompt_text()
     rows: list[dict[str, Any]] = []
     for task in tasks:
         prompt = "\n".join(
             [
-                f"system: {SYSTEM_PROMPT}",
+                f"system: {system}",
                 f"system_tools: {tool_specs}",
                 f"user: {task['prompt']}",
             ]
@@ -246,9 +282,10 @@ def task_to_eval_row(task: dict[str, Any], *, tools: list[dict[str, Any]]) -> di
     tool_specs = json.dumps(
         [tool["function"] for tool in tools], ensure_ascii=False, separators=(",", ":")
     )
+    system = _system_prompt_text()
     prompt = "\n".join(
         [
-            f"system: {SYSTEM_PROMPT}",
+            f"system: {system}",
             f"system_tools: {tool_specs}",
             f"user: {task['prompt']}",
         ]
@@ -265,119 +302,261 @@ def task_to_eval_row(task: dict[str, Any], *, tools: list[dict[str, Any]]) -> di
 # Seed data (embedded so the bundle imports + tests run with no GPU collector)
 # ---------------------------------------------------------------------------
 #
-# Each seed trajectory is the exact messages transcript a successful collector
-# run would produce for a small mail task, hand-authored against the MailEnv
-# fixtures in tools.py so recorded tool results match the environment. Replace
-# SEED_TRAJECTORIES with real collector output (--trajectories) at scale; the
-# conversion code path is unchanged.
+# Each seed trajectory is the exact messages transcript a successful collector run
+# would produce, hand-authored against the ``AgentEnv`` harness in tools.py so
+# recorded tool results match the environment. Replace SEED_TRAJECTORIES with real
+# collector output (--trajectories) at scale; the conversion code path is unchanged.
+#
+# The canonical episode is the Gmail-login flow (t1): skill_view both email
+# skills -> clarify (which route) -> clarify (client-secret path) -> terminal
+# --client-secret -> terminal --auth-url -> prose (send the URL) -> [user pastes
+# the code] -> terminal --auth-code -> final prose (logged in). The remaining seed
+# tasks are shorter mail questions over the same action space.
 
-SEED_TRAJECTORIES: list[dict[str, Any]] = [
-    {
+
+def _gw_skill_view_payload() -> dict[str, Any]:
+    """The skill_view result for google-workspace (setup_needed, per the harness)."""
+
+    return AgentEnv.default().skill_view(name="google-workspace")
+
+
+def _himalaya_skill_view_payload() -> dict[str, Any]:
+    return AgentEnv.default().skill_view(name="himalaya")
+
+
+def _tool_message(tool_call_id: str, name: str, result: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "role": "tool",
+        "tool_call_id": tool_call_id,
+        "name": name,
+        "content": tool_result_to_text(result),
+    }
+
+
+def _seed_gmail_login() -> dict[str, Any]:
+    """The canonical Gmail-login episode (see the example README for the prose)."""
+
+    auth_url = _auth_url_for_seed()
+    auth_code_url = (
+        "http://localhost:1/?state=EXAMPLE_STATE&iss=https://accounts.google.com"
+        "&code=4/0AXlqoi70OgsQBmtvCP029CYQuOs6-BgaW8GzPnnLqmDUf_mUKi2RCI-N0buDTsGbksJp9A"
+        "&scope=https://www.googleapis.com/auth/gmail.readonly"
+    )
+    return {
         "task_id": "t1",
-        "lang": "en",
+        "lang": "zh",
         "done": True,
         "messages": [
-            {"role": "user", "content": "Read the email about the Q3 financial review meeting."},
+            {"role": "user", "content": "帮我登录我的谷歌邮箱"},
             {
                 "role": "assistant",
-                "content": "",
+                "content": "我先查看一下可用的 Google 邮箱工具技能，了解正确的认证方式。",
                 "tool_calls": [
                     {
                         "type": "function",
                         "id": "call_1",
-                        "function": {"name": "search_emails", "arguments": {"keyword": "Q3 financial review"}},
+                        "function": {"name": "skill_view", "arguments": {"name": "google-workspace"}},
+                    },
+                    {
+                        "type": "function",
+                        "id": "call_2",
+                        "function": {"name": "skill_view", "arguments": {"name": "himalaya"}},
+                    },
+                ],
+            },
+            _tool_message("call_1", "skill_view", _gw_skill_view_payload()),
+            _tool_message("call_2", "skill_view", _himalaya_skill_view_payload()),
+            {
+                "role": "assistant",
+                "content": "有两个功能类似的邮箱技能，先确认你的需求。",
+                "tool_calls": [
+                    {
+                        "type": "function",
+                        "id": "call_3",
+                        "function": {
+                            "name": "clarify",
+                            "arguments": {
+                                "question": "你只需要登录/收发 Gmail 邮件，还是也想用日历、云盘、文档等其他 Google 服务？",
+                                "choices": [
+                                    "只要邮箱（IMAP/SMTP，2分钟搞定）",
+                                    "邮箱 + 日历/云盘/文档等（OAuth 授权）",
+                                ],
+                            },
+                        },
                     }
                 ],
             },
+            _tool_message(
+                "call_3",
+                "clarify",
+                {
+                    "question": "你只需要登录/收发 Gmail 邮件，还是也想用日历、云盘、文档等其他 Google 服务？",
+                    "choices_offered": [
+                        "只要邮箱（IMAP/SMTP，2分钟搞定）",
+                        "邮箱 + 日历/云盘/文档等（OAuth 授权）",
+                    ],
+                    "user_response": "邮箱 + 日历/云盘/文档等（OAuth 授权）",
+                },
+            ),
             {
-                "role": "tool",
-                "tool_call_id": "call_1",
-                "name": "search_emails",
-                "content": tool_result_to_text(
-                    MailEnv.default().search_emails(keyword="Q3 financial review")
-                ),
+                "role": "assistant",
+                "content": "好，走 OAuth 授权路线。我需要你的 Google Cloud OAuth 客户端凭证（client_secret JSON）。",
+                "tool_calls": [
+                    {
+                        "type": "function",
+                        "id": "call_4",
+                        "function": {
+                            "name": "clarify",
+                            "arguments": {
+                                "question": "Google Cloud 的 OAuth 客户端凭证（client_secret JSON）文件路径是什么？",
+                            },
+                        },
+                    }
+                ],
             },
+            _tool_message(
+                "call_4",
+                "clarify",
+                {
+                    "question": "Google Cloud 的 OAuth 客户端凭证（client_secret JSON）文件路径是什么？",
+                    "choices_offered": [],
+                    "user_response": f"文件路径是：{FIXTURE_CLIENT_SECRET}",
+                },
+            ),
             {
                 "role": "assistant",
                 "content": "",
                 "tool_calls": [
                     {
                         "type": "function",
-                        "id": "call_2",
-                        "function": {"name": "read_email", "arguments": {"email_id": "e1"}},
+                        "id": "call_5",
+                        "function": {
+                            "name": "terminal",
+                            "arguments": {
+                                "command": (
+                                    "python ~/.hermes/skills/productivity/google-workspace/"
+                                    f"scripts/setup.py --client-secret {FIXTURE_CLIENT_SECRET}"
+                                )
+                            },
+                        },
                     }
                 ],
             },
-            {
-                "role": "tool",
-                "tool_call_id": "call_2",
-                "name": "read_email",
-                "content": tool_result_to_text(MailEnv.default().read_email(email_id="e1")),
-            },
+            _tool_message(
+                "call_5",
+                "terminal",
+                {
+                    "output": "OK: Client secret saved to ~/.hermes/google_client_secret.json",
+                    "exit_code": 0,
+                    "error": None,
+                },
+            ),
             {
                 "role": "assistant",
-                "content": "The Q3 financial review meeting is scheduled for Thursday at 10am; "
-                "Alice asked you to bring the latest P&L.",
+                "content": "凭证已保存。现在生成授权链接，你需要在浏览器里打开它完成授权。",
+                "tool_calls": [
+                    {
+                        "type": "function",
+                        "id": "call_6",
+                        "function": {
+                            "name": "terminal",
+                            "arguments": {
+                                "command": (
+                                    "python ~/.hermes/skills/productivity/google-workspace/"
+                                    "scripts/setup.py --auth-url"
+                                )
+                            },
+                        },
+                    }
+                ],
+            },
+            _tool_message(
+                "call_6",
+                "terminal",
+                {"output": auth_url, "exit_code": 0, "error": None},
+            ),
+            {
+                "role": "assistant",
+                "content": (
+                    "请在浏览器打开下面的链接完成授权，然后把你跳转到的完整 URL 粘贴回来：\n\n"
+                    + auth_url
+                ),
+            },
+            {"role": "user", "content": auth_code_url},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "type": "function",
+                        "id": "call_7",
+                        "function": {
+                            "name": "terminal",
+                            "arguments": {
+                                "command": (
+                                    "python ~/.hermes/skills/productivity/google-workspace/"
+                                    f"scripts/setup.py --auth-code '{auth_code_url}'"
+                                )
+                            },
+                        },
+                    }
+                ],
+            },
+            _tool_message(
+                "call_7",
+                "terminal",
+                {
+                    "output": (
+                        "OK: Authenticated. Token saved to ~/.hermes/google_token.json\n"
+                        "AUTHENTICATED: Token valid at ~/.hermes/google_token.json"
+                    ),
+                    "exit_code": 0,
+                    "error": None,
+                },
+            ),
+            {
+                "role": "assistant",
+                "content": (
+                    f"登录完成，你的邮箱账号是 {FIXTURE_ACCOUNT}，令牌保存在 "
+                    "~/.hermes/google_token.json 并会自动刷新。现在可以帮你读邮件、"
+                    "发邮件、查日程、传云盘文件等，需要做什么直接说。"
+                ),
             },
         ],
-    },
-    {
+    }
+
+
+def _auth_url_for_seed() -> str:
+    from tools import FIXTURE_AUTH_URL
+
+    return FIXTURE_AUTH_URL
+
+
+def _seed_unread_digest() -> dict[str, Any]:
+    """A shorter follow-up episode: list unread mail via the API script."""
+
+    gmail_search = (
+        "python ~/.hermes/skills/productivity/google-workspace/scripts/google_api.py "
+        "gmail search \"is:unread\" --max 3"
+    )
+    return {
         "task_id": "t2",
-        "lang": "en",
+        "lang": "zh",
         "done": True,
         "messages": [
-            {"role": "user", "content": "What is the latest email in my inbox?"},
+            {"role": "user", "content": "看看我的谷歌邮箱里有哪些未读邮件。"},
             {
                 "role": "assistant",
-                "content": "",
+                "content": "我先加载 Google Workspace 技能，了解查询邮件的命令。",
                 "tool_calls": [
                     {
                         "type": "function",
                         "id": "call_1",
-                        "function": {"name": "list_emails", "arguments": {"folder": "inbox", "limit": 1}},
+                        "function": {"name": "skill_view", "arguments": {"name": "google-workspace"}},
                     }
                 ],
             },
-            {
-                "role": "tool",
-                "tool_call_id": "call_1",
-                "name": "list_emails",
-                "content": tool_result_to_text(
-                    MailEnv.default().list_emails(folder="inbox", limit=1)
-                ),
-            },
-            {
-                "role": "assistant",
-                "content": "The latest email is from corp@antgroup.com, subject "
-                "\"Office closed next Monday\".",
-            },
-        ],
-    },
-    {
-        "task_id": "t3",
-        "lang": "en",
-        "done": True,
-        "messages": [
-            {"role": "user", "content": "Find anything about budget approval and tell me the decision."},
-            {
-                "role": "assistant",
-                "content": "",
-                "tool_calls": [
-                    {
-                        "type": "function",
-                        "id": "call_1",
-                        "function": {"name": "search_emails", "arguments": {"keyword": "budget approval"}},
-                    }
-                ],
-            },
-            {
-                "role": "tool",
-                "tool_call_id": "call_1",
-                "name": "search_emails",
-                "content": tool_result_to_text(
-                    MailEnv.default().search_emails(keyword="budget approval")
-                ),
-            },
+            _tool_message("call_1", "skill_view", _gw_skill_view_payload()),
             {
                 "role": "assistant",
                 "content": "",
@@ -385,81 +564,134 @@ SEED_TRAJECTORIES: list[dict[str, Any]] = [
                     {
                         "type": "function",
                         "id": "call_2",
-                        "function": {"name": "read_email", "arguments": {"email_id": "e3"}},
+                        "function": {"name": "terminal", "arguments": {"command": gmail_search}},
                     }
                 ],
             },
-            {
-                "role": "tool",
-                "tool_call_id": "call_2",
-                "name": "read_email",
-                "content": tool_result_to_text(MailEnv.default().read_email(email_id="e3")),
-            },
+            _tool_message(
+                "call_2",
+                "terminal",
+                {
+                    "output": json.dumps(
+                        [
+                            {
+                                "id": "1a11efa219fdd936",
+                                "from": "McKinsey Weekend Read <publishing@email.mckinsey.com>",
+                                "subject": "Is your organization standing between AI and value?",
+                                "date": "Fri, 9 Oct 2026 04:44:30 +0000",
+                                "labels": ["UNREAD", "CATEGORY_UPDATES", "INBOX"],
+                            },
+                            {
+                                "id": "1a11e554e743d131",
+                                "from": "Upwork Notification <donotreply@upwork.com>",
+                                "subject": "New job alert: AI and Automation Developer",
+                                "date": "Fri, 09 Oct 2026 01:44:28 +0000",
+                                "labels": ["UNREAD", "CATEGORY_UPDATES", "INBOX"],
+                            },
+                        ],
+                        ensure_ascii=False,
+                        indent=2,
+                    ),
+                    "exit_code": 0,
+                    "error": None,
+                },
+            ),
             {
                 "role": "assistant",
-                "content": "Bob approved the budget up to 50k and asked you to file the requisition "
-                "through the finance portal.",
+                "content": (
+                    "你有 2 封未读邮件：一封来自 McKinsey Weekend Read（主题：Is your "
+                    "organization standing between AI and value?），另一封来自 Upwork "
+                    "Notification（主题：New job alert: AI and Automation Developer）。"
+                ),
             },
         ],
-    },
-    {
+    }
+
+
+def _seed_reply_by_skill_route() -> dict[str, Any]:
+    """A himalaya-route episode: the user picks the IMAP/SMTP path instead."""
+
+    return {
+        "task_id": "t3",
+        "lang": "zh",
+        "done": True,
+        "messages": [
+            {"role": "user", "content": "我想在终端里收邮件，用 himalaya 怎么配置？"},
+            {
+                "role": "assistant",
+                "content": "我先加载 himalaya 技能，看它的配置说明。",
+                "tool_calls": [
+                    {
+                        "type": "function",
+                        "id": "call_1",
+                        "function": {"name": "skill_view", "arguments": {"name": "himalaya"}},
+                    }
+                ],
+            },
+            _tool_message("call_1", "skill_view", _himalaya_skill_view_payload()),
+            {
+                "role": "assistant",
+                "content": (
+                    "himalaya 需要一个配置文件 ~/.config/himalaya/config.toml，里面填 IMAP/SMTP "
+                    "服务器和账号。最快的方式是运行 `himalaya account configure` 向导，它会逐步问你"
+                    "邮箱地址、服务器和密码（密码建议用 `pass` 或系统钥匙串保存）。配置里的 folder.aliases "
+                    "需要把 inbox/sent/drafts/trash 映射到服务端的真实文件夹名，Gmail 用户尤其要注意。"
+                ),
+            },
+        ],
+    }
+
+
+def _seed_refuse_no_login() -> dict[str, Any]:
+    """An episode where the user only wants one known message (no full login)."""
+
+    return {
         "task_id": "t4",
         "lang": "zh",
         "done": True,
         "messages": [
-            {"role": "user", "content": "帮我看一下收件箱里关于假期办公室关闭的邮件。"},
+            {"role": "user", "content": "帮我看下谷歌邮箱里最近的未读邮件标题就行，不用登录那么麻烦。"},
             {
                 "role": "assistant",
-                "content": "",
+                "content": "我先看下有没有更轻量的邮箱技能。",
                 "tool_calls": [
                     {
                         "type": "function",
                         "id": "call_1",
-                        "function": {"name": "search_emails", "arguments": {"keyword": "office closed"}},
+                        "function": {"name": "skill_view", "arguments": {"name": "himalaya"}},
                     }
                 ],
             },
+            _tool_message("call_1", "skill_view", _himalaya_skill_view_payload()),
             {
-                "role": "tool",
-                "tool_call_id": "call_1",
-                "name": "search_emails",
-                "content": tool_result_to_text(
-                    MailEnv.default().search_emails(keyword="office closed")
+                "role": "assistant",
+                "content": (
+                    "不管是 himalaya 还是 Google Workspace，都需要先授权一次才能读你的邮箱——"
+                    "没有免登录的路径。himalaya 用 Gmail 应用专用密码，2 分钟；Google Workspace 用 "
+                    "OAuth，能顺带用日历/云盘。你选哪个？"
                 ),
             },
-            {
-                "role": "assistant",
-                "content": "",
-                "tool_calls": [
-                    {
-                        "type": "function",
-                        "id": "call_2",
-                        "function": {"name": "read_email", "arguments": {"email_id": "e4"}},
-                    }
-                ],
-            },
-            {
-                "role": "tool",
-                "tool_call_id": "call_2",
-                "name": "read_email",
-                "content": tool_result_to_text(MailEnv.default().read_email(email_id="e4")),
-            },
-            {
-                "role": "assistant",
-                "content": "下周一办公室因假期关闭,不要安排会议。",
-            },
         ],
-    },
+    }
+
+
+SEED_TRAJECTORIES: list[dict[str, Any]] = [
+    _seed_gmail_login(),
+    _seed_unread_digest(),
+    _seed_reply_by_skill_route(),
+    _seed_refuse_no_login(),
 ]
 
 SEED_NO_TOOL_TASKS: list[dict[str, Any]] = [
     {"task_id": "n1", "lang": "en", "prompt": "Thanks!", "response": "You're welcome."},
     {
         "task_id": "n2",
-        "lang": "en",
-        "prompt": "What can you do?",
-        "response": "I can read and search your mail with the list_emails, read_email, "
-        "search_emails, and send_email tools, and summarize what I find.",
+        "lang": "zh",
+        "prompt": "你能做什么？",
+        "response": (
+            "我可以帮你读/发 Gmail 邮件、查日历、传云盘文件、编辑文档表格。需要的话我也可以"
+            "在终端里跑命令、查看技能说明或加载脚本。"
+        ),
     },
     {
         "task_id": "n3",
@@ -467,27 +699,27 @@ SEED_NO_TOOL_TASKS: list[dict[str, Any]] = [
         "prompt": "Who wrote Romeo and Juliet?",
         "response": "William Shakespeare wrote Romeo and Juliet.",
     },
-    {"task_id": "n4", "lang": "zh", "prompt": "你好。", "response": "你好,有什么我可以帮你的吗?"},
+    {"task_id": "n4", "lang": "zh", "prompt": "你好。", "response": "你好，有什么我可以帮你的吗？"},
 ]
 
 SEED_EVAL_TASKS: list[dict[str, Any]] = [
     {
         "task_id": "v1",
-        "lang": "en",
-        "prompt": "Read Alice's email about the review meeting and tell me when it is.",
-        "answer": "Thursday at 10am.",
+        "lang": "zh",
+        "prompt": "帮我登录我的谷歌邮箱。",
+        "answer": "需要先确认你要哪些 Google 服务，然后提供 client_secret JSON 完成 OAuth 授权。",
     },
     {
         "task_id": "v2",
-        "lang": "en",
-        "prompt": "Search for the benefits enrollment email and tell me the deadline.",
-        "answer": "Next Friday.",
+        "lang": "zh",
+        "prompt": "我只想用终端收 Gmail，怎么配置？",
+        "answer": "加载 himalaya 技能，用 Gmail 应用专用密码配置 IMAP/SMTP。",
     },
     {
         "task_id": "v3",
-        "lang": "zh",
-        "prompt": "帮我看看收件箱里最新的会议邮件是什么时间。",
-        "answer": "周四上午 10 点。",
+        "lang": "en",
+        "prompt": "List my unread Gmail messages.",
+        "answer": "Load the google-workspace skill and run google_api.py gmail search \"is:unread\".",
     },
 ]
 
@@ -500,7 +732,7 @@ def build(
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Filter, expand, and split trajectories + negatives into train/eval rows."""
 
-    env = MailEnv.default()
+    env = AgentEnv.default()
     train: list[dict[str, Any]] = []
     for trajectory in trajectories:
         if not clean_trajectory(trajectory, env=env):
@@ -517,7 +749,7 @@ def _load_jsonl(path: Path) -> list[dict[str, Any]]:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        description="Convert collected mail-agent trajectories into Ling-3.0-tiny tool-call SFT data.",
+        description="Convert collected Hermes tool-call trajectories into Ling-3.0-tiny SFT data.",
     )
     parser.add_argument(
         "--trajectories",
