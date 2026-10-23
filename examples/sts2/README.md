@@ -66,3 +66,31 @@ pytest tests/test_sts2_sim_*_cpu.py tests/test_sts2_react_cpu.py
 
 `run_agent.py` needs `openai` and a running rollout endpoint, so it is not
 covered by the CPU tests.
+
+## Play the Live Game (STS2MCP)
+
+`play_live.py` plays one real game through the STS2MCP mod, with the policy
+served over an OpenAI-compatible endpoint. It needs only the standard library,
+so it runs on the machine with the game (for example a Mac). `live/sts2mcp_live.py`
+reads the game state from `localhost:15526` and builds action ids in the same
+vocabulary as the simulator.
+
+On the machine with the trained checkpoint (for example the DGX Spark):
+
+```bash
+areno serve --model-path /path/to/checkpoint --port 8000
+```
+
+On the game machine, open a tunnel and start the player:
+
+```bash
+ssh -L 8000:127.0.0.1:8000 <dgx-host>
+python3 examples/sts2/play_live.py --model-url http://127.0.0.1:8000/v1 --log-jsonl live.jsonl
+```
+
+Use `--dry-run` first to check that the game is reachable and the observation
+looks right, without calling the model.
+
+Combat screens use the simulator's observation layout. Other screens (map,
+rewards, shops and so on) use the adapter's digest, which the policy did not
+see in training, so expect weaker play there.

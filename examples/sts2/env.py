@@ -24,6 +24,15 @@ _ACTION_RE = re.compile(r"^\s*Action\s*:\s*(.+?)\s*$", re.IGNORECASE | re.MULTIL
 MAX_TURNS = 48
 MAX_INVALID_ACTIONS = 3
 
+SYSTEM_PROMPT = (
+    "You are playing one Slay the Spire 2 combat as the Ironclad. Defeat every enemy "
+    "while keeping your HP high. Reply in the ReAct format on every turn:\n"
+    "Thought: one or two sentences about the best next play.\n"
+    "Action: exactly one id copied from the Legal actions list, such as end_turn.\n"
+    "Play one action per reply. After each action you receive an Observation with the "
+    "updated state and the next list of legal actions."
+)
+
 
 def parse_action(text: str) -> str | None:
     """Return the id on the last ``Action:`` line of a model response."""

@@ -17,19 +17,11 @@ from typing import Any
 from areno.api.agentic import AgentTrajectory, AgentTrajectoryTurn
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from env import MAX_INVALID_ACTIONS, MAX_TURNS, Episode, Sts2ReActEnv, parse_action  # noqa: E402
+from env import MAX_INVALID_ACTIONS, MAX_TURNS, SYSTEM_PROMPT, Episode, Sts2ReActEnv, parse_action  # noqa: E402
 
 logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-SYSTEM_PROMPT = (
-    "You are playing one Slay the Spire 2 combat as the Ironclad. Defeat every enemy "
-    "while keeping your HP high. Reply in the ReAct format on every turn:\n"
-    "Thought: one or two sentences about the best next play.\n"
-    "Action: exactly one id copied from the Legal actions list, such as end_turn.\n"
-    "Play one action per reply. After each action you receive an Observation with the "
-    "updated state and the next list of legal actions."
-)
 
 
 async def run_agent(ctx, batch):
