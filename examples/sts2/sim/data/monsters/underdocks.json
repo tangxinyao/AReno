@@ -1,0 +1,2491 @@
+[
+ {
+  "monster_id": "corpse_slug",
+  "game_id": "CORPSE_SLUG",
+  "name": "Corpse Slug",
+  "kind": "normal",
+  "hp": [
+   25,
+   27
+  ],
+  "hp_asc": [
+   27,
+   29
+  ],
+  "innate_powers": [
+   {
+    "power": "ravenous",
+    "amount": [
+     4,
+     5,
+     9
+    ]
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "WHIP_SLAP": {
+    "name": "Whip Slap",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": 3,
+       "hits": 2
+      }
+     }
+    ]
+   },
+   "GLOMP": {
+    "name": "Glomp",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "GOOP": {
+    "name": "Goop",
+    "intents": [
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "frail",
+       "amount": 2,
+       "target": "player"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "START",
+   "nodes": {
+    "WHIP_SLAP": {
+     "type": "move",
+     "move": "WHIP_SLAP",
+     "next": "GLOMP"
+    },
+    "GLOMP": {
+     "type": "move",
+     "move": "GLOMP",
+     "next": "GOOP"
+    },
+    "GOOP": {
+     "type": "move",
+     "move": "GOOP",
+     "next": "WHIP_SLAP"
+    },
+    "START": {
+     "type": "conditional",
+     "branches": [
+      {
+       "to": "GLOMP",
+       "if": "starter",
+       "arg": 1
+      },
+      {
+       "to": "GOOP",
+       "if": "starter",
+       "arg": 2
+      },
+      {
+       "to": "WHIP_SLAP"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "calcified_cultist",
+  "game_id": "CALCIFIED_CULTIST",
+  "name": "Calcified Cultist",
+  "kind": "normal",
+  "hp": [
+   38,
+   41
+  ],
+  "hp_asc": [
+   39,
+   42
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "INCANTATION": {
+    "name": "Incantation",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "ritual",
+       "amount": 2,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "DARK_STRIKE": {
+    "name": "Dark Strike",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        9,
+        11,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "INCANTATION",
+   "nodes": {
+    "INCANTATION": {
+     "type": "move",
+     "move": "INCANTATION",
+     "next": "DARK_STRIKE"
+    },
+    "DARK_STRIKE": {
+     "type": "move",
+     "move": "DARK_STRIKE",
+     "next": "DARK_STRIKE"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "damp_cultist",
+  "game_id": "DAMP_CULTIST",
+  "name": "Damp Cultist",
+  "kind": "normal",
+  "hp": [
+   51,
+   53
+  ],
+  "hp_asc": [
+   52,
+   54
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "INCANTATION": {
+    "name": "Incantation",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "ritual",
+       "amount": [
+        5,
+        6,
+        9
+       ],
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "DARK_STRIKE": {
+    "name": "Dark Strike",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        1,
+        3,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "INCANTATION",
+   "nodes": {
+    "INCANTATION": {
+     "type": "move",
+     "move": "INCANTATION",
+     "next": "DARK_STRIKE"
+    },
+    "DARK_STRIKE": {
+     "type": "move",
+     "move": "DARK_STRIKE",
+     "next": "DARK_STRIKE"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "fossil_stalker",
+  "game_id": "FOSSIL_STALKER",
+  "name": "Fossil Stalker",
+  "kind": "normal",
+  "hp": [
+   51,
+   53
+  ],
+  "hp_asc": [
+   54,
+   56
+  ],
+  "innate_powers": [
+   {
+    "power": "suck",
+    "amount": 3
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "LATCH": {
+    "name": "Latch",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        12,
+        14,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "TACKLE": {
+    "name": "Tackle",
+    "intents": [
+     "attack",
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        9,
+        11,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "frail",
+       "amount": 1,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "LASH": {
+    "name": "Lash",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        3,
+        4,
+        9
+       ],
+       "hits": 2
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "LATCH",
+   "nodes": {
+    "LATCH": {
+     "type": "move",
+     "move": "LATCH",
+     "next": "RAND"
+    },
+    "TACKLE": {
+     "type": "move",
+     "move": "TACKLE",
+     "next": "RAND"
+    },
+    "LASH": {
+     "type": "move",
+     "move": "LASH",
+     "next": "RAND"
+    },
+    "RAND": {
+     "type": "random",
+     "branches": [
+      {
+       "to": "LATCH",
+       "weight": 1.0,
+       "repeat": "can_repeat_x",
+       "max_times": 2
+      },
+      {
+       "to": "TACKLE",
+       "weight": 1.0,
+       "repeat": "can_repeat_x",
+       "max_times": 2
+      },
+      {
+       "to": "LASH",
+       "weight": 1.0,
+       "repeat": "can_repeat_x",
+       "max_times": 2
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "fat_gremlin",
+  "game_id": "FAT_GREMLIN",
+  "name": "Fat Gremlin",
+  "kind": "normal",
+  "hp": [
+   13,
+   17
+  ],
+  "hp_asc": [
+   14,
+   18
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "FLEE": {
+    "name": "Flee",
+    "intents": [
+     "escape"
+    ],
+    "effects": [
+     {
+      "verb": "escape",
+      "args": {}
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "FLEE",
+   "nodes": {
+    "FLEE": {
+     "type": "move",
+     "move": "FLEE",
+     "next": "FLEE"
+    }
+   }
+  },
+  "notes": "Arrives stunned ('Wake Up') when the Gremlin Merc dies, then flees with the stolen gold."
+ },
+ {
+  "monster_id": "gremlin_merc",
+  "game_id": "GREMLIN_MERC",
+  "name": "Gremlin Merc",
+  "kind": "normal",
+  "hp": [
+   47,
+   49
+  ],
+  "hp_asc": [
+   51,
+   53
+  ],
+  "innate_powers": [
+   {
+    "power": "surprise",
+    "amount": 1
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "GIMME": {
+    "name": "Gimme",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        7,
+        8,
+        8
+       ],
+       "hits": 2
+      }
+     },
+     {
+      "verb": "steal_gold",
+      "args": {
+       "amount": 20
+      }
+     }
+    ]
+   },
+   "DOUBLE_SMASH": {
+    "name": "Double Smash",
+    "intents": [
+     "attack",
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        6,
+        7,
+        8
+       ],
+       "hits": 2
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "weak",
+       "amount": 2,
+       "target": "player"
+      }
+     },
+     {
+      "verb": "steal_gold",
+      "args": {
+       "amount": 20
+      }
+     }
+    ]
+   },
+   "HEHE": {
+    "name": "Hehe",
+    "intents": [
+     "attack",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        8
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 2,
+       "target": "self"
+      }
+     },
+     {
+      "verb": "steal_gold",
+      "args": {
+       "amount": 20
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "GIMME",
+   "nodes": {
+    "GIMME": {
+     "type": "move",
+     "move": "GIMME",
+     "next": "DOUBLE_SMASH"
+    },
+    "DOUBLE_SMASH": {
+     "type": "move",
+     "move": "DOUBLE_SMASH",
+     "next": "HEHE"
+    },
+    "HEHE": {
+     "type": "move",
+     "move": "HEHE",
+     "next": "GIMME"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "sneaky_gremlin",
+  "game_id": "SNEAKY_GREMLIN",
+  "name": "Sneaky Gremlin",
+  "kind": "normal",
+  "hp": [
+   10,
+   14
+  ],
+  "hp_asc": [
+   11,
+   15
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "TACKLE": {
+    "name": "Tackle",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        9,
+        10,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "TACKLE",
+   "nodes": {
+    "TACKLE": {
+     "type": "move",
+     "move": "TACKLE",
+     "next": "TACKLE"
+    }
+   }
+  },
+  "notes": "Arrives stunned ('Wake Up') when the Gremlin Merc dies."
+ },
+ {
+  "monster_id": "haunted_ship",
+  "game_id": "HAUNTED_SHIP",
+  "name": "Haunted Ship",
+  "kind": "normal",
+  "hp": [
+   63,
+   63
+  ],
+  "hp_asc": [
+   67,
+   67
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "HAUNT": {
+    "name": "Haunt",
+    "intents": [
+     "debuff",
+     "status"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "weak",
+       "amount": 3,
+       "target": "player"
+      }
+     },
+     {
+      "verb": "add_card",
+      "args": {
+       "card": "dazed",
+       "pile": "discard",
+       "count": 5
+      }
+     }
+    ]
+   },
+   "SWIPE": {
+    "name": "Swipe",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        13,
+        14,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "STOMP": {
+    "name": "Stomp",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        4,
+        5,
+        9
+       ],
+       "hits": 3
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "HAUNT",
+   "nodes": {
+    "HAUNT": {
+     "type": "move",
+     "move": "HAUNT",
+     "next": "SWIPE"
+    },
+    "SWIPE": {
+     "type": "move",
+     "move": "SWIPE",
+     "next": "STOMP"
+    },
+    "STOMP": {
+     "type": "move",
+     "move": "STOMP",
+     "next": "SWIPE"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "lagavulin_matriarch",
+  "game_id": "LAGAVULIN_MATRIARCH",
+  "name": "Lagavulin Matriarch",
+  "kind": "boss",
+  "hp": [
+   222,
+   222
+  ],
+  "hp_asc": [
+   233,
+   233
+  ],
+  "innate_powers": [
+   {
+    "power": "plating",
+    "amount": 12
+   },
+   {
+    "power": "asleep",
+    "amount": 3
+   }
+  ],
+  "starting_block": 12,
+  "moves": {
+   "SLEEP": {
+    "name": "Sleep",
+    "intents": [
+     "sleep"
+    ],
+    "effects": []
+   },
+   "SLASH": {
+    "name": "Slash",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        19,
+        21,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "DISEMBOWEL": {
+    "name": "Disembowel",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        9,
+        10,
+        9
+       ],
+       "hits": 2
+      }
+     }
+    ]
+   },
+   "SLASH2": {
+    "name": "Slash",
+    "intents": [
+     "attack",
+     "defend"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        12,
+        14,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "block",
+      "args": {
+       "amount": [
+        12,
+        14,
+        8
+       ]
+      }
+     }
+    ]
+   },
+   "SOUL_SIPHON": {
+    "name": "Soul Siphon",
+    "intents": [
+     "debuff",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "special",
+      "args": {
+       "name": "soul_siphon",
+       "amount": 2
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "SLEEP",
+   "nodes": {
+    "SLEEP": {
+     "type": "move",
+     "move": "SLEEP",
+     "next": "SLEEP_BRANCH"
+    },
+    "SLEEP_BRANCH": {
+     "type": "conditional",
+     "branches": [
+      {
+       "to": "SLEEP",
+       "if": "has_power",
+       "arg": "asleep"
+      },
+      {
+       "to": "SLASH"
+      }
+     ]
+    },
+    "SLASH": {
+     "type": "move",
+     "move": "SLASH",
+     "next": "DISEMBOWEL"
+    },
+    "DISEMBOWEL": {
+     "type": "move",
+     "move": "DISEMBOWEL",
+     "next": "SLASH2"
+    },
+    "SLASH2": {
+     "type": "move",
+     "move": "SLASH2",
+     "next": "SOUL_SIPHON"
+    },
+    "SOUL_SIPHON": {
+     "type": "move",
+     "move": "SOUL_SIPHON",
+     "next": "SLASH"
+    }
+   }
+  },
+  "notes": "Wakes (stunned one turn, Plating removed) when it loses HP; Soul Siphon takes 2 Strength and 2 Dexterity."
+ },
+ {
+  "monster_id": "gas_bomb",
+  "game_id": "GAS_BOMB",
+  "name": "Gas Bomb",
+  "kind": "normal",
+  "hp": [
+   7,
+   7
+  ],
+  "hp_asc": [
+   8,
+   8
+  ],
+  "innate_powers": [
+   {
+    "power": "minion",
+    "amount": 1
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "EXPLODE": {
+    "name": "Explode",
+    "intents": [
+     "death_blow"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "suicide",
+      "args": {}
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "EXPLODE",
+   "nodes": {
+    "EXPLODE": {
+     "type": "move",
+     "move": "EXPLODE",
+     "next": "EXPLODE"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "living_fog",
+  "game_id": "LIVING_FOG",
+  "name": "Living Fog",
+  "kind": "normal",
+  "hp": [
+   80,
+   80
+  ],
+  "hp_asc": [
+   82,
+   82
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "ADVANCED_GAS": {
+    "name": "Advanced Gas",
+    "intents": [
+     "attack",
+     "card_debuff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "smoggy",
+       "amount": 1,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "BLOAT": {
+    "name": "Bloat",
+    "intents": [
+     "attack",
+     "summon"
+    ],
+    "effects": [
+     {
+      "verb": "summon",
+      "args": {
+       "monster": "gas_bomb",
+       "where": "before",
+       "max_alive": 5
+      }
+     },
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        5,
+        6,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "SUPER_GAS_BLAST": {
+    "name": "Super Gas Blast",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "ADVANCED_GAS",
+   "nodes": {
+    "ADVANCED_GAS": {
+     "type": "move",
+     "move": "ADVANCED_GAS",
+     "next": "BLOAT"
+    },
+    "BLOAT": {
+     "type": "move",
+     "move": "BLOAT",
+     "next": "SUPER_GAS_BLAST"
+    },
+    "SUPER_GAS_BLAST": {
+     "type": "move",
+     "move": "SUPER_GAS_BLAST",
+     "next": "BLOAT"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "phantasmal_gardener",
+  "game_id": "PHANTASMAL_GARDENER",
+  "name": "Phantasmal Gardener",
+  "kind": "elite",
+  "hp": [
+   26,
+   31
+  ],
+  "hp_asc": [
+   27,
+   32
+  ],
+  "innate_powers": [
+   {
+    "power": "skittish",
+    "amount": [
+     6,
+     7,
+     8
+    ]
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "BITE": {
+    "name": "Bite",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": 5
+      }
+     }
+    ]
+   },
+   "LASH": {
+    "name": "Lash",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": 7
+      }
+     }
+    ]
+   },
+   "FLAIL": {
+    "name": "Flail",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": 1,
+       "hits": 3
+      }
+     }
+    ]
+   },
+   "ENLARGE": {
+    "name": "Enlarge",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": [
+        2,
+        3,
+        9
+       ],
+       "target": "self"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "START",
+   "nodes": {
+    "BITE": {
+     "type": "move",
+     "move": "BITE",
+     "next": "LASH"
+    },
+    "LASH": {
+     "type": "move",
+     "move": "LASH",
+     "next": "FLAIL"
+    },
+    "FLAIL": {
+     "type": "move",
+     "move": "FLAIL",
+     "next": "ENLARGE"
+    },
+    "ENLARGE": {
+     "type": "move",
+     "move": "ENLARGE",
+     "next": "BITE"
+    },
+    "START": {
+     "type": "conditional",
+     "branches": [
+      {
+       "to": "FLAIL",
+       "if": "kind_index",
+       "arg": 0
+      },
+      {
+       "to": "BITE",
+       "if": "kind_index",
+       "arg": 1
+      },
+      {
+       "to": "LASH",
+       "if": "kind_index",
+       "arg": 2
+      },
+      {
+       "to": "ENLARGE"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "punch_construct",
+  "game_id": "PUNCH_CONSTRUCT",
+  "name": "Punch Construct",
+  "kind": "normal",
+  "hp": [
+   55,
+   55
+  ],
+  "hp_asc": [
+   60,
+   60
+  ],
+  "innate_powers": [
+   {
+    "power": "artifact",
+    "amount": 1
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "READY": {
+    "name": "Ready",
+    "intents": [
+     "defend"
+    ],
+    "effects": [
+     {
+      "verb": "block",
+      "args": {
+       "amount": 10
+      }
+     }
+    ]
+   },
+   "FAST_PUNCH": {
+    "name": "Fast Punch",
+    "intents": [
+     "attack",
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        5,
+        6,
+        9
+       ],
+       "hits": 2
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "frail",
+       "amount": 1,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "STRONG_PUNCH": {
+    "name": "Strong Punch",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        14,
+        16,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "READY",
+   "nodes": {
+    "READY": {
+     "type": "move",
+     "move": "READY",
+     "next": "FAST_PUNCH"
+    },
+    "FAST_PUNCH": {
+     "type": "move",
+     "move": "FAST_PUNCH",
+     "next": "STRONG_PUNCH"
+    },
+    "STRONG_PUNCH": {
+     "type": "move",
+     "move": "STRONG_PUNCH",
+     "next": "READY"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "seapunk",
+  "game_id": "SEAPUNK",
+  "name": "Seapunk",
+  "kind": "normal",
+  "hp": [
+   44,
+   46
+  ],
+  "hp_asc": [
+   47,
+   49
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "SEA_KICK": {
+    "name": "Sea Kick",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        11,
+        13,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "SPINNING_KICK": {
+    "name": "Spinning Kick",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": 2,
+       "hits": 4
+      }
+     }
+    ]
+   },
+   "BUBBLE_BURP": {
+    "name": "Bubble Burp",
+    "intents": [
+     "buff",
+     "defend"
+    ],
+    "effects": [
+     {
+      "verb": "block",
+      "args": {
+       "amount": [
+        7,
+        8,
+        8
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": [
+        1,
+        2,
+        9
+       ],
+       "target": "self"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "SEA_KICK",
+   "nodes": {
+    "SEA_KICK": {
+     "type": "move",
+     "move": "SEA_KICK",
+     "next": "SPINNING_KICK"
+    },
+    "SPINNING_KICK": {
+     "type": "move",
+     "move": "SPINNING_KICK",
+     "next": "BUBBLE_BURP"
+    },
+    "BUBBLE_BURP": {
+     "type": "move",
+     "move": "BUBBLE_BURP",
+     "next": "SEA_KICK"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "sewer_clam",
+  "game_id": "SEWER_CLAM",
+  "name": "Sewer Clam",
+  "kind": "normal",
+  "hp": [
+   56,
+   56
+  ],
+  "hp_asc": [
+   58,
+   58
+  ],
+  "innate_powers": [
+   {
+    "power": "plating",
+    "amount": 9
+   }
+  ],
+  "starting_block": 9,
+  "moves": {
+   "JET": {
+    "name": "Jet",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        10,
+        11,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "PRESSURIZE": {
+    "name": "Pressurize",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 4,
+       "target": "self"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "JET",
+   "nodes": {
+    "JET": {
+     "type": "move",
+     "move": "JET",
+     "next": "PRESSURIZE"
+    },
+    "PRESSURIZE": {
+     "type": "move",
+     "move": "PRESSURIZE",
+     "next": "JET"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "skulking_colony",
+  "game_id": "SKULKING_COLONY",
+  "name": "Skulking Colony",
+  "kind": "elite",
+  "hp": [
+   75,
+   75
+  ],
+  "hp_asc": [
+   80,
+   80
+  ],
+  "innate_powers": [
+   {
+    "power": "hardened_shell",
+    "amount": 20
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "ZOOM": {
+    "name": "Zoom",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        14,
+        16,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "ZOOM_MOVE_2": {
+    "name": "Zoom",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        14,
+        16,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "INERTIA": {
+    "name": "Inertia",
+    "intents": [
+     "attack",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        9,
+        11,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": [
+        2,
+        4,
+        9
+       ],
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "PIERCING_STABS": {
+    "name": "Piercing Stabs",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        7,
+        8,
+        9
+       ],
+       "hits": 2
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "ZOOM",
+   "nodes": {
+    "ZOOM": {
+     "type": "move",
+     "move": "ZOOM",
+     "next": "ZOOM_MOVE_2"
+    },
+    "ZOOM_MOVE_2": {
+     "type": "move",
+     "move": "ZOOM_MOVE_2",
+     "next": "INERTIA"
+    },
+    "INERTIA": {
+     "type": "move",
+     "move": "INERTIA",
+     "next": "PIERCING_STABS"
+    },
+    "PIERCING_STABS": {
+     "type": "move",
+     "move": "PIERCING_STABS",
+     "next": "ZOOM"
+    }
+   }
+  },
+  "notes": "Hardened Shell resets to 20 at the start of each player turn."
+ },
+ {
+  "monster_id": "sludge_spinner",
+  "game_id": "SLUDGE_SPINNER",
+  "name": "Sludge Spinner",
+  "kind": "normal",
+  "hp": [
+   37,
+   39
+  ],
+  "hp_asc": [
+   41,
+   42
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "OIL_SPRAY": {
+    "name": "Oil Spray",
+    "intents": [
+     "attack",
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "weak",
+       "amount": 1,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "SLAM": {
+    "name": "Slam",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        11,
+        12,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "RAGE": {
+    "name": "Rage",
+    "intents": [
+     "attack",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        6,
+        7,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 3,
+       "target": "self"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "OIL_SPRAY",
+   "nodes": {
+    "OIL_SPRAY": {
+     "type": "move",
+     "move": "OIL_SPRAY",
+     "next": "RAND"
+    },
+    "SLAM": {
+     "type": "move",
+     "move": "SLAM",
+     "next": "RAND"
+    },
+    "RAGE": {
+     "type": "move",
+     "move": "RAGE",
+     "next": "RAND"
+    },
+    "RAND": {
+     "type": "random",
+     "branches": [
+      {
+       "to": "OIL_SPRAY",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      },
+      {
+       "to": "SLAM",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      },
+      {
+       "to": "RAGE",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "soul_fysh",
+  "game_id": "SOUL_FYSH",
+  "name": "Soul Fysh",
+  "kind": "boss",
+  "hp": [
+   211,
+   211
+  ],
+  "hp_asc": [
+   221,
+   221
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "BECKON": {
+    "name": "Beckon",
+    "intents": [
+     "status"
+    ],
+    "effects": [
+     {
+      "verb": "special",
+      "args": {
+       "name": "beckon",
+       "amount": 2
+      }
+     }
+    ]
+   },
+   "DE_GAS": {
+    "name": "De-Gas",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        16,
+        17,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "GAZE": {
+    "name": "Gaze",
+    "intents": [
+     "attack",
+     "status"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        7,
+        8,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "add_card",
+      "args": {
+       "card": "beckon",
+       "pile": "discard",
+       "count": 1
+      }
+     }
+    ]
+   },
+   "FADE": {
+    "name": "Fade",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "intangible",
+       "amount": 2,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "SCREAM": {
+    "name": "Scream",
+    "intents": [
+     "attack",
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        13,
+        15,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "vulnerable",
+       "amount": 3,
+       "target": "player"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "BECKON",
+   "nodes": {
+    "BECKON": {
+     "type": "move",
+     "move": "BECKON",
+     "next": "DE_GAS"
+    },
+    "DE_GAS": {
+     "type": "move",
+     "move": "DE_GAS",
+     "next": "GAZE"
+    },
+    "GAZE": {
+     "type": "move",
+     "move": "GAZE",
+     "next": "FADE"
+    },
+    "FADE": {
+     "type": "move",
+     "move": "FADE",
+     "next": "SCREAM"
+    },
+    "SCREAM": {
+     "type": "move",
+     "move": "SCREAM",
+     "next": "BECKON"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "terror_eel",
+  "game_id": "TERROR_EEL",
+  "name": "Terror Eel",
+  "kind": "elite",
+  "hp": [
+   140,
+   140
+  ],
+  "hp_asc": [
+   150,
+   150
+  ],
+  "innate_powers": [
+   {
+    "power": "shriek",
+    "amount": [
+     70,
+     75,
+     8
+    ]
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "CRASH": {
+    "name": "Crash",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        16,
+        18,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "THRASH": {
+    "name": "Thrash",
+    "intents": [
+     "attack",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        3,
+        4,
+        9
+       ],
+       "hits": 3
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "vigor",
+       "amount": 6,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "TERROR": {
+    "name": "Terrorize",
+    "intents": [
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "vulnerable",
+       "amount": 99,
+       "target": "player"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "CRASH",
+   "nodes": {
+    "CRASH": {
+     "type": "move",
+     "move": "CRASH",
+     "next": "THRASH"
+    },
+    "THRASH": {
+     "type": "move",
+     "move": "THRASH",
+     "next": "CRASH"
+    },
+    "TERROR": {
+     "type": "move",
+     "move": "TERROR",
+     "next": "CRASH"
+    }
+   }
+  },
+  "notes": "Shriek: first time HP <= threshold it is stunned, then Terrorizes (99 Vulnerable)."
+ },
+ {
+  "monster_id": "toadpole",
+  "game_id": "TOADPOLE",
+  "name": "Toadpole",
+  "kind": "normal",
+  "hp": [
+   21,
+   25
+  ],
+  "hp_asc": [
+   22,
+   26
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "SPIKEN": {
+    "name": "Spiken",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "thorns",
+       "amount": 2,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "SPIKE_SPIT": {
+    "name": "Spike Spit",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "special",
+      "args": {
+       "name": "spike_spit"
+      }
+     },
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        3,
+        4,
+        9
+       ],
+       "hits": 3
+      }
+     }
+    ]
+   },
+   "WHIRL": {
+    "name": "Whirl",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        7,
+        8,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "START",
+   "nodes": {
+    "SPIKE_SPIT": {
+     "type": "move",
+     "move": "SPIKE_SPIT",
+     "next": "WHIRL"
+    },
+    "WHIRL": {
+     "type": "move",
+     "move": "WHIRL",
+     "next": "SPIKEN"
+    },
+    "SPIKEN": {
+     "type": "move",
+     "move": "SPIKEN",
+     "next": "SPIKE_SPIT"
+    },
+    "START": {
+     "type": "conditional",
+     "branches": [
+      {
+       "to": "SPIKEN",
+       "if": "front"
+      },
+      {
+       "to": "WHIRL"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "two_tailed_rat",
+  "game_id": "TWO_TAILED_RAT",
+  "name": "Two-Tailed Rat",
+  "kind": "normal",
+  "hp": [
+   17,
+   21
+  ],
+  "hp_asc": [
+   18,
+   22
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "SCRATCH": {
+    "name": "Scratch",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "DISEASE_BITE": {
+    "name": "Disease Bite",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        6,
+        7,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "SCREECH": {
+    "name": "Screech",
+    "intents": [
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "frail",
+       "amount": 1,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "CALL_FOR_BACKUP": {
+    "name": "Call for Backup",
+    "intents": [
+     "summon"
+    ],
+    "effects": [
+     {
+      "verb": "special",
+      "args": {
+       "name": "rat_backup"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "START",
+   "nodes": {
+    "SCRATCH": {
+     "type": "move",
+     "move": "SCRATCH",
+     "next": "rat_RAND"
+    },
+    "DISEASE_BITE": {
+     "type": "move",
+     "move": "DISEASE_BITE",
+     "next": "rat_RAND"
+    },
+    "SCREECH": {
+     "type": "move",
+     "move": "SCREECH",
+     "next": "rat_RAND"
+    },
+    "CALL_FOR_BACKUP": {
+     "type": "move",
+     "move": "CALL_FOR_BACKUP",
+     "next": "rat_RAND"
+    },
+    "START": {
+     "type": "conditional",
+     "branches": [
+      {
+       "to": "SCRATCH",
+       "if": "starter",
+       "arg": 0
+      },
+      {
+       "to": "DISEASE_BITE",
+       "if": "starter",
+       "arg": 1
+      },
+      {
+       "to": "SCREECH",
+       "if": "starter",
+       "arg": 2
+      },
+      {
+       "to": "rat_RAND"
+      }
+     ]
+    },
+    "rat_RAND": {
+     "type": "random",
+     "branches": [
+      {
+       "to": "SCRATCH",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      },
+      {
+       "to": "DISEASE_BITE",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      },
+      {
+       "to": "SCREECH",
+       "weight": 1.0,
+       "repeat": "cannot_repeat",
+       "cooldown": 3
+      },
+      {
+       "to": "CALL_FOR_BACKUP",
+       "weight": 0.75,
+       "repeat": "use_only_once"
+      }
+     ]
+    }
+   }
+  },
+  "notes": "Backup weighs 0.75 (others 1/12) while it can summon: cooldown done, < 3 backups this combat, < 5 alive, no other rat calling; otherwise 0."
+ },
+ {
+  "monster_id": "waterfall_giant",
+  "game_id": "WATERFALL_GIANT",
+  "name": "Waterfall Giant",
+  "kind": "boss",
+  "hp": [
+   240,
+   240
+  ],
+  "hp_asc": [
+   250,
+   250
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "PRESSURIZE": {
+    "name": "Pressurize",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "steam_eruption",
+       "amount": [
+        15,
+        20,
+        9
+       ],
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "STOMP": {
+    "name": "Stomp",
+    "intents": [
+     "attack",
+     "debuff",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        15,
+        16,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "weak",
+       "amount": 1,
+       "target": "player"
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "steam_eruption",
+       "amount": 3,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "RAM": {
+    "name": "Ram",
+    "intents": [
+     "attack",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        10,
+        11,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "steam_eruption",
+       "amount": 3,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "SIPHON": {
+    "name": "Siphon",
+    "intents": [
+     "heal",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "heal",
+      "args": {
+       "amount": [
+        10,
+        15,
+        8
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "steam_eruption",
+       "amount": 3,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "PRESSURE_GUN": {
+    "name": "Pressure Gun",
+    "intents": [
+     "attack",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "special",
+      "args": {
+       "name": "pressure_gun",
+       "amount": [
+        20,
+        23,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "steam_eruption",
+       "amount": 3,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "PRESSURE_UP": {
+    "name": "Pressure Up",
+    "intents": [
+     "attack",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        13,
+        14,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "steam_eruption",
+       "amount": 3,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "ABOUT_TO_BLOW": {
+    "name": "About to Blow",
+    "intents": [
+     "stun"
+    ],
+    "effects": []
+   },
+   "EXPLODE": {
+    "name": "Explode",
+    "intents": [
+     "death_blow"
+    ],
+    "effects": [
+     {
+      "verb": "special",
+      "args": {
+       "name": "explode"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "PRESSURIZE",
+   "nodes": {
+    "PRESSURIZE": {
+     "type": "move",
+     "move": "PRESSURIZE",
+     "next": "STOMP"
+    },
+    "STOMP": {
+     "type": "move",
+     "move": "STOMP",
+     "next": "RAM"
+    },
+    "RAM": {
+     "type": "move",
+     "move": "RAM",
+     "next": "SIPHON"
+    },
+    "SIPHON": {
+     "type": "move",
+     "move": "SIPHON",
+     "next": "PRESSURE_GUN"
+    },
+    "PRESSURE_GUN": {
+     "type": "move",
+     "move": "PRESSURE_GUN",
+     "next": "PRESSURE_UP"
+    },
+    "PRESSURE_UP": {
+     "type": "move",
+     "move": "PRESSURE_UP",
+     "next": "STOMP"
+    },
+    "ABOUT_TO_BLOW": {
+     "type": "move",
+     "move": "ABOUT_TO_BLOW",
+     "next": "EXPLODE"
+    },
+    "EXPLODE": {
+     "type": "move",
+     "move": "EXPLODE",
+     "next": "EXPLODE"
+    }
+   }
+  },
+  "notes": "On death with Steam Eruption: stands back up, About to Blow, then Explodes for the Steam Eruption amount. Pressure Gun gains 5 damage each time it fires."
+ }
+]

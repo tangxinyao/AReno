@@ -1,0 +1,2800 @@
+[
+ {
+  "monster_id": "bygone_effigy",
+  "game_id": "BYGONE_EFFIGY",
+  "name": "Bygone Effigy",
+  "kind": "elite",
+  "hp": [
+   127,
+   127
+  ],
+  "hp_asc": [
+   132,
+   132
+  ],
+  "innate_powers": [
+   {
+    "power": "slow",
+    "amount": 1
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "SLEEP": {
+    "name": "Sleep",
+    "intents": [
+     "sleep"
+    ],
+    "effects": []
+   },
+   "WAKE": {
+    "name": "Wake",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 10,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "SLASHES": {
+    "name": "Slashes",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        13,
+        15,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "SLEEP",
+   "nodes": {
+    "SLEEP": {
+     "type": "move",
+     "move": "SLEEP",
+     "next": "WAKE"
+    },
+    "WAKE": {
+     "type": "move",
+     "move": "WAKE",
+     "next": "SLASHES"
+    },
+    "SLASHES": {
+     "type": "move",
+     "move": "SLASHES",
+     "next": "SLASHES"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "byrdonis",
+  "game_id": "BYRDONIS",
+  "name": "Byrdonis",
+  "kind": "elite",
+  "hp": [
+   81,
+   84
+  ],
+  "hp_asc": [
+   90,
+   90
+  ],
+  "innate_powers": [
+   {
+    "power": "territorial",
+    "amount": 1
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "SWOOP": {
+    "name": "Swoop",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        17,
+        19,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "PECK": {
+    "name": "Peck",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        3,
+        4,
+        9
+       ],
+       "hits": 3
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "SWOOP",
+   "nodes": {
+    "SWOOP": {
+     "type": "move",
+     "move": "SWOOP",
+     "next": "PECK"
+    },
+    "PECK": {
+     "type": "move",
+     "move": "PECK",
+     "next": "SWOOP"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "ceremonial_beast",
+  "game_id": "CEREMONIAL_BEAST",
+  "name": "Ceremonial Beast",
+  "kind": "boss",
+  "hp": [
+   252,
+   252
+  ],
+  "hp_asc": [
+   262,
+   262
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "STAMP": {
+    "name": "Stamp",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "plow",
+       "amount": [
+        150,
+        160,
+        9
+       ],
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "PLOW": {
+    "name": "Plow",
+    "intents": [
+     "attack",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        18,
+        20,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 2,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "BEAST_CRY": {
+    "name": "Beast Cry",
+    "intents": [
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "ringing",
+       "amount": 1,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "STOMP": {
+    "name": "Stomp",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        15,
+        17,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "CRUSH": {
+    "name": "Crush",
+    "intents": [
+     "attack",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        17,
+        19,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": [
+        3,
+        4,
+        9
+       ],
+       "target": "self"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "STAMP",
+   "nodes": {
+    "STAMP": {
+     "type": "move",
+     "move": "STAMP",
+     "next": "PLOW"
+    },
+    "PLOW": {
+     "type": "move",
+     "move": "PLOW",
+     "next": "PLOW"
+    },
+    "BEAST_CRY": {
+     "type": "move",
+     "move": "BEAST_CRY",
+     "next": "STOMP"
+    },
+    "STOMP": {
+     "type": "move",
+     "move": "STOMP",
+     "next": "CRUSH"
+    },
+    "CRUSH": {
+     "type": "move",
+     "move": "CRUSH",
+     "next": "BEAST_CRY"
+    }
+   }
+  },
+  "notes": "Plow: first time HP <= threshold it is stunned, loses all Strength, then loops Beast Cry -> Stomp -> Crush."
+ },
+ {
+  "monster_id": "cubex_construct",
+  "game_id": "CUBEX_CONSTRUCT",
+  "name": "Cubex Construct",
+  "kind": "normal",
+  "hp": [
+   65,
+   65
+  ],
+  "hp_asc": [
+   70,
+   70
+  ],
+  "innate_powers": [
+   {
+    "power": "artifact",
+    "amount": 1
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "CHARGE_UP": {
+    "name": "Charge Up",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 2,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "REPEATER_BLAST": {
+    "name": "Repeater Blast",
+    "intents": [
+     "attack",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        7,
+        8,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 2,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "REPEATER_BLAST_MOVE_2": {
+    "name": "Repeater Blast",
+    "intents": [
+     "attack",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        7,
+        8,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 2,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "EXPEL": {
+    "name": "Expel",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        5,
+        6,
+        9
+       ],
+       "hits": 2
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "CHARGE_UP",
+   "nodes": {
+    "CHARGE_UP": {
+     "type": "move",
+     "move": "CHARGE_UP",
+     "next": "REPEATER_BLAST"
+    },
+    "REPEATER_BLAST": {
+     "type": "move",
+     "move": "REPEATER_BLAST",
+     "next": "REPEATER_BLAST_MOVE_2"
+    },
+    "REPEATER_BLAST_MOVE_2": {
+     "type": "move",
+     "move": "REPEATER_BLAST_MOVE_2",
+     "next": "EXPEL"
+    },
+    "EXPEL": {
+     "type": "move",
+     "move": "EXPEL",
+     "next": "REPEATER_BLAST"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "flyconid",
+  "game_id": "FLYCONID",
+  "name": "Flyconid",
+  "kind": "normal",
+  "hp": [
+   47,
+   49
+  ],
+  "hp_asc": [
+   51,
+   53
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "VULNERABLE_SPORES": {
+    "name": "Vulnerable Spores",
+    "intents": [
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "vulnerable",
+       "amount": 2,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "FRAIL_SPORES": {
+    "name": "Frail Spores",
+    "intents": [
+     "attack",
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "frail",
+       "amount": 2,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "SMASH": {
+    "name": "Smash",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        11,
+        12,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "INITIAL",
+   "nodes": {
+    "VULNERABLE_SPORES": {
+     "type": "move",
+     "move": "VULNERABLE_SPORES",
+     "next": "RAND"
+    },
+    "FRAIL_SPORES": {
+     "type": "move",
+     "move": "FRAIL_SPORES",
+     "next": "RAND"
+    },
+    "SMASH": {
+     "type": "move",
+     "move": "SMASH",
+     "next": "RAND"
+    },
+    "INITIAL": {
+     "type": "random",
+     "branches": [
+      {
+       "to": "FRAIL_SPORES",
+       "weight": 1.0,
+       "repeat": "can_repeat"
+      },
+      {
+       "to": "SMASH",
+       "weight": 1.0,
+       "repeat": "can_repeat"
+      }
+     ]
+    },
+    "RAND": {
+     "type": "random",
+     "branches": [
+      {
+       "to": "VULNERABLE_SPORES",
+       "weight": 1.0,
+       "repeat": "cannot_repeat",
+       "cooldown": 3
+      },
+      {
+       "to": "FRAIL_SPORES",
+       "weight": 1.0,
+       "repeat": "cannot_repeat",
+       "cooldown": 2
+      },
+      {
+       "to": "SMASH",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "leaf_slime_m",
+  "game_id": "LEAF_SLIME_M",
+  "name": "Leaf Slime (M)",
+  "kind": "normal",
+  "hp": [
+   32,
+   35
+  ],
+  "hp_asc": [
+   33,
+   36
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "CLUMP_SHOT": {
+    "name": "Clump Shot",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "STICKY_SHOT": {
+    "name": "Sticky Shot",
+    "intents": [
+     "status"
+    ],
+    "effects": [
+     {
+      "verb": "add_card",
+      "args": {
+       "card": "slimed",
+       "pile": "discard",
+       "count": 2
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "CLUMP_SHOT",
+   "nodes": {
+    "CLUMP_SHOT": {
+     "type": "move",
+     "move": "CLUMP_SHOT",
+     "next": "STICKY_SHOT"
+    },
+    "STICKY_SHOT": {
+     "type": "move",
+     "move": "STICKY_SHOT",
+     "next": "CLUMP_SHOT"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "twig_slime_m",
+  "game_id": "TWIG_SLIME_M",
+  "name": "Twig Slime (M)",
+  "kind": "normal",
+  "hp": [
+   26,
+   28
+  ],
+  "hp_asc": [
+   27,
+   29
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "POKEY_POUNCE": {
+    "name": "Pokey Pounce",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        11,
+        12,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "STICKY_SHOT": {
+    "name": "Sticky Shot",
+    "intents": [
+     "status"
+    ],
+    "effects": [
+     {
+      "verb": "add_card",
+      "args": {
+       "card": "slimed",
+       "pile": "discard",
+       "count": 1
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "STICKY_SHOT",
+   "nodes": {
+    "POKEY_POUNCE": {
+     "type": "move",
+     "move": "POKEY_POUNCE",
+     "next": "RAND"
+    },
+    "STICKY_SHOT": {
+     "type": "move",
+     "move": "STICKY_SHOT",
+     "next": "RAND"
+    },
+    "RAND": {
+     "type": "random",
+     "branches": [
+      {
+       "to": "POKEY_POUNCE",
+       "weight": 1.0,
+       "repeat": "can_repeat_x",
+       "max_times": 2
+      },
+      {
+       "to": "STICKY_SHOT",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "leaf_slime_s",
+  "game_id": "LEAF_SLIME_S",
+  "name": "Leaf Slime (S)",
+  "kind": "normal",
+  "hp": [
+   11,
+   15
+  ],
+  "hp_asc": [
+   12,
+   16
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "TACKLE": {
+    "name": "Tackle",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        3,
+        4,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "GOOP": {
+    "name": "Goop",
+    "intents": [
+     "status"
+    ],
+    "effects": [
+     {
+      "verb": "add_card",
+      "args": {
+       "card": "slimed",
+       "pile": "discard",
+       "count": 1
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "START",
+   "nodes": {
+    "TACKLE": {
+     "type": "move",
+     "move": "TACKLE",
+     "next": "RAND"
+    },
+    "GOOP": {
+     "type": "move",
+     "move": "GOOP",
+     "next": "RAND"
+    },
+    "START": {
+     "type": "conditional",
+     "branches": [
+      {
+       "to": "TACKLE",
+       "if": "starter",
+       "arg": 0
+      },
+      {
+       "to": "GOOP",
+       "if": "starter",
+       "arg": 1
+      },
+      {
+       "to": "RAND"
+      }
+     ]
+    },
+    "RAND": {
+     "type": "random",
+     "branches": [
+      {
+       "to": "TACKLE",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      },
+      {
+       "to": "GOOP",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "twig_slime_s",
+  "game_id": "TWIG_SLIME_S",
+  "name": "Twig Slime (S)",
+  "kind": "normal",
+  "hp": [
+   7,
+   11
+  ],
+  "hp_asc": [
+   8,
+   12
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "TACKLE": {
+    "name": "Tackle",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        4,
+        5,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "TACKLE",
+   "nodes": {
+    "TACKLE": {
+     "type": "move",
+     "move": "TACKLE",
+     "next": "TACKLE"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "eye_with_teeth",
+  "game_id": "EYE_WITH_TEETH",
+  "name": "Eye with Teeth",
+  "kind": "normal",
+  "hp": [
+   6,
+   6
+  ],
+  "hp_asc": [
+   6,
+   6
+  ],
+  "innate_powers": [
+   {
+    "power": "illusion",
+    "amount": 1
+   },
+   {
+    "power": "minion",
+    "amount": 1
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "DISTRACT": {
+    "name": "Distract",
+    "intents": [
+     "status"
+    ],
+    "effects": [
+     {
+      "verb": "add_card",
+      "args": {
+       "card": "dazed",
+       "pile": "discard",
+       "count": 3
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "DISTRACT",
+   "nodes": {
+    "DISTRACT": {
+     "type": "move",
+     "move": "DISTRACT",
+     "next": "DISTRACT"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "fogmog",
+  "game_id": "FOGMOG",
+  "name": "Fogmog",
+  "kind": "normal",
+  "hp": [
+   74,
+   74
+  ],
+  "hp_asc": [
+   78,
+   78
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "ILLUSION": {
+    "name": "Illusory Spores",
+    "intents": [
+     "summon"
+    ],
+    "effects": [
+     {
+      "verb": "summon",
+      "args": {
+       "monster": "eye_with_teeth",
+       "where": "before"
+      }
+     }
+    ]
+   },
+   "SWIPE": {
+    "name": "Thwack",
+    "intents": [
+     "attack",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 1,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "SWIPE_RANDOM": {
+    "name": "Thwack",
+    "intents": [
+     "attack",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 1,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "HEADBUTT": {
+    "name": "Headbutt",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        14,
+        16,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "ILLUSION",
+   "nodes": {
+    "ILLUSION": {
+     "type": "move",
+     "move": "ILLUSION",
+     "next": "SWIPE"
+    },
+    "SWIPE": {
+     "type": "move",
+     "move": "SWIPE",
+     "next": "BRANCH"
+    },
+    "SWIPE_RANDOM": {
+     "type": "move",
+     "move": "SWIPE_RANDOM",
+     "next": "HEADBUTT"
+    },
+    "HEADBUTT": {
+     "type": "move",
+     "move": "HEADBUTT",
+     "next": "SWIPE"
+    },
+    "BRANCH": {
+     "type": "random",
+     "branches": [
+      {
+       "to": "SWIPE_RANDOM",
+       "weight": 0.4,
+       "repeat": "cannot_repeat"
+      },
+      {
+       "to": "HEADBUTT",
+       "weight": 0.6,
+       "repeat": "cannot_repeat"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "fuzzy_wurm_crawler",
+  "game_id": "FUZZY_WURM_CRAWLER",
+  "name": "Fuzzy Wurm Crawler",
+  "kind": "normal",
+  "hp": [
+   55,
+   57
+  ],
+  "hp_asc": [
+   58,
+   59
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "FIRST_ACID_GOOP": {
+    "name": "Acid Goop",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        4,
+        6,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "INHALE": {
+    "name": "Inhale",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 7,
+       "target": "self"
+      }
+     }
+    ]
+   },
+   "ACID_GOOP": {
+    "name": "Acid Goop",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        4,
+        6,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "FIRST_ACID_GOOP",
+   "nodes": {
+    "FIRST_ACID_GOOP": {
+     "type": "move",
+     "move": "FIRST_ACID_GOOP",
+     "next": "INHALE"
+    },
+    "INHALE": {
+     "type": "move",
+     "move": "INHALE",
+     "next": "ACID_GOOP"
+    },
+    "ACID_GOOP": {
+     "type": "move",
+     "move": "ACID_GOOP",
+     "next": "FIRST_ACID_GOOP"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "inklet",
+  "game_id": "INKLET",
+  "name": "Inklet",
+  "kind": "normal",
+  "hp": [
+   11,
+   17
+  ],
+  "hp_asc": [
+   12,
+   18
+  ],
+  "innate_powers": [
+   {
+    "power": "slippery",
+    "amount": 1
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "JAB": {
+    "name": "Jab",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        3,
+        4,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "WHIRLWIND": {
+    "name": "Whirlwind",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        2,
+        3,
+        9
+       ],
+       "hits": 3
+      }
+     }
+    ]
+   },
+   "PIERCING_GAZE": {
+    "name": "Piercing Gaze",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        10,
+        11,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "START",
+   "nodes": {
+    "JAB": {
+     "type": "move",
+     "move": "JAB",
+     "next": "RAND"
+    },
+    "WHIRLWIND": {
+     "type": "move",
+     "move": "WHIRLWIND",
+     "next": "JAB"
+    },
+    "PIERCING_GAZE": {
+     "type": "move",
+     "move": "PIERCING_GAZE",
+     "next": "JAB"
+    },
+    "START": {
+     "type": "conditional",
+     "branches": [
+      {
+       "to": "WHIRLWIND",
+       "if": "kind_index",
+       "arg": 1
+      },
+      {
+       "to": "JAB"
+      }
+     ]
+    },
+    "RAND": {
+     "type": "random",
+     "branches": [
+      {
+       "to": "PIERCING_GAZE",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      },
+      {
+       "to": "WHIRLWIND",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "mawler",
+  "game_id": "MAWLER",
+  "name": "Mawler",
+  "kind": "normal",
+  "hp": [
+   72,
+   72
+  ],
+  "hp_asc": [
+   76,
+   76
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "RIP_AND_TEAR": {
+    "name": "Rip and Tear",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        14,
+        16,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "ROAR": {
+    "name": "Roar",
+    "intents": [
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "vulnerable",
+       "amount": 3,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "CLAW": {
+    "name": "Claw",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        4,
+        5,
+        9
+       ],
+       "hits": 2
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "CLAW",
+   "nodes": {
+    "RIP_AND_TEAR": {
+     "type": "move",
+     "move": "RIP_AND_TEAR",
+     "next": "RAND"
+    },
+    "ROAR": {
+     "type": "move",
+     "move": "ROAR",
+     "next": "RAND"
+    },
+    "CLAW": {
+     "type": "move",
+     "move": "CLAW",
+     "next": "RAND"
+    },
+    "RAND": {
+     "type": "random",
+     "branches": [
+      {
+       "to": "RIP_AND_TEAR",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      },
+      {
+       "to": "ROAR",
+       "weight": 1.0,
+       "repeat": "use_only_once"
+      },
+      {
+       "to": "CLAW",
+       "weight": 1.0,
+       "repeat": "cannot_repeat"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "nibbit",
+  "game_id": "NIBBIT",
+  "name": "Nibbit",
+  "kind": "normal",
+  "hp": [
+   42,
+   46
+  ],
+  "hp_asc": [
+   44,
+   48
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "BUTT": {
+    "name": "Butt",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        12,
+        13,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "SLICE": {
+    "name": "Slice",
+    "intents": [
+     "attack",
+     "defend"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        6,
+        7,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "block",
+      "args": {
+       "amount": [
+        5,
+        6,
+        8
+       ]
+      }
+     }
+    ]
+   },
+   "HISS": {
+    "name": "Hiss",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": [
+        2,
+        3,
+        9
+       ],
+       "target": "self"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "INIT",
+   "nodes": {
+    "BUTT": {
+     "type": "move",
+     "move": "BUTT",
+     "next": "SLICE"
+    },
+    "SLICE": {
+     "type": "move",
+     "move": "SLICE",
+     "next": "HISS"
+    },
+    "HISS": {
+     "type": "move",
+     "move": "HISS",
+     "next": "BUTT"
+    },
+    "INIT": {
+     "type": "conditional",
+     "branches": [
+      {
+       "to": "BUTT",
+       "if": "alone"
+      },
+      {
+       "to": "SLICE",
+       "if": "front"
+      },
+      {
+       "to": "HISS"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "shrinker_beetle",
+  "game_id": "SHRINKER_BEETLE",
+  "name": "Shrinker Beetle",
+  "kind": "normal",
+  "hp": [
+   38,
+   40
+  ],
+  "hp_asc": [
+   40,
+   42
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "SHRINKER": {
+    "name": "Shrinker",
+    "intents": [
+     "strong_debuff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "shrink",
+       "amount": 1,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "CHOMP": {
+    "name": "Chomp",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        7,
+        8,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "STOMP": {
+    "name": "Stomp",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        13,
+        14,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "SHRINKER",
+   "nodes": {
+    "SHRINKER": {
+     "type": "move",
+     "move": "SHRINKER",
+     "next": "CHOMP"
+    },
+    "CHOMP": {
+     "type": "move",
+     "move": "CHOMP",
+     "next": "STOMP"
+    },
+    "STOMP": {
+     "type": "move",
+     "move": "STOMP",
+     "next": "CHOMP"
+    }
+   }
+  },
+  "notes": "Shrink lasts until the beetle dies."
+ },
+ {
+  "monster_id": "phrog_parasite",
+  "game_id": "PHROG_PARASITE",
+  "name": "Phrog Parasite",
+  "kind": "elite",
+  "hp": [
+   61,
+   64
+  ],
+  "hp_asc": [
+   66,
+   68
+  ],
+  "innate_powers": [
+   {
+    "power": "infested",
+    "amount": 4
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "INFECT": {
+    "name": "Infect",
+    "intents": [
+     "status"
+    ],
+    "effects": [
+     {
+      "verb": "add_card",
+      "args": {
+       "card": "infection",
+       "pile": "discard",
+       "count": 3
+      }
+     }
+    ]
+   },
+   "LASH": {
+    "name": "Lash",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        4,
+        5,
+        9
+       ],
+       "hits": 4
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "INFECT",
+   "nodes": {
+    "INFECT": {
+     "type": "move",
+     "move": "INFECT",
+     "next": "LASH"
+    },
+    "LASH": {
+     "type": "move",
+     "move": "LASH",
+     "next": "INFECT"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "wriggler",
+  "game_id": "WRIGGLER",
+  "name": "Wriggler",
+  "kind": "elite",
+  "hp": [
+   17,
+   21
+  ],
+  "hp_asc": [
+   18,
+   22
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "NASTY_BITE": {
+    "name": "Nasty Bite",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        6,
+        7,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "WRIGGLE": {
+    "name": "Wriggle",
+    "intents": [
+     "buff",
+     "status"
+    ],
+    "effects": [
+     {
+      "verb": "add_card",
+      "args": {
+       "card": "infection",
+       "pile": "discard",
+       "count": 1
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 2,
+       "target": "self"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "INIT",
+   "nodes": {
+    "NASTY_BITE": {
+     "type": "move",
+     "move": "NASTY_BITE",
+     "next": "WRIGGLE"
+    },
+    "WRIGGLE": {
+     "type": "move",
+     "move": "WRIGGLE",
+     "next": "NASTY_BITE"
+    },
+    "INIT": {
+     "type": "conditional",
+     "branches": [
+      {
+       "to": "NASTY_BITE",
+       "if": "kind_index",
+       "arg": 0
+      },
+      {
+       "to": "WRIGGLE",
+       "if": "kind_index",
+       "arg": 1
+      },
+      {
+       "to": "NASTY_BITE",
+       "if": "kind_index",
+       "arg": 2
+      },
+      {
+       "to": "WRIGGLE"
+      }
+     ]
+    }
+   }
+  },
+  "notes": "Spawned stunned (4 on Phrog Parasite's death); slot 1/3 bite first, 2/4 wriggle first."
+ },
+ {
+  "monster_id": "assassin_ruby_raider",
+  "game_id": "ASSASSIN_RUBY_RAIDER",
+  "name": "Assassin Raider",
+  "kind": "normal",
+  "hp": [
+   18,
+   23
+  ],
+  "hp_asc": [
+   19,
+   24
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "KILLSHOT": {
+    "name": "Killshot",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        10,
+        11,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "KILLSHOT",
+   "nodes": {
+    "KILLSHOT": {
+     "type": "move",
+     "move": "KILLSHOT",
+     "next": "KILLSHOT"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "axe_ruby_raider",
+  "game_id": "AXE_RUBY_RAIDER",
+  "name": "Axe Raider",
+  "kind": "normal",
+  "hp": [
+   20,
+   22
+  ],
+  "hp_asc": [
+   21,
+   23
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "SWING_1": {
+    "name": "Swing",
+    "intents": [
+     "attack",
+     "defend"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        5,
+        6,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "block",
+      "args": {
+       "amount": [
+        5,
+        6,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "SWING_2": {
+    "name": "Swing",
+    "intents": [
+     "attack",
+     "defend"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        5,
+        6,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "block",
+      "args": {
+       "amount": [
+        5,
+        6,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "BIG_SWING": {
+    "name": "Big Swing",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        12,
+        13,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "SWING_1",
+   "nodes": {
+    "SWING_1": {
+     "type": "move",
+     "move": "SWING_1",
+     "next": "SWING_2"
+    },
+    "SWING_2": {
+     "type": "move",
+     "move": "SWING_2",
+     "next": "BIG_SWING"
+    },
+    "BIG_SWING": {
+     "type": "move",
+     "move": "BIG_SWING",
+     "next": "SWING_1"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "brute_ruby_raider",
+  "game_id": "BRUTE_RUBY_RAIDER",
+  "name": "Brute Raider",
+  "kind": "normal",
+  "hp": [
+   30,
+   33
+  ],
+  "hp_asc": [
+   31,
+   34
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "BEAT": {
+    "name": "Beat",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        7,
+        8,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "ROAR": {
+    "name": "Roar",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 3,
+       "target": "self"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "BEAT",
+   "nodes": {
+    "BEAT": {
+     "type": "move",
+     "move": "BEAT",
+     "next": "ROAR"
+    },
+    "ROAR": {
+     "type": "move",
+     "move": "ROAR",
+     "next": "BEAT"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "crossbow_ruby_raider",
+  "game_id": "CROSSBOW_RUBY_RAIDER",
+  "name": "Crossbow Raider",
+  "kind": "normal",
+  "hp": [
+   18,
+   21
+  ],
+  "hp_asc": [
+   19,
+   22
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "RELOAD": {
+    "name": "Reload",
+    "intents": [
+     "defend"
+    ],
+    "effects": [
+     {
+      "verb": "block",
+      "args": {
+       "amount": 3
+      }
+     }
+    ]
+   },
+   "FIRE": {
+    "name": "Fire!",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        14,
+        16,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "RELOAD",
+   "nodes": {
+    "RELOAD": {
+     "type": "move",
+     "move": "RELOAD",
+     "next": "FIRE"
+    },
+    "FIRE": {
+     "type": "move",
+     "move": "FIRE",
+     "next": "RELOAD"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "tracker_ruby_raider",
+  "game_id": "TRACKER_RUBY_RAIDER",
+  "name": "Tracker Raider",
+  "kind": "normal",
+  "hp": [
+   21,
+   25
+  ],
+  "hp_asc": [
+   22,
+   26
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "TRACK": {
+    "name": "Track",
+    "intents": [
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "frail",
+       "amount": 2,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "HOUNDS": {
+    "name": "Unleash the Hounds",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": 1,
+       "hits": [
+        8,
+        9,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "TRACK",
+   "nodes": {
+    "TRACK": {
+     "type": "move",
+     "move": "TRACK",
+     "next": "HOUNDS"
+    },
+    "HOUNDS": {
+     "type": "move",
+     "move": "HOUNDS",
+     "next": "HOUNDS"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "slithering_strangler",
+  "game_id": "SLITHERING_STRANGLER",
+  "name": "Slithering Strangler",
+  "kind": "normal",
+  "hp": [
+   53,
+   55
+  ],
+  "hp_asc": [
+   54,
+   56
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "CONSTRICT": {
+    "name": "Constrict",
+    "intents": [
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "constrict",
+       "amount": 3,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "THWACK": {
+    "name": "Thwack",
+    "intents": [
+     "attack",
+     "defend"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        7,
+        8,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "block",
+      "args": {
+       "amount": 5
+      }
+     }
+    ]
+   },
+   "LASH": {
+    "name": "Lash",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        12,
+        13,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "CONSTRICT",
+   "nodes": {
+    "CONSTRICT": {
+     "type": "move",
+     "move": "CONSTRICT",
+     "next": "RAND"
+    },
+    "THWACK": {
+     "type": "move",
+     "move": "THWACK",
+     "next": "CONSTRICT"
+    },
+    "LASH": {
+     "type": "move",
+     "move": "LASH",
+     "next": "CONSTRICT"
+    },
+    "RAND": {
+     "type": "random",
+     "branches": [
+      {
+       "to": "THWACK",
+       "weight": 1.0,
+       "repeat": "can_repeat"
+      },
+      {
+       "to": "LASH",
+       "weight": 1.0,
+       "repeat": "can_repeat"
+      }
+     ]
+    }
+   }
+  },
+  "notes": "Constrict is removed when the Strangler dies."
+ },
+ {
+  "monster_id": "snapping_jaxfruit",
+  "game_id": "SNAPPING_JAXFRUIT",
+  "name": "Snapping Jaxfruit",
+  "kind": "normal",
+  "hp": [
+   31,
+   33
+  ],
+  "hp_asc": [
+   34,
+   36
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "ENERGY_ORB": {
+    "name": "Energy Orb",
+    "intents": [
+     "attack",
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        3,
+        4,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 2,
+       "target": "self"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "ENERGY_ORB",
+   "nodes": {
+    "ENERGY_ORB": {
+     "type": "move",
+     "move": "ENERGY_ORB",
+     "next": "ENERGY_ORB"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "kin_follower",
+  "game_id": "KIN_FOLLOWER",
+  "name": "Kin Follower",
+  "kind": "boss",
+  "hp": [
+   58,
+   59
+  ],
+  "hp_asc": [
+   62,
+   63
+  ],
+  "innate_powers": [
+   {
+    "power": "minion",
+    "amount": 1
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "QUICK_SLASH": {
+    "name": "Quick Slash",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": 5
+      }
+     }
+    ]
+   },
+   "BOOMERANG": {
+    "name": "Boomerang",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": 2,
+       "hits": 2
+      }
+     }
+    ]
+   },
+   "POWER_DANCE": {
+    "name": "Power Dance",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": [
+        2,
+        3,
+        9
+       ],
+       "target": "self"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "START",
+   "nodes": {
+    "QUICK_SLASH": {
+     "type": "move",
+     "move": "QUICK_SLASH",
+     "next": "BOOMERANG"
+    },
+    "BOOMERANG": {
+     "type": "move",
+     "move": "BOOMERANG",
+     "next": "POWER_DANCE"
+    },
+    "POWER_DANCE": {
+     "type": "move",
+     "move": "POWER_DANCE",
+     "next": "QUICK_SLASH"
+    },
+    "START": {
+     "type": "conditional",
+     "branches": [
+      {
+       "to": "POWER_DANCE",
+       "if": "kind_index",
+       "arg": 0
+      },
+      {
+       "to": "QUICK_SLASH"
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "kin_priest",
+  "game_id": "KIN_PRIEST",
+  "name": "Kin Priest",
+  "kind": "boss",
+  "hp": [
+   190,
+   190
+  ],
+  "hp_asc": [
+   199,
+   199
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "ORB_OF_FRAILTY": {
+    "name": "Orb of Frailty",
+    "intents": [
+     "attack",
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "frail",
+       "amount": 1,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "ORB_OF_WEAKNESS": {
+    "name": "Orb of Weakness",
+    "intents": [
+     "attack",
+     "debuff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "weak",
+       "amount": 1,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "BEAM": {
+    "name": "Soul Beam",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": 3,
+       "hits": 3
+      }
+     }
+    ]
+   },
+   "RITUAL": {
+    "name": "Dark Ritual",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": [
+        2,
+        3,
+        9
+       ],
+       "target": "self"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "ORB_OF_FRAILTY",
+   "nodes": {
+    "ORB_OF_FRAILTY": {
+     "type": "move",
+     "move": "ORB_OF_FRAILTY",
+     "next": "ORB_OF_WEAKNESS"
+    },
+    "ORB_OF_WEAKNESS": {
+     "type": "move",
+     "move": "ORB_OF_WEAKNESS",
+     "next": "BEAM"
+    },
+    "BEAM": {
+     "type": "move",
+     "move": "BEAM",
+     "next": "RITUAL"
+    },
+    "RITUAL": {
+     "type": "move",
+     "move": "RITUAL",
+     "next": "ORB_OF_FRAILTY"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "vantom",
+  "game_id": "VANTOM",
+  "name": "Vantom",
+  "kind": "boss",
+  "hp": [
+   173,
+   173
+  ],
+  "hp_asc": [
+   183,
+   183
+  ],
+  "innate_powers": [
+   {
+    "power": "slippery",
+    "amount": [
+     8,
+     9,
+     8
+    ]
+   }
+  ],
+  "starting_block": 0,
+  "moves": {
+   "INK_BLOT": {
+    "name": "Ink Blot",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        7,
+        8,
+        9
+       ]
+      }
+     }
+    ]
+   },
+   "INKY_LANCE": {
+    "name": "Inky Lance",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        6,
+        7,
+        9
+       ],
+       "hits": 2
+      }
+     }
+    ]
+   },
+   "DISMEMBER": {
+    "name": "Dismember",
+    "intents": [
+     "attack",
+     "status"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        26,
+        30,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "add_card",
+      "args": {
+       "card": "wound",
+       "pile": "discard",
+       "count": 3
+      }
+     }
+    ]
+   },
+   "PREPARE": {
+    "name": "Prepare",
+    "intents": [
+     "buff"
+    ],
+    "effects": [
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "strength",
+       "amount": 2,
+       "target": "self"
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "INK_BLOT",
+   "nodes": {
+    "INK_BLOT": {
+     "type": "move",
+     "move": "INK_BLOT",
+     "next": "INKY_LANCE"
+    },
+    "INKY_LANCE": {
+     "type": "move",
+     "move": "INKY_LANCE",
+     "next": "DISMEMBER"
+    },
+    "DISMEMBER": {
+     "type": "move",
+     "move": "DISMEMBER",
+     "next": "PREPARE"
+    },
+    "PREPARE": {
+     "type": "move",
+     "move": "PREPARE",
+     "next": "INK_BLOT"
+    }
+   }
+  }
+ },
+ {
+  "monster_id": "vine_shambler",
+  "game_id": "VINE_SHAMBLER",
+  "name": "Vine Shambler",
+  "kind": "normal",
+  "hp": [
+   61,
+   61
+  ],
+  "hp_asc": [
+   64,
+   64
+  ],
+  "innate_powers": [],
+  "starting_block": 0,
+  "moves": {
+   "SWIPE": {
+    "name": "Swipe",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        6,
+        7,
+        9
+       ],
+       "hits": 2
+      }
+     }
+    ]
+   },
+   "GRASPING_VINES": {
+    "name": "Grasping Vines",
+    "intents": [
+     "attack",
+     "card_debuff"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        8,
+        9,
+        9
+       ]
+      }
+     },
+     {
+      "verb": "apply_power",
+      "args": {
+       "power": "tangled",
+       "amount": 1,
+       "target": "player"
+      }
+     }
+    ]
+   },
+   "CHOMP": {
+    "name": "Chomp",
+    "intents": [
+     "attack"
+    ],
+    "effects": [
+     {
+      "verb": "attack",
+      "args": {
+       "damage": [
+        16,
+        18,
+        9
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "ai": {
+   "initial": "SWIPE",
+   "nodes": {
+    "SWIPE": {
+     "type": "move",
+     "move": "SWIPE",
+     "next": "GRASPING_VINES"
+    },
+    "GRASPING_VINES": {
+     "type": "move",
+     "move": "GRASPING_VINES",
+     "next": "CHOMP"
+    },
+    "CHOMP": {
+     "type": "move",
+     "move": "CHOMP",
+     "next": "SWIPE"
+    }
+   }
+  }
+ }
+]

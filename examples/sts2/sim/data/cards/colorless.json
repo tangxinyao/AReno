@@ -1,0 +1,2057 @@
+[
+ {
+  "card_id": "automation",
+  "game_id": "AUTOMATION",
+  "name": "Automation",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "energy": 1
+  },
+  "description": "Every 10 cards you draw, gain 1 Energy.",
+  "upgrade_of": "automation+1"
+ },
+ {
+  "card_id": "automation+1",
+  "game_id": "AUTOMATION",
+  "name": "Automation+",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "vars": {
+   "energy": 1
+  },
+  "description": "Every 10 cards you draw, gain 1 Energy.",
+  "upgraded_from": "automation"
+ },
+ {
+  "card_id": "believe_in_you",
+  "game_id": "BELIEVE_IN_YOU",
+  "name": "Believe in You",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "ally",
+  "cost": 0,
+  "multiplayer_only": true,
+  "vars": {
+   "energy": 2
+  },
+  "description": "Another player gains 2 Energy.",
+  "upgrade_of": "believe_in_you+1"
+ },
+ {
+  "card_id": "believe_in_you+1",
+  "game_id": "BELIEVE_IN_YOU",
+  "name": "Believe in You+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "ally",
+  "cost": 0,
+  "multiplayer_only": true,
+  "vars": {
+   "energy": 3
+  },
+  "description": "Another player gains 3 Energy.",
+  "upgraded_from": "believe_in_you"
+ },
+ {
+  "card_id": "catastrophe",
+  "game_id": "CATASTROPHE",
+  "name": "Catastrophe",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 2,
+  "vars": {
+   "cards": 2
+  },
+  "description": "Play 2 random cards from your Draw Pile.",
+  "upgrade_of": "catastrophe+1"
+ },
+ {
+  "card_id": "catastrophe+1",
+  "game_id": "CATASTROPHE",
+  "name": "Catastrophe+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 2,
+  "vars": {
+   "cards": 3
+  },
+  "description": "Play 3 random cards from your Draw Pile.",
+  "upgraded_from": "catastrophe"
+ },
+ {
+  "card_id": "coordinate",
+  "game_id": "COORDINATE",
+  "name": "Coordinate",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "ally",
+  "cost": 1,
+  "multiplayer_only": true,
+  "vars": {
+   "strength": 5
+  },
+  "description": "Give another player 5 Strength this turn.",
+  "upgrade_of": "coordinate+1"
+ },
+ {
+  "card_id": "coordinate+1",
+  "game_id": "COORDINATE",
+  "name": "Coordinate+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "ally",
+  "cost": 1,
+  "multiplayer_only": true,
+  "vars": {
+   "strength": 8
+  },
+  "description": "Give another player 8 Strength this turn.",
+  "upgraded_from": "coordinate"
+ },
+ {
+  "card_id": "dark_shackles",
+  "game_id": "DARK_SHACKLES",
+  "name": "Dark Shackles",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 0,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "strength_loss": 9
+  },
+  "description": "Enemy loses 9 Strength this turn.",
+  "upgrade_of": "dark_shackles+1"
+ },
+ {
+  "card_id": "dark_shackles+1",
+  "game_id": "DARK_SHACKLES",
+  "name": "Dark Shackles+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 0,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "strength_loss": 15
+  },
+  "description": "Enemy loses 15 Strength this turn.",
+  "upgraded_from": "dark_shackles"
+ },
+ {
+  "card_id": "discovery",
+  "game_id": "DISCOVERY",
+  "name": "Discovery",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "description": "Choose 1 of 3 random cards to add into your Hand. It's free to play this turn.",
+  "upgrade_of": "discovery+1"
+ },
+ {
+  "card_id": "discovery+1",
+  "game_id": "DISCOVERY",
+  "name": "Discovery+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "description": "Choose 1 of 3 random cards to add into your Hand. It's free to play this turn.",
+  "upgraded_from": "discovery"
+ },
+ {
+  "card_id": "dramatic_entrance",
+  "game_id": "DRAMATIC_ENTRANCE",
+  "name": "Dramatic Entrance",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "all_enemies",
+  "cost": 0,
+  "keywords": [
+   "exhaust",
+   "innate"
+  ],
+  "vars": {
+   "damage": 11
+  },
+  "description": "Deal 11 damage to ALL enemies.",
+  "upgrade_of": "dramatic_entrance+1"
+ },
+ {
+  "card_id": "dramatic_entrance+1",
+  "game_id": "DRAMATIC_ENTRANCE",
+  "name": "Dramatic Entrance+",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "all_enemies",
+  "cost": 0,
+  "keywords": [
+   "exhaust",
+   "innate"
+  ],
+  "vars": {
+   "damage": 15
+  },
+  "description": "Deal 15 damage to ALL enemies.",
+  "upgraded_from": "dramatic_entrance"
+ },
+ {
+  "card_id": "equilibrium",
+  "game_id": "EQUILIBRIUM",
+  "name": "Equilibrium",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 2,
+  "vars": {
+   "equilibrium": 1,
+   "block": 13
+  },
+  "description": "Gain 13 Block. Retain your Hand this turn.",
+  "upgrade_of": "equilibrium+1"
+ },
+ {
+  "card_id": "equilibrium+1",
+  "game_id": "EQUILIBRIUM",
+  "name": "Equilibrium+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 2,
+  "vars": {
+   "equilibrium": 1,
+   "block": 16
+  },
+  "description": "Gain 16 Block. Retain your Hand this turn.",
+  "upgraded_from": "equilibrium"
+ },
+ {
+  "card_id": "fasten",
+  "game_id": "FASTEN",
+  "name": "Fasten",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "tags": [
+   "defend"
+  ],
+  "vars": {
+   "extra_block": 4
+  },
+  "description": "Gain an additional 4 Block from Defend cards.",
+  "upgrade_of": "fasten+1"
+ },
+ {
+  "card_id": "fasten+1",
+  "game_id": "FASTEN",
+  "name": "Fasten+",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "tags": [
+   "defend"
+  ],
+  "vars": {
+   "extra_block": 6
+  },
+  "description": "Gain an additional 6 Block from Defend cards.",
+  "upgraded_from": "fasten"
+ },
+ {
+  "card_id": "finesse",
+  "game_id": "FINESSE",
+  "name": "Finesse",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "vars": {
+   "block": 4,
+   "cards": 1
+  },
+  "description": "Gain 4 Block. Draw 1 card.",
+  "upgrade_of": "finesse+1"
+ },
+ {
+  "card_id": "finesse+1",
+  "game_id": "FINESSE",
+  "name": "Finesse+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "vars": {
+   "block": 7,
+   "cards": 1
+  },
+  "description": "Gain 7 Block. Draw 1 card.",
+  "upgraded_from": "finesse"
+ },
+ {
+  "card_id": "fisticuffs",
+  "game_id": "FISTICUFFS",
+  "name": "Fisticuffs",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 7
+  },
+  "description": "Deal 7 damage. Gain Block equal to damage dealt.",
+  "upgrade_of": "fisticuffs+1"
+ },
+ {
+  "card_id": "fisticuffs+1",
+  "game_id": "FISTICUFFS",
+  "name": "Fisticuffs+",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 9
+  },
+  "description": "Deal 9 damage. Gain Block equal to damage dealt.",
+  "upgraded_from": "fisticuffs"
+ },
+ {
+  "card_id": "flash_of_steel",
+  "game_id": "FLASH_OF_STEEL",
+  "name": "Flash of Steel",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 0,
+  "vars": {
+   "damage": 5,
+   "cards": 1
+  },
+  "description": "Deal 5 damage. Draw 1 card.",
+  "upgrade_of": "flash_of_steel+1"
+ },
+ {
+  "card_id": "flash_of_steel+1",
+  "game_id": "FLASH_OF_STEEL",
+  "name": "Flash of Steel+",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 0,
+  "vars": {
+   "damage": 8,
+   "cards": 1
+  },
+  "description": "Deal 8 damage. Draw 1 card.",
+  "upgraded_from": "flash_of_steel"
+ },
+ {
+  "card_id": "gang_up",
+  "game_id": "GANG_UP",
+  "name": "Gang Up",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "multiplayer_only": true,
+  "vars": {
+   "calculation_base": 5,
+   "extra_damage": 5,
+   "calculated_damage": 5
+  },
+  "description": "Deal 5 damage. Deals 5 additional damage for each time another player has attacked the enemy this turn.",
+  "upgrade_of": "gang_up+1"
+ },
+ {
+  "card_id": "gang_up+1",
+  "game_id": "GANG_UP",
+  "name": "Gang Up+",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "multiplayer_only": true,
+  "vars": {
+   "calculation_base": 5,
+   "extra_damage": 7,
+   "calculated_damage": 5
+  },
+  "description": "Deal 5 damage. Deals 7 additional damage for each time another player has attacked the enemy this turn.",
+  "upgraded_from": "gang_up"
+ },
+ {
+  "card_id": "huddle_up",
+  "game_id": "HUDDLE_UP",
+  "name": "Huddle Up",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "all_allies",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "multiplayer_only": true,
+  "vars": {
+   "cards": 2
+  },
+  "description": "ALL players draw 2 cards.",
+  "upgrade_of": "huddle_up+1"
+ },
+ {
+  "card_id": "huddle_up+1",
+  "game_id": "HUDDLE_UP",
+  "name": "Huddle Up+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "all_allies",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "multiplayer_only": true,
+  "vars": {
+   "cards": 3
+  },
+  "description": "ALL players draw 3 cards.",
+  "upgraded_from": "huddle_up"
+ },
+ {
+  "card_id": "impatience",
+  "game_id": "IMPATIENCE",
+  "name": "Impatience",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "vars": {
+   "cards": 2
+  },
+  "description": "If you have no Attacks in your Hand, draw 2 cards.",
+  "upgrade_of": "impatience+1"
+ },
+ {
+  "card_id": "impatience+1",
+  "game_id": "IMPATIENCE",
+  "name": "Impatience+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "vars": {
+   "cards": 3
+  },
+  "description": "If you have no Attacks in your Hand, draw 3 cards.",
+  "upgraded_from": "impatience"
+ },
+ {
+  "card_id": "intercept",
+  "game_id": "INTERCEPT",
+  "name": "Intercept",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "ally",
+  "cost": 1,
+  "multiplayer_only": true,
+  "vars": {
+   "block": 9
+  },
+  "description": "Gain 9 Block. Redirect all incoming attacks that would be dealt to another player this turn to you.",
+  "upgrade_of": "intercept+1"
+ },
+ {
+  "card_id": "intercept+1",
+  "game_id": "INTERCEPT",
+  "name": "Intercept+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "ally",
+  "cost": 1,
+  "multiplayer_only": true,
+  "vars": {
+   "block": 13
+  },
+  "description": "Gain 13 Block. Redirect all incoming attacks that would be dealt to another player this turn to you.",
+  "upgraded_from": "intercept"
+ },
+ {
+  "card_id": "jack_of_all_trades",
+  "game_id": "JACK_OF_ALL_TRADES",
+  "name": "Jack of All Trades",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "cards": 1
+  },
+  "description": "Add 1 random Colorless card into your Hand.",
+  "upgrade_of": "jack_of_all_trades+1"
+ },
+ {
+  "card_id": "jack_of_all_trades+1",
+  "game_id": "JACK_OF_ALL_TRADES",
+  "name": "Jack of All Trades+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "cards": 2
+  },
+  "description": "Add 2 random Colorless cards into your Hand.",
+  "upgraded_from": "jack_of_all_trades"
+ },
+ {
+  "card_id": "lift",
+  "game_id": "LIFT",
+  "name": "Lift",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "ally",
+  "cost": 1,
+  "multiplayer_only": true,
+  "vars": {
+   "block": 11
+  },
+  "description": "Give another player 11 Block.",
+  "upgrade_of": "lift+1"
+ },
+ {
+  "card_id": "lift+1",
+  "game_id": "LIFT",
+  "name": "Lift+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "ally",
+  "cost": 1,
+  "multiplayer_only": true,
+  "vars": {
+   "block": 16
+  },
+  "description": "Give another player 16 Block.",
+  "upgraded_from": "lift"
+ },
+ {
+  "card_id": "mind_blast",
+  "game_id": "MIND_BLAST",
+  "name": "Mind Blast",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "keywords": [
+   "innate"
+  ],
+  "vars": {
+   "calculation_base": 0,
+   "extra_damage": 1,
+   "calculated_damage": 0
+  },
+  "description": "Deal damage equal to the number of cards in your Draw Pile.",
+  "upgrade_of": "mind_blast+1"
+ },
+ {
+  "card_id": "mind_blast+1",
+  "game_id": "MIND_BLAST",
+  "name": "Mind Blast+",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 0,
+  "keywords": [
+   "innate"
+  ],
+  "vars": {
+   "calculation_base": 0,
+   "extra_damage": 1,
+   "calculated_damage": 0
+  },
+  "description": "Deal damage equal to the number of cards in your Draw Pile.",
+  "upgraded_from": "mind_blast"
+ },
+ {
+  "card_id": "omnislice",
+  "game_id": "OMNISLICE",
+  "name": "Omnislice",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 0,
+  "vars": {
+   "damage": 8
+  },
+  "description": "Deal 8 damage. Damage ALL other enemies equal to the damage dealt.",
+  "upgrade_of": "omnislice+1"
+ },
+ {
+  "card_id": "omnislice+1",
+  "game_id": "OMNISLICE",
+  "name": "Omnislice+",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 0,
+  "vars": {
+   "damage": 11
+  },
+  "description": "Deal 11 damage. Damage ALL other enemies equal to the damage dealt.",
+  "upgraded_from": "omnislice"
+ },
+ {
+  "card_id": "panache",
+  "game_id": "PANACHE",
+  "name": "Panache",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "vars": {
+   "panache_damage": 10
+  },
+  "description": "Every time you play 5 cards in a single turn, deal 10 damage to ALL enemies.",
+  "upgrade_of": "panache+1"
+ },
+ {
+  "card_id": "panache+1",
+  "game_id": "PANACHE",
+  "name": "Panache+",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "vars": {
+   "panache_damage": 14
+  },
+  "description": "Every time you play 5 cards in a single turn, deal 14 damage to ALL enemies.",
+  "upgraded_from": "panache"
+ },
+ {
+  "card_id": "panic_button",
+  "game_id": "PANIC_BUTTON",
+  "name": "Panic Button",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "turns": 2,
+   "block": 30
+  },
+  "description": "Gain 30 Block. You cannot gain Block from cards for 2 turns.",
+  "upgrade_of": "panic_button+1"
+ },
+ {
+  "card_id": "panic_button+1",
+  "game_id": "PANIC_BUTTON",
+  "name": "Panic Button+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "turns": 2,
+   "block": 40
+  },
+  "description": "Gain 40 Block. You cannot gain Block from cards for 2 turns.",
+  "upgraded_from": "panic_button"
+ },
+ {
+  "card_id": "prep_time",
+  "game_id": "PREP_TIME",
+  "name": "Prep Time",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "prep_time": 4
+  },
+  "description": "At the start of your turn, gain 4 Vigor.",
+  "upgrade_of": "prep_time+1"
+ },
+ {
+  "card_id": "prep_time+1",
+  "game_id": "PREP_TIME",
+  "name": "Prep Time+",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "prep_time": 6
+  },
+  "description": "At the start of your turn, gain 6 Vigor.",
+  "upgraded_from": "prep_time"
+ },
+ {
+  "card_id": "production",
+  "game_id": "PRODUCTION",
+  "name": "Production",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "energy": 2
+  },
+  "description": "Gain 2 Energy.",
+  "upgrade_of": "production+1"
+ },
+ {
+  "card_id": "production+1",
+  "game_id": "PRODUCTION",
+  "name": "Production+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "energy": 3
+  },
+  "description": "Gain 3 Energy.",
+  "upgraded_from": "production"
+ },
+ {
+  "card_id": "prolong",
+  "game_id": "PROLONG",
+  "name": "Prolong",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "exhaust"
+  ],
+  "description": "Next turn, gain Block equal to your current Block.",
+  "upgrade_of": "prolong+1"
+ },
+ {
+  "card_id": "prolong+1",
+  "game_id": "PROLONG",
+  "name": "Prolong+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "description": "Next turn, gain Block equal to your current Block.",
+  "upgraded_from": "prolong"
+ },
+ {
+  "card_id": "prowess",
+  "game_id": "PROWESS",
+  "name": "Prowess",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "strength": 1,
+   "dexterity": 1
+  },
+  "description": "Gain 1 Strength. Gain 1 Dexterity.",
+  "upgrade_of": "prowess+1"
+ },
+ {
+  "card_id": "prowess+1",
+  "game_id": "PROWESS",
+  "name": "Prowess+",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "strength": 2,
+   "dexterity": 2
+  },
+  "description": "Gain 2 Strength. Gain 2 Dexterity.",
+  "upgraded_from": "prowess"
+ },
+ {
+  "card_id": "purity",
+  "game_id": "PURITY",
+  "name": "Purity",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "exhaust",
+   "retain"
+  ],
+  "vars": {
+   "cards": 3
+  },
+  "description": "Exhaust up to 3 cards in your Hand.",
+  "upgrade_of": "purity+1"
+ },
+ {
+  "card_id": "purity+1",
+  "game_id": "PURITY",
+  "name": "Purity+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "exhaust",
+   "retain"
+  ],
+  "vars": {
+   "cards": 5
+  },
+  "description": "Exhaust up to 5 cards in your Hand.",
+  "upgraded_from": "purity"
+ },
+ {
+  "card_id": "restlessness",
+  "game_id": "RESTLESSNESS",
+  "name": "Restlessness",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "retain"
+  ],
+  "vars": {
+   "cards": 2,
+   "energy": 2
+  },
+  "description": "If your Hand is empty, draw 2 cards and gain 2 Energy.",
+  "upgrade_of": "restlessness+1"
+ },
+ {
+  "card_id": "restlessness+1",
+  "game_id": "RESTLESSNESS",
+  "name": "Restlessness+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "retain"
+  ],
+  "vars": {
+   "cards": 3,
+   "energy": 3
+  },
+  "description": "If your Hand is empty, draw 3 cards and gain 3 Energy.",
+  "upgraded_from": "restlessness"
+ },
+ {
+  "card_id": "seeker_strike",
+  "game_id": "SEEKER_STRIKE",
+  "name": "Seeker Strike",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "tags": [
+   "strike"
+  ],
+  "vars": {
+   "damage": 9,
+   "cards": 3
+  },
+  "description": "Deal 9 damage. Choose 1 of 3 cards in your Draw Pile to add into your Hand.",
+  "upgrade_of": "seeker_strike+1"
+ },
+ {
+  "card_id": "seeker_strike+1",
+  "game_id": "SEEKER_STRIKE",
+  "name": "Seeker Strike+",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "tags": [
+   "strike"
+  ],
+  "vars": {
+   "damage": 12,
+   "cards": 3
+  },
+  "description": "Deal 12 damage. Choose 1 of 3 cards in your Draw Pile to add into your Hand.",
+  "upgraded_from": "seeker_strike"
+ },
+ {
+  "card_id": "shockwave",
+  "game_id": "SHOCKWAVE",
+  "name": "Shockwave",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "all_enemies",
+  "cost": 2,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "power": 3
+  },
+  "description": "Apply 3 Weak and Vulnerable to ALL enemies.",
+  "upgrade_of": "shockwave+1"
+ },
+ {
+  "card_id": "shockwave+1",
+  "game_id": "SHOCKWAVE",
+  "name": "Shockwave+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "all_enemies",
+  "cost": 2,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "power": 5
+  },
+  "description": "Apply 5 Weak and Vulnerable to ALL enemies.",
+  "upgraded_from": "shockwave"
+ },
+ {
+  "card_id": "splash",
+  "game_id": "SPLASH",
+  "name": "Splash",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "description": "Choose 1 of 3 random Attacks from another character to add into your Hand. It's free to play this turn.",
+  "upgrade_of": "splash+1"
+ },
+ {
+  "card_id": "splash+1",
+  "game_id": "SPLASH",
+  "name": "Splash+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "description": "Choose 1 of 3 random Upgraded Attacks from another character to add into your Hand. It's free to play this turn.",
+  "upgraded_from": "splash"
+ },
+ {
+  "card_id": "stratagem",
+  "game_id": "STRATAGEM",
+  "name": "Stratagem",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "description": "Whenever you shuffle your Draw Pile, choose a card from it to put into your Hand.",
+  "upgrade_of": "stratagem+1"
+ },
+ {
+  "card_id": "stratagem+1",
+  "game_id": "STRATAGEM",
+  "name": "Stratagem+",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "description": "Whenever you shuffle your Draw Pile, choose a card from it to put into your Hand.",
+  "upgraded_from": "stratagem"
+ },
+ {
+  "card_id": "tag_team",
+  "game_id": "TAG_TEAM",
+  "name": "Tag Team",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 2,
+  "multiplayer_only": true,
+  "vars": {
+   "damage": 11
+  },
+  "description": "Deal 11 damage. The next Attack another player plays on the enemy is played an extra time.",
+  "upgrade_of": "tag_team+1"
+ },
+ {
+  "card_id": "tag_team+1",
+  "game_id": "TAG_TEAM",
+  "name": "Tag Team+",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 2,
+  "multiplayer_only": true,
+  "vars": {
+   "damage": 15
+  },
+  "description": "Deal 15 damage. The next Attack another player plays on the enemy is played an extra time.",
+  "upgraded_from": "tag_team"
+ },
+ {
+  "card_id": "the_bomb",
+  "game_id": "THE_BOMB",
+  "name": "The Bomb",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 2,
+  "vars": {
+   "turns": 3,
+   "bomb_damage": 40
+  },
+  "description": "At the end of 3 turns, deal 40 damage to ALL enemies.",
+  "upgrade_of": "the_bomb+1"
+ },
+ {
+  "card_id": "the_bomb+1",
+  "game_id": "THE_BOMB",
+  "name": "The Bomb+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 2,
+  "vars": {
+   "turns": 3,
+   "bomb_damage": 50
+  },
+  "description": "At the end of 3 turns, deal 50 damage to ALL enemies.",
+  "upgraded_from": "the_bomb"
+ },
+ {
+  "card_id": "thinking_ahead",
+  "game_id": "THINKING_AHEAD",
+  "name": "Thinking Ahead",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "cards": 2
+  },
+  "description": "Draw 2 cards. Put 1 card from your Hand on top of your Draw Pile.",
+  "upgrade_of": "thinking_ahead+1"
+ },
+ {
+  "card_id": "thinking_ahead+1",
+  "game_id": "THINKING_AHEAD",
+  "name": "Thinking Ahead+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 0,
+  "vars": {
+   "cards": 2
+  },
+  "description": "Draw 2 cards. Put 1 card from your Hand on top of your Draw Pile.",
+  "upgraded_from": "thinking_ahead"
+ },
+ {
+  "card_id": "thrumming_hatchet",
+  "game_id": "THRUMMING_HATCHET",
+  "name": "Thrumming Hatchet",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 11
+  },
+  "description": "Deal 11 damage. At the start of your next turn, return this to your Hand.",
+  "upgrade_of": "thrumming_hatchet+1"
+ },
+ {
+  "card_id": "thrumming_hatchet+1",
+  "game_id": "THRUMMING_HATCHET",
+  "name": "Thrumming Hatchet+",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 14
+  },
+  "description": "Deal 14 damage. At the start of your next turn, return this to your Hand.",
+  "upgraded_from": "thrumming_hatchet"
+ },
+ {
+  "card_id": "ultimate_defend",
+  "game_id": "ULTIMATE_DEFEND",
+  "name": "Ultimate Defend",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "tags": [
+   "defend"
+  ],
+  "vars": {
+   "block": 11
+  },
+  "description": "Gain 11 Block.",
+  "upgrade_of": "ultimate_defend+1"
+ },
+ {
+  "card_id": "ultimate_defend+1",
+  "game_id": "ULTIMATE_DEFEND",
+  "name": "Ultimate Defend+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "uncommon",
+  "target": "self",
+  "cost": 1,
+  "tags": [
+   "defend"
+  ],
+  "vars": {
+   "block": 15
+  },
+  "description": "Gain 15 Block.",
+  "upgraded_from": "ultimate_defend"
+ },
+ {
+  "card_id": "ultimate_strike",
+  "game_id": "ULTIMATE_STRIKE",
+  "name": "Ultimate Strike",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "tags": [
+   "strike"
+  ],
+  "vars": {
+   "damage": 14
+  },
+  "description": "Deal 14 damage.",
+  "upgrade_of": "ultimate_strike+1"
+ },
+ {
+  "card_id": "ultimate_strike+1",
+  "game_id": "ULTIMATE_STRIKE",
+  "name": "Ultimate Strike+",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "single_enemy",
+  "cost": 1,
+  "tags": [
+   "strike"
+  ],
+  "vars": {
+   "damage": 20
+  },
+  "description": "Deal 20 damage.",
+  "upgraded_from": "ultimate_strike"
+ },
+ {
+  "card_id": "volley",
+  "game_id": "VOLLEY",
+  "name": "Volley",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "random_enemy",
+  "cost": 0,
+  "x_cost": true,
+  "vars": {
+   "damage": 10
+  },
+  "description": "Deal 10 damage to a random enemy X times.",
+  "upgrade_of": "volley+1"
+ },
+ {
+  "card_id": "volley+1",
+  "game_id": "VOLLEY",
+  "name": "Volley+",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "uncommon",
+  "target": "random_enemy",
+  "cost": 0,
+  "x_cost": true,
+  "vars": {
+   "damage": 14
+  },
+  "description": "Deal 14 damage to a random enemy X times.",
+  "upgraded_from": "volley"
+ },
+ {
+  "card_id": "alchemize",
+  "game_id": "ALCHEMIZE",
+  "name": "Alchemize",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "generated_in_combat": false,
+  "description": "Procure a random potion.",
+  "upgrade_of": "alchemize+1"
+ },
+ {
+  "card_id": "alchemize+1",
+  "game_id": "ALCHEMIZE",
+  "name": "Alchemize+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "exhaust"
+  ],
+  "generated_in_combat": false,
+  "description": "Procure a random potion.",
+  "upgraded_from": "alchemize"
+ },
+ {
+  "card_id": "anointed",
+  "game_id": "ANOINTED",
+  "name": "Anointed",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "description": "Put every Rare card from your Draw Pile into your Hand.",
+  "upgrade_of": "anointed+1"
+ },
+ {
+  "card_id": "anointed+1",
+  "game_id": "ANOINTED",
+  "name": "Anointed+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "keywords": [
+   "exhaust",
+   "retain"
+  ],
+  "description": "Put every Rare card from your Draw Pile into your Hand.",
+  "upgraded_from": "anointed"
+ },
+ {
+  "card_id": "beacon_of_hope",
+  "game_id": "BEACON_OF_HOPE",
+  "name": "Beacon of Hope",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "multiplayer_only": true,
+  "description": "Whenever you gain Block on your turn, other players gain half that much Block.",
+  "upgrade_of": "beacon_of_hope+1"
+ },
+ {
+  "card_id": "beacon_of_hope+1",
+  "game_id": "BEACON_OF_HOPE",
+  "name": "Beacon of Hope+",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "multiplayer_only": true,
+  "description": "Whenever you gain Block on your turn, other players gain half that much Block.",
+  "keywords": [
+   "innate"
+  ],
+  "upgraded_from": "beacon_of_hope"
+ },
+ {
+  "card_id": "beat_down",
+  "game_id": "BEAT_DOWN",
+  "name": "Beat Down",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "random_enemy",
+  "cost": 3,
+  "vars": {
+   "cards": 3
+  },
+  "description": "Play 3 random Attacks from your Discard Pile.",
+  "upgrade_of": "beat_down+1"
+ },
+ {
+  "card_id": "beat_down+1",
+  "game_id": "BEAT_DOWN",
+  "name": "Beat Down+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "random_enemy",
+  "cost": 3,
+  "vars": {
+   "cards": 4
+  },
+  "description": "Play 4 random Attacks from your Discard Pile.",
+  "upgraded_from": "beat_down"
+ },
+ {
+  "card_id": "bolas",
+  "game_id": "BOLAS",
+  "name": "Bolas",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 0,
+  "vars": {
+   "damage": 3
+  },
+  "description": "Deal 3 damage. At the start of your next turn, return this to your Hand.",
+  "upgrade_of": "bolas+1"
+ },
+ {
+  "card_id": "bolas+1",
+  "game_id": "BOLAS",
+  "name": "Bolas+",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 0,
+  "vars": {
+   "damage": 4
+  },
+  "description": "Deal 4 damage. At the start of your next turn, return this to your Hand.",
+  "upgraded_from": "bolas"
+ },
+ {
+  "card_id": "calamity",
+  "game_id": "CALAMITY",
+  "name": "Calamity",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 3,
+  "description": "Whenever you play an Attack, add a random Attack into your Hand.",
+  "upgrade_of": "calamity+1"
+ },
+ {
+  "card_id": "calamity+1",
+  "game_id": "CALAMITY",
+  "name": "Calamity+",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 2,
+  "description": "Whenever you play an Attack, add a random Attack into your Hand.",
+  "upgraded_from": "calamity"
+ },
+ {
+  "card_id": "entropy",
+  "game_id": "ENTROPY",
+  "name": "Entropy",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "cards": 1
+  },
+  "description": "At the start of your turn, Transform 1 card in your Hand.",
+  "upgrade_of": "entropy+1"
+ },
+ {
+  "card_id": "entropy+1",
+  "game_id": "ENTROPY",
+  "name": "Entropy+",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "vars": {
+   "cards": 1
+  },
+  "description": "At the start of your turn, Transform 1 card in your Hand.",
+  "keywords": [
+   "innate"
+  ],
+  "upgraded_from": "entropy"
+ },
+ {
+  "card_id": "eternal_armor",
+  "game_id": "ETERNAL_ARMOR",
+  "name": "Eternal Armor",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 3,
+  "vars": {
+   "plating": 9
+  },
+  "description": "Gain 9 Plating.",
+  "upgrade_of": "eternal_armor+1"
+ },
+ {
+  "card_id": "eternal_armor+1",
+  "game_id": "ETERNAL_ARMOR",
+  "name": "Eternal Armor+",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 3,
+  "vars": {
+   "plating": 12
+  },
+  "description": "Gain 12 Plating.",
+  "upgraded_from": "eternal_armor"
+ },
+ {
+  "card_id": "gold_axe",
+  "game_id": "GOLD_AXE",
+  "name": "Gold Axe",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "calculation_base": 0,
+   "extra_damage": 1,
+   "calculated_damage": 0
+  },
+  "description": "Deal damage equal to the number of cards played this combat.",
+  "upgrade_of": "gold_axe+1"
+ },
+ {
+  "card_id": "gold_axe+1",
+  "game_id": "GOLD_AXE",
+  "name": "Gold Axe+",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "calculation_base": 0,
+   "extra_damage": 1,
+   "calculated_damage": 0
+  },
+  "description": "Deal damage equal to the number of cards played this combat.",
+  "keywords": [
+   "retain"
+  ],
+  "upgraded_from": "gold_axe"
+ },
+ {
+  "card_id": "hand_of_greed",
+  "game_id": "HAND_OF_GREED",
+  "name": "Hand of Greed",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 2,
+  "generated_in_combat": false,
+  "vars": {
+   "gold": 20,
+   "damage": 20
+  },
+  "description": "Deal 20 damage. If Fatal, gain 20 Gold.",
+  "upgrade_of": "hand_of_greed+1"
+ },
+ {
+  "card_id": "hand_of_greed+1",
+  "game_id": "HAND_OF_GREED",
+  "name": "Hand of Greed+",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 2,
+  "generated_in_combat": false,
+  "vars": {
+   "gold": 25,
+   "damage": 25
+  },
+  "description": "Deal 25 damage. If Fatal, gain 25 Gold.",
+  "upgraded_from": "hand_of_greed"
+ },
+ {
+  "card_id": "hidden_gem",
+  "game_id": "HIDDEN_GEM",
+  "name": "Hidden Gem",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "generated_in_combat": false,
+  "vars": {
+   "replay": 2
+  },
+  "description": "A random card without Replay in your Draw Pile gains Replay 2.",
+  "upgrade_of": "hidden_gem+1"
+ },
+ {
+  "card_id": "hidden_gem+1",
+  "game_id": "HIDDEN_GEM",
+  "name": "Hidden Gem+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "generated_in_combat": false,
+  "vars": {
+   "replay": 3
+  },
+  "description": "A random card without Replay in your Draw Pile gains Replay 3.",
+  "upgraded_from": "hidden_gem"
+ },
+ {
+  "card_id": "jackpot",
+  "game_id": "JACKPOT",
+  "name": "Jackpot",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 3,
+  "vars": {
+   "damage": 25,
+   "cards": 3
+  },
+  "description": "Deal 25 damage. Add 3 random 0Energy cards into your Hand.",
+  "upgrade_of": "jackpot+1"
+ },
+ {
+  "card_id": "jackpot+1",
+  "game_id": "JACKPOT",
+  "name": "Jackpot+",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 3,
+  "vars": {
+   "damage": 30,
+   "cards": 3
+  },
+  "description": "Deal 30 damage. Add 3 random Upgraded 0Energy cards into your Hand.",
+  "upgraded_from": "jackpot"
+ },
+ {
+  "card_id": "knockdown",
+  "game_id": "KNOCKDOWN",
+  "name": "Knockdown",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 3,
+  "multiplayer_only": true,
+  "vars": {
+   "damage": 10,
+   "knockdown": 2
+  },
+  "description": "Deal 10 damage. The enemy takes double damage from other players this turn.",
+  "upgrade_of": "knockdown+1"
+ },
+ {
+  "card_id": "knockdown+1",
+  "game_id": "KNOCKDOWN",
+  "name": "Knockdown+",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 3,
+  "multiplayer_only": true,
+  "vars": {
+   "damage": 14,
+   "knockdown": 3
+  },
+  "description": "Deal 14 damage. The enemy takes triple damage from other players this turn.",
+  "upgraded_from": "knockdown"
+ },
+ {
+  "card_id": "master_of_strategy",
+  "game_id": "MASTER_OF_STRATEGY",
+  "name": "Master of Strategy",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "cards": 3
+  },
+  "description": "Draw 3 cards.",
+  "upgrade_of": "master_of_strategy+1"
+ },
+ {
+  "card_id": "master_of_strategy+1",
+  "game_id": "MASTER_OF_STRATEGY",
+  "name": "Master of Strategy+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "cards": 4
+  },
+  "description": "Draw 4 cards.",
+  "upgraded_from": "master_of_strategy"
+ },
+ {
+  "card_id": "mayhem",
+  "game_id": "MAYHEM",
+  "name": "Mayhem",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 2,
+  "description": "At the start of your turn, play the top card of your Draw Pile.",
+  "upgrade_of": "mayhem+1"
+ },
+ {
+  "card_id": "mayhem+1",
+  "game_id": "MAYHEM",
+  "name": "Mayhem+",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "description": "At the start of your turn, play the top card of your Draw Pile.",
+  "upgraded_from": "mayhem"
+ },
+ {
+  "card_id": "mimic",
+  "game_id": "MIMIC",
+  "name": "Mimic",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "ally",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "multiplayer_only": true,
+  "vars": {
+   "calculation_base": 0,
+   "calculation_extra": 1
+  },
+  "description": "Gain Block equal to the Block on another player.",
+  "upgrade_of": "mimic+1"
+ },
+ {
+  "card_id": "mimic+1",
+  "game_id": "MIMIC",
+  "name": "Mimic+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "ally",
+  "cost": 1,
+  "multiplayer_only": true,
+  "vars": {
+   "calculation_base": 0,
+   "calculation_extra": 1
+  },
+  "description": "Gain Block equal to the Block on another player.",
+  "upgraded_from": "mimic"
+ },
+ {
+  "card_id": "nostalgia",
+  "game_id": "NOSTALGIA",
+  "name": "Nostalgia",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "description": "The first Attack or Skill you play each turn is placed on top of your Draw Pile.",
+  "upgrade_of": "nostalgia+1"
+ },
+ {
+  "card_id": "nostalgia+1",
+  "game_id": "NOSTALGIA",
+  "name": "Nostalgia+",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 0,
+  "description": "The first Attack or Skill you play each turn is placed on top of your Draw Pile.",
+  "upgraded_from": "nostalgia"
+ },
+ {
+  "card_id": "rally",
+  "game_id": "RALLY",
+  "name": "Rally",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "all_allies",
+  "cost": 2,
+  "multiplayer_only": true,
+  "vars": {
+   "block": 12
+  },
+  "description": "ALL players gain 12 Block.",
+  "upgrade_of": "rally+1"
+ },
+ {
+  "card_id": "rally+1",
+  "game_id": "RALLY",
+  "name": "Rally+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "all_allies",
+  "cost": 2,
+  "multiplayer_only": true,
+  "vars": {
+   "block": 17
+  },
+  "description": "ALL players gain 17 Block.",
+  "upgraded_from": "rally"
+ },
+ {
+  "card_id": "rend",
+  "game_id": "REND",
+  "name": "Rend",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 2,
+  "vars": {
+   "calculation_base": 15,
+   "extra_damage": 5,
+   "calculated_damage": 15
+  },
+  "description": "Deal 15 damage. Deals 5 additional damage for each unique debuff on the enemy.",
+  "upgrade_of": "rend+1"
+ },
+ {
+  "card_id": "rend+1",
+  "game_id": "REND",
+  "name": "Rend+",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 2,
+  "vars": {
+   "calculation_base": 18,
+   "extra_damage": 8,
+   "calculated_damage": 15
+  },
+  "description": "Deal 18 damage. Deals 8 additional damage for each unique debuff on the enemy.",
+  "upgraded_from": "rend"
+ },
+ {
+  "card_id": "rolling_boulder",
+  "game_id": "ROLLING_BOULDER",
+  "name": "Rolling Boulder",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 3,
+  "vars": {
+   "increment_amount": 5,
+   "rolling_boulder": 5
+  },
+  "description": "At the start of your turn, deal 5 damage to ALL enemies and increase this damage by 5.",
+  "upgrade_of": "rolling_boulder+1"
+ },
+ {
+  "card_id": "rolling_boulder+1",
+  "game_id": "ROLLING_BOULDER",
+  "name": "Rolling Boulder+",
+  "color": "colorless",
+  "card_type": "power",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 3,
+  "vars": {
+   "increment_amount": 5,
+   "rolling_boulder": 10
+  },
+  "description": "At the start of your turn, deal 10 damage to ALL enemies and increase this damage by 5.",
+  "upgraded_from": "rolling_boulder"
+ },
+ {
+  "card_id": "salvo",
+  "game_id": "SALVO",
+  "name": "Salvo",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 12
+  },
+  "description": "Deal 12 damage. Retain your Hand this turn.",
+  "upgrade_of": "salvo+1"
+ },
+ {
+  "card_id": "salvo+1",
+  "game_id": "SALVO",
+  "name": "Salvo+",
+  "color": "colorless",
+  "card_type": "attack",
+  "rarity": "rare",
+  "target": "single_enemy",
+  "cost": 1,
+  "vars": {
+   "damage": 16
+  },
+  "description": "Deal 16 damage. Retain your Hand this turn.",
+  "upgraded_from": "salvo"
+ },
+ {
+  "card_id": "scrawl",
+  "game_id": "SCRAWL",
+  "name": "Scrawl",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "description": "Draw cards until your Hand is full.",
+  "upgrade_of": "scrawl+1"
+ },
+ {
+  "card_id": "scrawl+1",
+  "game_id": "SCRAWL",
+  "name": "Scrawl+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 1,
+  "keywords": [
+   "exhaust",
+   "retain"
+  ],
+  "description": "Draw cards until your Hand is full.",
+  "upgraded_from": "scrawl"
+ },
+ {
+  "card_id": "secret_technique",
+  "game_id": "SECRET_TECHNIQUE",
+  "name": "Secret Technique",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "exhaust"
+  ],
+  "description": "Put a Skill from your Draw Pile into your Hand.",
+  "upgrade_of": "secret_technique+1"
+ },
+ {
+  "card_id": "secret_technique+1",
+  "game_id": "SECRET_TECHNIQUE",
+  "name": "Secret Technique+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 0,
+  "description": "Put a Skill from your Draw Pile into your Hand.",
+  "upgraded_from": "secret_technique"
+ },
+ {
+  "card_id": "secret_weapon",
+  "game_id": "SECRET_WEAPON",
+  "name": "Secret Weapon",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 0,
+  "keywords": [
+   "exhaust"
+  ],
+  "description": "Put an Attack from your Draw Pile into your Hand.",
+  "upgrade_of": "secret_weapon+1"
+ },
+ {
+  "card_id": "secret_weapon+1",
+  "game_id": "SECRET_WEAPON",
+  "name": "Secret Weapon+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 0,
+  "description": "Put an Attack from your Draw Pile into your Hand.",
+  "upgraded_from": "secret_weapon"
+ },
+ {
+  "card_id": "the_gambit",
+  "game_id": "THE_GAMBIT",
+  "name": "The Gambit",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 0,
+  "vars": {
+   "block": 50
+  },
+  "description": "Gain 50 Block. If you take unblocked attack damage this combat, die.",
+  "upgrade_of": "the_gambit+1"
+ },
+ {
+  "card_id": "the_gambit+1",
+  "game_id": "THE_GAMBIT",
+  "name": "The Gambit+",
+  "color": "colorless",
+  "card_type": "skill",
+  "rarity": "rare",
+  "target": "self",
+  "cost": 0,
+  "vars": {
+   "block": 75
+  },
+  "description": "Gain 75 Block. If you take unblocked attack damage this combat, die.",
+  "upgraded_from": "the_gambit"
+ }
+]

@@ -1,0 +1,243 @@
+[
+ {
+  "card_id": "beckon",
+  "game_id": "BECKON",
+  "name": "Beckon",
+  "color": "status",
+  "card_type": "status",
+  "rarity": "status",
+  "target": "none",
+  "cost": 1,
+  "vars": {
+   "hp_loss": 6
+  },
+  "description": "At the end of your turn, if this is in your Hand, lose 6 HP."
+ },
+ {
+  "card_id": "burn",
+  "game_id": "BURN",
+  "name": "Burn",
+  "color": "status",
+  "card_type": "status",
+  "rarity": "status",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "vars": {
+   "damage": 2
+  },
+  "description": "At the end of your turn, if this is in your Hand, take 2 damage."
+ },
+ {
+  "card_id": "dazed",
+  "game_id": "DAZED",
+  "name": "Dazed",
+  "color": "status",
+  "card_type": "status",
+  "rarity": "status",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "keywords": [
+   "ethereal"
+  ],
+  "description": ""
+ },
+ {
+  "card_id": "debris",
+  "game_id": "DEBRIS",
+  "name": "Debris",
+  "color": "status",
+  "card_type": "status",
+  "rarity": "status",
+  "target": "none",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "description": ""
+ },
+ {
+  "card_id": "frantic_escape",
+  "game_id": "FRANTIC_ESCAPE",
+  "name": "Frantic Escape",
+  "color": "status",
+  "card_type": "status",
+  "rarity": "status",
+  "target": "self",
+  "cost": 1,
+  "generated_in_combat": false,
+  "description": "Get farther away. Increase Sandpit by 1. Increase the cost of this card by 1."
+ },
+ {
+  "card_id": "infection",
+  "game_id": "INFECTION",
+  "name": "Infection",
+  "color": "status",
+  "card_type": "status",
+  "rarity": "status",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "vars": {
+   "damage": 3
+  },
+  "description": "At the end of your turn, if this is in your Hand, take 3 damage."
+ },
+ {
+  "card_id": "slimed",
+  "game_id": "SLIMED",
+  "name": "Slimed",
+  "color": "status",
+  "card_type": "status",
+  "rarity": "status",
+  "target": "none",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "cards": 1
+  },
+  "description": "Draw 1 card."
+ },
+ {
+  "card_id": "soot",
+  "game_id": "SOOT",
+  "name": "Soot",
+  "color": "status",
+  "card_type": "status",
+  "rarity": "status",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "generated_in_combat": false,
+  "description": ""
+ },
+ {
+  "card_id": "toxic",
+  "game_id": "TOXIC",
+  "name": "Toxic",
+  "color": "status",
+  "card_type": "status",
+  "rarity": "status",
+  "target": "none",
+  "cost": 1,
+  "keywords": [
+   "exhaust"
+  ],
+  "vars": {
+   "damage": 5
+  },
+  "description": "At the end of your turn, if this is in your Hand, take 5 damage."
+ },
+ {
+  "card_id": "void",
+  "game_id": "VOID",
+  "name": "Void",
+  "color": "status",
+  "card_type": "status",
+  "rarity": "status",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "keywords": [
+   "ethereal"
+  ],
+  "vars": {
+   "energy": 1
+  },
+  "description": "Whenever you draw this card, lose 1 Energy."
+ },
+ {
+  "card_id": "wither",
+  "game_id": "WITHER",
+  "name": "Wither",
+  "color": "status",
+  "card_type": "status",
+  "rarity": "status",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "vars": {
+   "damage": 3
+  },
+  "description": "At the end of your turn, if this is in your Hand, take 3 damage."
+ },
+ {
+  "card_id": "wound",
+  "game_id": "WOUND",
+  "name": "Wound",
+  "color": "status",
+  "card_type": "status",
+  "rarity": "status",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "description": ""
+ },
+ {
+  "card_id": "disintegration",
+  "game_id": "DISINTEGRATION",
+  "name": "Disintegration",
+  "color": "status",
+  "card_type": "status",
+  "rarity": "status",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "generated_in_combat": false,
+  "vars": {
+   "disintegration": 6
+  },
+  "description": "At the end of your turn, take 6 damage."
+ },
+ {
+  "card_id": "mind_rot",
+  "game_id": "MIND_ROT",
+  "name": "Mind Rot",
+  "color": "status",
+  "card_type": "status",
+  "rarity": "status",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "generated_in_combat": false,
+  "vars": {
+   "mind_rot": 1
+  },
+  "description": "Draw 1 fewer card each turn."
+ },
+ {
+  "card_id": "sloth",
+  "game_id": "SLOTH",
+  "name": "Sloth",
+  "color": "status",
+  "card_type": "status",
+  "rarity": "status",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "generated_in_combat": false,
+  "vars": {
+   "sloth": 3
+  },
+  "description": "You cannot play more than 3 cards each turn."
+ },
+ {
+  "card_id": "waste_away",
+  "game_id": "WASTE_AWAY",
+  "name": "Waste Away",
+  "color": "status",
+  "card_type": "status",
+  "rarity": "status",
+  "target": "none",
+  "cost": 0,
+  "unplayable": true,
+  "generated_in_combat": false,
+  "vars": {
+   "waste_away": 1
+  },
+  "description": "Gain 1 less Energy per turn."
+ }
+]
